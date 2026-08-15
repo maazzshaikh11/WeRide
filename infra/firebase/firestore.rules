@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: own profile only
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+
+    // Groups: members can read, any authed user can create/join
+    match /groups/{groupId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null; // joining = arrayUnion
+
+      // Locations: only the rider writes their own
+      match /locations/{riderId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == riderId;
+      }
+    }
+
+    // Hazards: any group member can read; any rider in the group can write
+    match /hazards/{clusterId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // SOS events: any rider can trigger; sender can resolve
+    match /sos_events/{sosId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null; // resolve
+    }
+
+    // Routes: readable by group members
+    match /routes/{routeId} {
+      allow read: if request.auth != null;
+      allow write: if false; // written by server API only
+    }
+
+    // FL rounds: readable by all; written by aggregation server
+    match /fl_rounds/{roundId} {
+      allow read: if request.auth != null;
+      allow write: if false; // server-side only
+    }
+
+    // Hazard reports (raw): group members read; riders write own
+    match /hazard_reports/{reportId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "vox_signal",
+  "description": "Internal to Person D. WebRTC signaling + voice_active broadcast. Frozen per WeRide spec §6.6.",
+  "type": "object",
+  "required": ["group_id", "rider_id", "voice_active"],
+  "properties": {
+    "group_id": { "type": "string" },
+    "rider_id": { "type": "string" },
+    "sdp_offer": { "type": ["string", "null"], "description": "SDP offer/answer for WebRTC peer connection setup" },
+    "ice_candidates": { "type": "array", "items": { "type": "string" }, "description": "ICE candidate strings" },
+    "voice_active": { "type": "boolean", "description": "true when VAD detects the rider speaking" }
+  },
+  "transport": "Socket.io namespace /vox (signaling + voice_active broadcast). Audio via WebRTC peer connections (mesh topology, cap 8 riders)."
+}

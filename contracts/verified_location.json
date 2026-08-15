@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "verified_location",
+  "description": "Published by Person A (EKF). Consumed by B, C, D. Frozen per WeRide spec §6.1.",
+  "type": "object",
+  "required": ["rider_id", "group_id", "timestamp_hlc", "lat", "lng", "speed_mps", "heading_deg", "spoof_flag", "nis_score", "accuracy_m"],
+  "properties": {
+    "rider_id": { "type": "string", "description": "uuid" },
+    "group_id": { "type": "string", "description": "uuid" },
+    "timestamp_hlc": { "type": "string", "description": "HLC timestamp from Person B's HLC utility" },
+    "lat": { "type": "number" },
+    "lng": { "type": "number" },
+    "speed_mps": { "type": "number" },
+    "heading_deg": { "type": "number" },
+    "spoof_flag": { "type": "boolean", "description": "true if NIS exceeded threshold (GPS spoof / anomaly detected)" },
+    "nis_score": { "type": "number", "description": "Normalized Innovation Squared from EKF" },
+    "accuracy_m": { "type": "number", "description": "Estimated position accuracy in meters" }
+  },
+  "transport": {
+    "live": "Socket.io event 'location:update'",
+    "persisted": "Firestore groups/{group_id}/locations/{rider_id} (throttled)"
+  }
+}

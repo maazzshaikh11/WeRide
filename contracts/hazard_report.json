@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "hazard_report",
+  "description": "Raw per-rider hazard report that feeds DBSCAN. Internal to Person B but versioned for UI/coordination. Not in spec §6 — defined in Person B plan.",
+  "type": "object",
+  "required": ["report_id", "rider_id", "group_id", "hazard_type", "lat", "lng", "timestamp_hlc", "reported_at_hlc"],
+  "properties": {
+    "report_id": { "type": "string", "description": "uuid" },
+    "rider_id": { "type": "string" },
+    "group_id": { "type": "string" },
+    "hazard_type": { "type": "string", "enum": ["pothole", "oil_spill", "accident", "debris", "other"] },
+    "lat": { "type": "number" },
+    "lng": { "type": "number" },
+    "timestamp_hlc": { "type": "string", "description": "HLC of the verified_location used for this report" },
+    "reported_at_hlc": { "type": "string", "description": "HLC at report submission" }
+  }
+}

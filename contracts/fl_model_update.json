@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "fl_model_update",
+  "description": "Internal to Person D. The ONLY payload that leaves the device for FL. No raw ride data. Frozen per WeRide spec §6.5.",
+  "type": "object",
+  "required": ["client_id", "round_id", "masked_weights_delta", "local_loss", "sample_count"],
+  "properties": {
+    "client_id": { "type": "string", "description": "uuid of the FL client (device)" },
+    "round_id": { "type": "integer", "minimum": 0 },
+    "masked_weights_delta": { "type": "string", "description": "base64-encoded weight delta after gradient clipping + DP noise" },
+    "local_loss": { "type": "number" },
+    "sample_count": { "type": "integer", "minimum": 0 }
+  },
+  "transport": "HTTP POST to FL aggregation server /fl/submit",
+  "privacy": "Only masked weights, local loss, and sample count are sent. Never raw ride data (locations, speeds, traces)."
+}

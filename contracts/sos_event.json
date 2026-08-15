@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sos_event",
+  "description": "Published by Person B (CRDT OR-Set). Frozen per WeRide spec §6.3. Offline-resilient: queued locally, batch-synced on reconnect.",
+  "type": "object",
+  "required": ["sos_id", "rider_id", "group_id", "lat", "lng", "created_at_hlc", "resolved", "resolved_at_hlc"],
+  "properties": {
+    "sos_id": { "type": "string", "description": "unique id (uuid)" },
+    "rider_id": { "type": "string" },
+    "group_id": { "type": "string" },
+    "lat": { "type": "number" },
+    "lng": { "type": "number" },
+    "created_at_hlc": { "type": "string", "description": "HLC timestamp at trigger" },
+    "resolved": { "type": "boolean" },
+    "resolved_at_hlc": { "type": ["string", "null"], "description": "HLC timestamp at resolve, null if unresolved" }
+  },
+  "crdt": "OR-Set with tombstone on resolve",
+  "transport": {
+    "local": "MMKV queue (react-native-mmkv) → Firestore batch write on reconnect",
+    "persisted": "Firestore sos_events/{sos_id}"
+  }
+}

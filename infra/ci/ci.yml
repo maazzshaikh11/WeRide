@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  # React Native app (lint + typecheck + Jest unit tests)
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+        working-directory: app
+      - run: npm run lint
+        working-directory: app
+      - run: npm run typecheck
+        working-directory: app
+      - run: npm test
+        working-directory: app
+
+  # Person A — tracking module (TS, Jest)
+  tracking:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+        working-directory: modules/tracking
+      - run: npm run lint
+        working-directory: modules/tracking
+      - run: npm run typecheck
+        working-directory: modules/tracking
+      - run: npm test
+        working-directory: modules/tracking
+
+  # Person B — hazard-sos module (TS, Jest)
+  hazard-sos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+        working-directory: modules/hazard-sos
+      - run: npm run lint
+        working-directory: modules/hazard-sos
+      - run: npm run typecheck
+        working-directory: modules/hazard-sos
+      - run: npm test
+        working-directory: modules/hazard-sos
+
+  # Person C — routing-eta client (TS, Jest) + server (Node.js, node:test)
+  routing-eta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # Client module
+      - run: npm install
+        working-directory: modules/routing-eta
+      - run: npm run lint
+        working-directory: modules/routing-eta
+      - run: npm run typecheck
+        working-directory: modules/routing-eta
+      - run: npm test
+        working-directory: modules/routing-eta
+      # Server module (Node.js — already JS, untouched)
+      - run: npm install
+        working-directory: modules/routing-eta/server
+      - run: npm test
+        working-directory: modules/routing-eta/server
+
+  # Person D — fl-voice module (TS, Jest)
+  fl-voice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+        working-directory: modules/fl-voice
+      - run: npm run lint
+        working-directory: modules/fl-voice
+      - run: npm run typecheck
+        working-directory: modules/fl-voice
+      - run: npm test
+        working-directory: modules/fl-voice
+
+  # Contract validation — ensure all JSON schemas are valid
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          for f in contracts/*.json; do
+            python -c "import json; json.load(open('$f'))" || exit 1
+          done

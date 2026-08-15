@@ -1,0 +1,59 @@
+# React Native / TypeScript
+node_modules/
+.expo/
+dist/
+*.tsbuildinfo
+
+# Build artifacts (legacy Flutter entries kept in case any tooling emits them)
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+pubspec.lock
+*.iml
+.idea/
+.vscode/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+google-services.json
+GoogleService-Info.plist
+firebase-adminsdk-*.json
+*.keystore
+*.jks
+
+# Firebase
+.firebase/
+firestore-debug.log
+ui-debug.log
+
+# Generated
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+
+# React Native
+.expo/

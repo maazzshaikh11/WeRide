@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "route_request / route_response",
+  "description": "Person C's routing API. POST /route. Frozen per WeRide spec §6.4.",
+  "type": "object",
+  "request": {
+    "required": ["group_id", "origin", "destination", "avoid_hazard_types"],
+    "properties": {
+      "group_id": { "type": "string" },
+      "origin": { "type": "object", "required": ["lat", "lng"], "properties": { "lat": {"type":"number"}, "lng": {"type":"number"} } },
+      "destination": { "type": "object", "required": ["lat", "lng"], "properties": { "lat": {"type":"number"}, "lng": {"type":"number"} } },
+      "avoid_hazard_types": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "response": {
+    "required": ["route_id", "path_points", "distance_km", "eta_minutes", "safety_score", "recalculated_at_hlc"],
+    "properties": {
+      "route_id": { "type": "string" },
+      "path_points": { "type": "array", "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } },
+      "distance_km": { "type": "number" },
+      "eta_minutes": { "type": "number" },
+      "safety_score": { "type": "number", "minimum": 0, "maximum": 1 },
+      "recalculated_at_hlc": { "type": "string", "description": "HLC of last recalculation" }
+    }
+  },
+  "transport": "Node.js REST API POST /route"
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "hazard_cluster",
+  "description": "Published by Person B (DBSCAN). Consumed by C (routing weights). Frozen per WeRide spec §6.2.",
+  "type": "object",
+  "required": ["cluster_id", "group_id", "hazard_type", "centroid_lat", "centroid_lng", "polygon_points", "report_count", "hazard_score", "created_at_hlc", "status"],
+  "properties": {
+    "cluster_id": { "type": "string" },
+    "group_id": { "type": "string" },
+    "hazard_type": { "type": "string", "enum": ["pothole", "oil_spill", "accident", "debris", "other"] },
+    "centroid_lat": { "type": "number" },
+    "centroid_lng": { "type": "number" },
+    "polygon_points": {
+      "type": "array",
+      "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+      "description": "Bounding box or convex hull of clustered report coords [[lat,lng],...]"
+    },
+    "report_count": { "type": "integer", "minimum": 1 },
+    "hazard_score": { "type": "number", "minimum": 0, "maximum": 1, "description": "f(report_count, recency)" },
+    "created_at_hlc": { "type": "string", "description": "HLC timestamp" },
+    "status": { "type": "string", "enum": ["active", "resolved"] }
+  },
+  "transport": {
+    "persisted": "Firestore hazards/{cluster_id} with real-time listener"
+  }
+}

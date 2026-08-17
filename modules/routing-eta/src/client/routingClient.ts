@@ -41,17 +41,17 @@ export class RoutingClient {
       body: JSON.stringify(routeRequestToJson(fullReq)),
     });
     if (!res.ok) throw new Error(`Route request failed: ${res.status}`);
-    const route = routeResponseFromJson(await res.json());
+    const route = routeResponseFromJson(await res.json() as Record<string, any>);
     this._onUpdate?.(route);
     return route;
   }
 
   /** Debounced request — batch hazard changes within `debounce` ms into one request. */
-  scheduleRecalculation(req: Parameters<RoutingClient['requestRoute']>[0]): void {
+  scheduleRecalculation(req: Omit<RouteRequest, 'avoid_hazard_types'> & { avoid_hazard_types?: string[] }): void {
     this._pendingRequest = req;
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
     this._debounceTimer = setTimeout(() => {
-      if (this._pendingRequest) this.requestRoute(this._pendingRequest).catch(console.error);
+      if (this._pendingRequest) this.requestRoute(this._pendingRequest as any).catch(console.error);
       this._pendingRequest = undefined;
     }, this.debounce);
   }

@@ -112,24 +112,111 @@ export function routeSafetyScore(path, graph, hazards, radiusM = 100) {
   return Math.max(0, 1 - totalPenalty / Math.max(1, hazards.length));
 }
 
+/**
+ * Validate route_response against the contract schema (T-03, Phase 1).
+ * Ensures mock/real responses are schema-exact.
+ */
+function validateRouteResponse(payload) {
+  const requiredFields = [
+    'route_id',
+    'path_points',
+    'distance_km',
+    'eta_minutes',
+    'safety_score',
+    'recalculated_at_hlc',
+  ];
+
+  for (const field of requiredFields) {
+    if (!(field in payload)) {
+      throw new Error(`Missing required field: ${field}`);
+    }
+  }
+
+  // Type checks
+  if (typeof payload.route_id !== 'string' || !payload.route_id) {
+    throw new Error('route_id must be a non-empty string');
+  }
+
+  if (!Array.isArray(payload.path_points)) {
+    throw new Error('path_points must be an array');
+  }
+
+  for (const point of payload.path_points) {
+    if (!Array.isArray(point) || point.length !== 2) {
+      throw new Error('Each path_point must be [lat, lng]');
+    }
+    if (typeof point[0] !== 'number' || typeof point[1] !== 'number') {
+      throw new Error('path_point coordinates must be numbers');
+    }
+  }
+
+  if (typeof payload.distance_km !== 'number' || payload.distance_km < 0) {
+    throw new Error('distance_km must be a non-negative number');
+  }
+
+  if (typeof payload.eta_minutes !== 'number' || payload.eta_minutes < 0) {
+    throw new Error('eta_minutes must be a non-negative number');
+  }
+
+  if (
+    typeof payload.safety_score !== 'number' ||
+    payload.safety_score < 0 ||
+    payload.safety_score > 1
+  ) {
+    throw new Error('safety_score must be a number in [0, 1]');
+  }
+
+  if (typeof payload.recalculated_at_hlc !== 'string' || !payload.recalculated_at_hlc) {
+    throw new Error('recalculated_at_hlc must be a non-empty string (HLC timestamp)');
+  }
+}
+
 // Express handler
 import { v4 as uuidv4 } from 'uuid';
 export async function handleRoute(req, res) {
   try {
+    // Validate required request fields (T-04.2)
     const { group_id, origin, destination, avoid_hazard_types } = req.body;
+
+    if (!group_id || typeof group_id !== 'string') {
+      return res.status(400).json({ error: 'group_id is required (string)' });
+    }
+
+    if (!origin || typeof origin.lat !== 'number' || typeof origin.lng !== 'number') {
+      return res.status(400).json({ error: 'origin must have lat, lng (numbers)' });
+    }
+
+    if (!destination || typeof destination.lat !== 'number' || typeof destination.lng !== 'number') {
+      return res.status(400).json({ error: 'destination must have lat, lng (numbers)' });
+    }
+
+    if (!Array.isArray(avoid_hazard_types)) {
+      return res.status(400).json({ error: 'avoid_hazard_types must be an array' });
+    }
+
     // TODO: load road graph for the bbox (Option A: use Directions API; Option B: OSM graph)
     // TODO: fetch active hazards from Firestore, filter by avoid_hazard_types
     // TODO: applyHazardPenalties, run astar, compute safety_score, call ETA model
-    // Mock response for now:
-    res.json({
+
+    // Mock response for now (T-04.1: schema-exact)
+    const distanceM = haversineMeters(origin.lat, origin.lng, destination.lat, destination.lng);
+    const mockResponse = {
       route_id: uuidv4(),
       path_points: [[origin.lat, origin.lng], [destination.lat, destination.lng]],
-      distance_km: haversineMeters(origin.lat, origin.lng, destination.lat, destination.lng) / 1000,
+      distance_km: distanceM / 1000,
       eta_minutes: 15,
       safety_score: 0.85,
       recalculated_at_hlc: `${Date.now()}:0`,
-    });
+    };
+
+    // Validate the mock response against the contract (T-04.1)
+    validateRouteResponse(mockResponse);
+
+    res.json(mockResponse);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 }
+
+// Export for testing
+export { validateRouteResponse };

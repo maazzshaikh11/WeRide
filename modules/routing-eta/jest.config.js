@@ -12,7 +12,7 @@ module.exports = {
     '^@flvoice/(.*)$': '<rootDir>/../fl-voice/src/$1',
     'react-native-mmkv': '<rootDir>/test/__mocks__/mmkvMock.js',
     '@react-native-firebase/firestore': '<rootDir>/test/__mocks__/firebaseMock.js',
-    '@react-native-firebase/auth': '<rootDir>/test/__mocks__/firebaseMock.js',
+    '@react-native-firebase/auth': '<rootDir>/test/__mocks__/authMock.js',
     'react-native-webrtc': '<rootDir>/test/__mocks__/webrtcMock.js',
     'react-native-sensors': '<rootDir>/test/__mocks__/sensorsMock.js',
     'react-native-geolocation-service': '<rootDir>/test/__mocks__/geoMock.js',

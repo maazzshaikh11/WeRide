@@ -173,6 +173,8 @@ function validateRouteResponse(payload) {
 
 // Express handler
 import { v4 as uuidv4 } from 'uuid';
+import { extractEtaFeatures, predictEta } from './eta_model.js';
+
 export async function handleRoute(req, res) {
   try {
     // Validate required request fields (T-04.2)
@@ -200,11 +202,20 @@ export async function handleRoute(req, res) {
 
     // Mock response for now (T-04.1: schema-exact)
     const distanceM = haversineMeters(origin.lat, origin.lng, destination.lat, destination.lng);
+    const distanceKm = distanceM / 1000;
+
+    // Phase 4: Extract ETA features and predict using LightGBM model
+    const etaFeatures = extractEtaFeatures(
+      { distance_km: distanceKm },
+      new Date()
+    );
+    const eta_minutes = await predictEta(etaFeatures);
+
     const mockResponse = {
       route_id: uuidv4(),
       path_points: [[origin.lat, origin.lng], [destination.lat, destination.lng]],
-      distance_km: distanceM / 1000,
-      eta_minutes: 15,
+      distance_km: distanceKm,
+      eta_minutes: eta_minutes,
       safety_score: 0.85,
       recalculated_at_hlc: `${Date.now()}:0`,
     };

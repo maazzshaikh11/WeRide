@@ -173,25 +173,27 @@ function validateRouteResponse(payload) {
 
 // Express handler
 import { v4 as uuidv4 } from 'uuid';
-import { HLC } from '../../../modules/hazard-sos/src/hlc/hlc.js';
 import { extractEtaFeatures, predictEta } from './eta_model.js';
 
 /**
  * Generate HLC-format timestamp (physical:counter).
- * Phase 6: Uses real HLC from Person B implementation.
+ * 
+ * Server is plain Node.js (no TypeScript support).
+ * Real HLC is used by the client (TypeScript) when requesting routes.
+ * Server generates valid HLC-format timestamps using milliseconds + counter.
+ * 
+ * Format: "milliseconds:counter" (matches real HLC string format)
+ * This ensures response timestamps are valid and comparable.
  */
-let _hlcInstance = null;
-
-function getHlcInstance() {
-  if (!_hlcInstance) {
-    _hlcInstance = HLC.fresh();
-  }
-  return _hlcInstance;
-}
+let _counter = 0;
 
 function generateHlcTimestamp() {
-  const hlc = getHlcInstance();
-  return hlc.now();  // Returns "physical:counter" format
+  // Use current timestamp in milliseconds as physical component
+  // Increment counter to ensure monotonicity within same millisecond
+  const physical = Date.now();
+  const hlcTimestamp = `${physical}:${_counter}`;
+  _counter = (_counter + 1) % 1000000; // Reset counter to avoid overflow
+  return hlcTimestamp;
 }
 
 export async function handleRoute(req, res) {

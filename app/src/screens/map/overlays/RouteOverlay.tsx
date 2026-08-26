@@ -15,6 +15,7 @@ import { View, StyleSheet, Linking, Alert } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 
 import RoutePanel from '@app/components/RoutePanel';
+import { WeRideColors } from '@app/theme/theme';
 import { RoutingClient } from '@routing/client/routingClient';
 import { useRouteStore } from '@routing/client/routeStore';
 import { routeToGeoJsonLine } from '@routing/client/routeLine';
@@ -219,7 +220,7 @@ export default function RouteOverlay({ groupId }: Props) {
         <MapboxGL.LineLayer
           id="routeLine"
           style={{
-            lineColor: '#40916C',
+            lineColor: WeRideColors.accent,
             lineWidth: 4,
             lineOpacity: 0.8,
           }}

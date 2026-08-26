@@ -19,7 +19,7 @@ export default function SosOverlay({ groupId }: { groupId: string }) {
 
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor: triggered ? '#9AA0A6' : WeRideColors.error }]}
+      style={[styles.button, { backgroundColor: triggered ? WeRideColors.riderStale : WeRideColors.error }]}
       // TODO: replace with hold/double-tap gesture — single tap must NOT trigger
       onPress={() => {}}
     >
@@ -30,5 +30,5 @@ export default function SosOverlay({ groupId }: { groupId: string }) {
 
 const styles = StyleSheet.create({
   button: { width: 72, height: 72, borderRadius: 36, position: 'absolute', top: 40, right: 16, justifyContent: 'center', alignItems: 'center' },
-  icon: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  icon: { color: WeRideColors.onPrimary, fontSize: 16, fontWeight: 'bold' },
 });

@@ -5,12 +5,10 @@
  * Auto-updates when route_response changes (no manual refresh).
  * "Avoid hazards" toggle.
  *
- * Integrates:
- * - RoutingClient for POST /route calls
- * - useRouteStore for shared route state
- * - routeToGeoJsonLine for path_points → Mapbox GeoJSON
- * - googleMapsDeepLink for deep-link generation
- * - Mapbox ShapeSource + LineLayer for route visualization
+ * Phase 6: Integrates real Person A (verified_location) and Person B (hazard_cluster) streams.
+ * - Origin: Real EKF-verified location from Person A (Socket.io location:update)
+ * - Hazards: Real active clusters from Person B (Firestore listener)
+ * - Prevents origin churn: Only recalcs when moved > 100m
  */
 import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet, Linking, Alert } from 'react-native';
@@ -21,16 +19,35 @@ import { RoutingClient } from '@routing/client/routingClient';
 import { useRouteStore } from '@routing/client/routeStore';
 import { routeToGeoJsonLine } from '@routing/client/routeLine';
 import { googleMapsDeepLink } from '@routing/client/deepLink';
+import { VerifiedLocation, verifiedLocationFromJson } from '@app/models/verifiedLocation';
+import { HazardCluster, hazardClusterFromJson } from '@app/models/hazardCluster';
+import { getLocationSocket } from '@app/services/socketService';
+import { firebaseFirestore } from '@app/services/firebaseService';
+import { HazardService } from '@hazard/services/hazardService';
 
 interface Props {
   groupId: string;
 }
 
+// Accuracy threshold: only use locations with accuracy < 50m (Phase 6 T-16)
+const ACCEPTABLE_ACCURACY_M = 50;
+// Distance threshold: only trigger recalc if moved > 100m (Phase 6 T-16)
+const RECALC_DISTANCE_THRESHOLD_M = 100;
+// Destination: mock for Phase 6 testing (Phase 7 will use real verified_location)
+const MOCK_DESTINATION = { lat: 40.7140, lng: -74.0089 };
+
 export default function RouteOverlay({ groupId }: Props) {
   // Store subscriptions
   const route = useRouteStore((state) => state.route);
+  const currentLocation = useRouteStore((state) => state.currentLocation);
+  const lastValidLocation = useRouteStore((state) => state.lastValidLocation);
+  const activeClusters = useRouteStore((state) => state.activeClusters);
   const avoidHazardTypes = useRouteStore((state) => state.avoidHazardTypes);
+
   const setRoute = useRouteStore((state) => state.setRoute);
+  const setCurrentLocation = useRouteStore((state) => state.setCurrentLocation);
+  const setLastValidLocation = useRouteStore((state) => state.setLastValidLocation);
+  const setActiveClusters = useRouteStore((state) => state.setActiveClusters);
   const setAvoidHazardTypes = useRouteStore((state) => state.setAvoidHazardTypes);
   const setIsLoading = useRouteStore((state) => state.setIsLoading);
 
@@ -44,36 +61,91 @@ export default function RouteOverlay({ groupId }: Props) {
   }
   const client = clientRef.current;
 
-  // Initial route request on mount
+  // Phase 6 T-16: Listen to real verified_location stream (Person A)
   useEffect(() => {
-    const fetchInitialRoute = async () => {
-      try {
-        setIsLoading(true);
-        // Mock origin/destination for Phase 5 UI testing
-        // Phase 6 will use real verified_location
-        const mockOrigin = { lat: 40.7128, lng: -74.006 };
-        const mockDestination = { lat: 40.7140, lng: -74.0089 };
+    const socket = getLocationSocket();
 
-        await client.requestRoute({
-          group_id: groupId,
-          origin: mockOrigin,
-          destination: mockDestination,
-          avoid_hazard_types: avoidHazardTypes,
-        });
+    const handleLocationUpdate = (payload: any) => {
+      try {
+        const location = verifiedLocationFromJson(payload);
+
+        // Only accept non-spoofed locations with acceptable accuracy
+        if (location.spoof_flag) {
+          console.warn('Location spoofed, skipping origin update');
+          return;
+        }
+
+        if (location.accuracy_m > ACCEPTABLE_ACCURACY_M) {
+          console.warn(`Location accuracy too poor (${location.accuracy_m}m > ${ACCEPTABLE_ACCURACY_M}m), skipping`);
+          return;
+        }
+
+        // Update current location
+        setCurrentLocation(location);
+        setLastValidLocation(location);
+
+        // Trigger recalculation if moved > 100m (prevent jitter storms)
+        if (lastValidLocation) {
+          client.scheduleOriginRecalcIfMoved(
+            { lat: location.lat, lng: location.lng },
+            MOCK_DESTINATION,
+            groupId,
+            avoidHazardTypes,
+            RECALC_DISTANCE_THRESHOLD_M
+          );
+        } else {
+          // First valid location, trigger initial route
+          client.scheduleRecalculation({
+            group_id: groupId,
+            origin: { lat: location.lat, lng: location.lng },
+            destination: MOCK_DESTINATION,
+            avoid_hazard_types: avoidHazardTypes,
+          });
+        }
       } catch (e) {
-        console.error('Route request failed:', e);
-        Alert.alert('Error', 'Failed to fetch route');
-      } finally {
-        setIsLoading(false);
+        console.error('Failed to process location update:', e);
       }
     };
 
-    fetchInitialRoute();
-  }, [groupId, client, setIsLoading, avoidHazardTypes]);
+    socket.on('location:update', handleLocationUpdate);
+
+    return () => {
+      socket.off('location:update', handleLocationUpdate);
+    };
+  }, [groupId, client, avoidHazardTypes, lastValidLocation, setCurrentLocation, setLastValidLocation]);
+
+  // Phase 6 T-17: Listen to real hazard_cluster stream (Person B)
+  useEffect(() => {
+    const hazardService = new HazardService();
+    const unsubscribe = hazardService.watchClusters(groupId).onSnapshot((snapshot) => {
+      try {
+        const clusters = snapshot.docs.map((doc) =>
+          hazardClusterFromJson(doc.data() as Record<string, any>)
+        );
+        setActiveClusters(clusters);
+
+        // Trigger recalculation on hazard changes (Phase 6 T-17 marquee test)
+        if (lastValidLocation) {
+          client.scheduleRecalculation({
+            group_id: groupId,
+            origin: { lat: lastValidLocation.lat, lng: lastValidLocation.lng },
+            destination: MOCK_DESTINATION,
+            avoid_hazard_types: avoidHazardTypes,
+          });
+        }
+      } catch (e) {
+        console.error('Failed to process hazard update:', e);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [groupId, client, avoidHazardTypes, lastValidLocation, setActiveClusters]);
 
   // Handle toggle avoid hazards
   const handleToggleAvoidHazards = async () => {
-    if (!route) return;
+    if (!lastValidLocation) return;
 
     try {
       setIsLoading(true);
@@ -85,21 +157,11 @@ export default function RouteOverlay({ groupId }: Props) {
 
       setAvoidHazardTypes(newTypes);
 
-      // Use current route origin/destination
-      const origin = {
-        lat: route.path_points[0][0],
-        lng: route.path_points[0][1],
-      };
-      const destination = {
-        lat: route.path_points[route.path_points.length - 1][0],
-        lng: route.path_points[route.path_points.length - 1][1],
-      };
-
-      // Debounced request (500ms)
+      // Trigger recalculation with new avoid types
       client.scheduleRecalculation({
         group_id: groupId,
-        origin,
-        destination,
+        origin: { lat: lastValidLocation.lat, lng: lastValidLocation.lng },
+        destination: MOCK_DESTINATION,
         avoid_hazard_types: newTypes,
       });
     } catch (e) {
@@ -112,12 +174,12 @@ export default function RouteOverlay({ groupId }: Props) {
 
   // Handle open in Google Maps
   const handleOpenInGoogleMaps = async () => {
-    if (!route) return;
+    if (!route || !lastValidLocation) return;
 
     try {
       const origin = {
-        lat: route.path_points[0][0],
-        lng: route.path_points[0][1],
+        lat: lastValidLocation.lat,
+        lng: lastValidLocation.lng,
       };
       const destination = {
         lat: route.path_points[route.path_points.length - 1][0],

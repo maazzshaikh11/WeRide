@@ -173,12 +173,31 @@ function validateRouteResponse(payload) {
 
 // Express handler
 import { v4 as uuidv4 } from 'uuid';
+import { HLC } from '../../../modules/hazard-sos/src/hlc/hlc.js';
 import { extractEtaFeatures, predictEta } from './eta_model.js';
+
+/**
+ * Generate HLC-format timestamp (physical:counter).
+ * Phase 6: Uses real HLC from Person B implementation.
+ */
+let _hlcInstance = null;
+
+function getHlcInstance() {
+  if (!_hlcInstance) {
+    _hlcInstance = HLC.fresh();
+  }
+  return _hlcInstance;
+}
+
+function generateHlcTimestamp() {
+  const hlc = getHlcInstance();
+  return hlc.now();  // Returns "physical:counter" format
+}
 
 export async function handleRoute(req, res) {
   try {
     // Validate required request fields (T-04.2)
-    const { group_id, origin, destination, avoid_hazard_types } = req.body;
+    const { group_id, origin, destination, avoid_hazard_types, active_hazards } = req.body;
 
     if (!group_id || typeof group_id !== 'string') {
       return res.status(400).json({ error: 'group_id is required (string)' });
@@ -196,8 +215,11 @@ export async function handleRoute(req, res) {
       return res.status(400).json({ error: 'avoid_hazard_types must be an array' });
     }
 
+    // Phase 6 T-17: Accept real hazards from client (or fetch from Firestore)
+    const hazardsToConsider = Array.isArray(active_hazards) ? active_hazards : [];
+
     // TODO: load road graph for the bbox (Option A: use Directions API; Option B: OSM graph)
-    // TODO: fetch active hazards from Firestore, filter by avoid_hazard_types
+    // TODO: fetch active hazards from Firestore if not passed by client
     // TODO: applyHazardPenalties, run astar, compute safety_score, call ETA model
 
     // Mock response for now (T-04.1: schema-exact)
@@ -211,13 +233,25 @@ export async function handleRoute(req, res) {
     );
     const eta_minutes = await predictEta(etaFeatures);
 
+    // Phase 6 T-17: Compute safety score with real hazards
+    let safety_score = 0.85;
+    if (hazardsToConsider.length > 0) {
+      // Simple penalty model: reduce score by hazard density
+      // Real model would apply route-specific hazard proximity calculations
+      const hazardPenalty = Math.min(0.3, hazardsToConsider.length * 0.05);
+      safety_score = Math.max(0.5, 0.85 - hazardPenalty);
+    }
+
+    // Phase 6 T-17: Use real HLC format for recalculated_at_hlc
+    const recalculated_at_hlc = generateHlcTimestamp();
+
     const mockResponse = {
       route_id: uuidv4(),
       path_points: [[origin.lat, origin.lng], [destination.lat, destination.lng]],
       distance_km: distanceKm,
       eta_minutes: eta_minutes,
-      safety_score: 0.85,
-      recalculated_at_hlc: `${Date.now()}:0`,
+      safety_score: safety_score,
+      recalculated_at_hlc: recalculated_at_hlc,
     };
 
     // Validate the mock response against the contract (T-04.1)

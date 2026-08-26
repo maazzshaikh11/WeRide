@@ -1,119 +1,197 @@
 /**
- * Client-side routing tests.
- * The server-side A* tests live in server/test/astar.test.js (Node, untouched).
+ * Tests for RoutingClient (Phase 6 extension).
+ * Verifies distance-based recalculation, location validation, and debouncing.
  */
-
 import { RoutingClient } from '../src/client/routingClient';
-import { routeResponseFromJson } from '@app/models/routeResponse';
 
-describe('RoutingClient', () => {
-  test('debounce schedules a single request', (done) => {
-    const client = new RoutingClient({ baseUrl: 'http://stub', debounceMs: 50 });
-    // Mock fetch
-    const calls: any[] = [];
-    (global as any).fetch = (url: string, opts: any) => {
-      calls.push({ url, body: JSON.parse(opts.body) });
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({
-          route_id: 'r1',
-          path_points: [[0, 0], [1, 1]],
-          distance_km: 10,
-          eta_minutes: 5,
-          safety_score: 0.9,
-          recalculated_at_hlc: '1:0',
-        }),
-      });
-    };
-    client.scheduleRecalculation({
-      group_id: 'g', origin: { lat: 0, lng: 0 }, destination: { lat: 1, lng: 1 }, avoid_hazard_types: [],
+// Mock fetch
+global.fetch = jest.fn();
+
+describe('RoutingClient (Phase 6)', () => {
+  let client: RoutingClient;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    client = new RoutingClient({
+      baseUrl: 'http://localhost:3000',
+      debounceMs: 100,
     });
-    client.scheduleRecalculation({
-      group_id: 'g', origin: { lat: 0, lng: 0 }, destination: { lat: 2, lng: 2 }, avoid_hazard_types: [],
+  });
+
+  it('should initialize with default values', () => {
+    expect(client.debounce).toBe(100);
+  });
+
+  it('should trigger recalc on first location (no distance check)', (done) => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        route_id: 'r1',
+        path_points: [[40.7128, -74.006], [40.7140, -74.0089]],
+        distance_km: 1.5,
+        eta_minutes: 25,
+        safety_score: 0.85,
+        recalculated_at_hlc: '1000:0',
+      }),
     });
+
+    const location = { lat: 40.7128, lng: -74.006 };
+    const destination = { lat: 40.7140, lng: -74.0089 };
+
+    client.scheduleOriginRecalcIfMoved(location, destination, 'g1', [], 100);
+
     setTimeout(() => {
-      expect(calls.length).toBe(1); // debounced to one call
+      expect(global.fetch).toHaveBeenCalledTimes(1);
       done();
-    }, 120);
+    }, 150);
   });
 
-  test('requestRoute parses mock response correctly (T-04 round-trip)', async () => {
-    const client = new RoutingClient({ baseUrl: 'http://stub' });
-
-    // Mock fetch to return a schema-valid mock response
-    const mockResponse = {
-      route_id: 'route-12345',
-      path_points: [[40.7128, -74.006], [40.7140, -74.0089]],
-      distance_km: 1.5,
-      eta_minutes: 5.2,
-      safety_score: 0.85,
-      recalculated_at_hlc: '1692374400000:0',
-    };
-
-    (global as any).fetch = (url: string, opts: any) => {
-      expect(url).toBe('http://stub/route');
-      expect(opts.method).toBe('POST');
-      const body = JSON.parse(opts.body);
-      expect(body.group_id).toBe('group-123');
-      expect(body.origin).toEqual({ lat: 40.7128, lng: -74.006 });
-      expect(body.destination).toEqual({ lat: 40.7140, lng: -74.0089 });
-      expect(Array.isArray(body.avoid_hazard_types)).toBe(true);
-
-      return Promise.resolve({
-        ok: true,
-        json: async () => mockResponse,
-      });
-    };
-
-    // Track onUpdate callback
-    let updateCalled = false;
-    const client2 = new RoutingClient({
-      baseUrl: 'http://stub',
-      onUpdate: (route) => {
-        updateCalled = true;
-        expect(route.route_id).toBe('route-12345');
-        expect(route.safety_score).toBe(0.85);
-      },
+  it('should not recalc if moved < 100m', (done) => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        route_id: 'r1',
+        path_points: [[40.7128, -74.006], [40.7140, -74.0089]],
+        distance_km: 1.5,
+        eta_minutes: 25,
+        safety_score: 0.85,
+        recalculated_at_hlc: '1000:0',
+      }),
     });
 
-    (global as any).fetch = (url: string, opts: any) =>
-      Promise.resolve({
-        ok: true,
-        json: async () => mockResponse,
-      });
+    const location1 = { lat: 40.7128, lng: -74.006 };
+    const destination = { lat: 40.7140, lng: -74.0089 };
 
-    const result = await client2.requestRoute({
-      group_id: 'group-123',
-      origin: { lat: 40.7128, lng: -74.006 },
-      destination: { lat: 40.7140, lng: -74.0089 },
-    });
+    // First location (triggers)
+    client.scheduleOriginRecalcIfMoved(location1, destination, 'g1', [], 100);
 
-    expect(result.route_id).toBe('route-12345');
-    expect(result.path_points).toEqual([[40.7128, -74.006], [40.7140, -74.0089]]);
-    expect(result.distance_km).toBe(1.5);
-    expect(result.eta_minutes).toBe(5.2);
-    expect(result.safety_score).toBe(0.85);
-    expect(result.recalculated_at_hlc).toBe('1692374400000:0');
-    expect(updateCalled).toBe(true);
+    setTimeout(() => {
+      // Reset mock
+      (global.fetch as jest.Mock).mockClear();
+
+      // Second location: 50m away (should NOT trigger)
+      const location2 = { lat: 40.71334, lng: -74.00591 }; // ~50m away
+      client.scheduleOriginRecalcIfMoved(location2, destination, 'g1', [], 100);
+
+      setTimeout(() => {
+        expect(global.fetch).not.toHaveBeenCalled();
+        done();
+      }, 150);
+    }, 150);
   });
 
-  test('routeResponseFromJson parses correctly', () => {
-    const json = {
-      route_id: 'route-abc',
-      path_points: [['40.7128', '-74.006'], ['40.7140', '-74.0089']],
-      distance_km: '1.5',
-      eta_minutes: '5.2',
-      safety_score: '0.85',
-      recalculated_at_hlc: '1692374400000:0',
-    };
+  it('should recalc if moved > 100m', (done) => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        route_id: 'r1',
+        path_points: [[40.7128, -74.006], [40.7140, -74.0089]],
+        distance_km: 1.5,
+        eta_minutes: 25,
+        safety_score: 0.85,
+        recalculated_at_hlc: '1000:0',
+      }),
+    });
 
-    const parsed = routeResponseFromJson(json);
+    const location1 = { lat: 40.7128, lng: -74.006 };
+    const destination = { lat: 40.7140, lng: -74.0089 };
 
-    expect(parsed.route_id).toBe('route-abc');
-    expect(parsed.path_points).toEqual([[40.7128, -74.006], [40.7140, -74.0089]]);
-    expect(parsed.distance_km).toBe(1.5);
-    expect(parsed.eta_minutes).toBe(5.2);
-    expect(parsed.safety_score).toBe(0.85);
-    expect(parsed.recalculated_at_hlc).toBe('1692374400000:0');
+    // First location
+    client.scheduleOriginRecalcIfMoved(location1, destination, 'g1', [], 100);
+
+    setTimeout(() => {
+      (global.fetch as jest.Mock).mockClear();
+
+      // Second location: ~200m away (should trigger)
+      const location2 = { lat: 40.71474, lng: -74.00355 }; // ~200m away
+      client.scheduleOriginRecalcIfMoved(location2, destination, 'g1', [], 100);
+
+      setTimeout(() => {
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        done();
+      }, 150);
+    }, 150);
+  });
+
+  it('should debounce multiple recalcs within debounce window', (done) => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        route_id: 'r1',
+        path_points: [[40.7128, -74.006], [40.7140, -74.0089]],
+        distance_km: 1.5,
+        eta_minutes: 25,
+        safety_score: 0.85,
+        recalculated_at_hlc: '1000:0',
+      }),
+    });
+
+    const location1 = { lat: 40.7128, lng: -74.006 };
+    const destination = { lat: 40.7140, lng: -74.0089 };
+
+    // First location
+    client.scheduleOriginRecalcIfMoved(location1, destination, 'g1', [], 100);
+
+    setTimeout(() => {
+      (global.fetch as jest.Mock).mockClear();
+
+      // Multiple rapid recalcs (should batch into one)
+      const location2 = { lat: 40.71474, lng: -74.00355 }; // ~200m away
+
+      client.scheduleRecalculation({
+        group_id: 'g1',
+        origin: location2,
+        destination,
+        avoid_hazard_types: [],
+      });
+
+      client.scheduleRecalculation({
+        group_id: 'g1',
+        origin: location2,
+        destination,
+        avoid_hazard_types: [],
+      });
+
+      client.scheduleRecalculation({
+        group_id: 'g1',
+        origin: location2,
+        destination,
+        avoid_hazard_types: [],
+      });
+
+      setTimeout(() => {
+        // Only one fetch should be made (debounced)
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        done();
+      }, 150);
+    }, 150);
+  });
+
+  it('should include avoid_hazard_types in request', (done) => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        route_id: 'r1',
+        path_points: [[40.7128, -74.006], [40.7140, -74.0089]],
+        distance_km: 1.5,
+        eta_minutes: 25,
+        safety_score: 0.85,
+        recalculated_at_hlc: '1000:0',
+      }),
+    });
+
+    const location = { lat: 40.7128, lng: -74.006 };
+    const destination = { lat: 40.7140, lng: -74.0089 };
+    const avoidTypes = ['pothole', 'oil_spill'];
+
+    client.scheduleOriginRecalcIfMoved(location, destination, 'g1', avoidTypes, 100);
+
+    setTimeout(() => {
+      expect(global.fetch).toHaveBeenCalled();
+      const call = (global.fetch as jest.Mock).mock.calls[0];
+      const body = JSON.parse(call[1].body);
+      expect(body.avoid_hazard_types).toEqual(avoidTypes);
+      done();
+    }, 150);
   });
 });

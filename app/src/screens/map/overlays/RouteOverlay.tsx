@@ -24,6 +24,7 @@ import { HazardCluster, hazardClusterFromJson } from '@app/models/hazardCluster'
 import { getLocationSocket } from '@app/services/socketService';
 import { firebaseFirestore } from '@app/services/firebaseService';
 import { HazardService } from '@hazard/services/hazardService';
+import { HLC } from '@hazard/hlc/hlc';
 
 interface Props {
   groupId: string;
@@ -116,10 +117,11 @@ export default function RouteOverlay({ groupId }: Props) {
 
   // Phase 6 T-17: Listen to real hazard_cluster stream (Person B)
   useEffect(() => {
-    const hazardService = new HazardService();
-    const unsubscribe = hazardService.watchClusters(groupId).onSnapshot((snapshot) => {
+    const hlc = HLC.fresh();
+    const hazardService = new HazardService(hlc);
+    const unsubscribe = hazardService.watchClusters(groupId).onSnapshot((snapshot: any) => {
       try {
-        const clusters = snapshot.docs.map((doc) =>
+        const clusters = snapshot.docs.map((doc: any) =>
           hazardClusterFromJson(doc.data() as Record<string, any>)
         );
         setActiveClusters(clusters);

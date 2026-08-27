@@ -4,6 +4,13 @@
  * To change a value here, open a PR — C reviews all UI PRs for consistency.
  *
  * Replaces the Flutter `theme.dart`. Same color values, RN-native.
+ * Phase 1 Day 1 (W1 D1): Locked fonts + icon set + all color maps + safety thresholds.
+ *
+ * Decision Register (ratified W1 D1):
+ * - D-07: Material Icons (react-native-vector-icons) + system font (Roboto)
+ * - D-08: Safety thresholds ≥0.7 (green), 0.4–0.7 (yellow), <0.4 (red)
+ * - Hazard severity: accident(5) > oil_spill(4) > debris(3) > pothole(2) > other(1)
+ * - Hazard radius R: 100m (tuned in Phase 3)
  */
 
 export const WeRideColors = {
@@ -41,6 +48,34 @@ export const WeRideColors = {
   // Text
   textPrimary: '#1A1A1A',
   textSecondary: '#6C757D',
+} as const;
+
+/**
+ * Font configuration (D-07: Material Icons + Roboto system font, locked W1 D1).
+ * Roboto is the standard system font for React Native on both iOS/Android.
+ * For custom fonts, this would reference font family names registered in native config.
+ */
+export const WeRideFonts = {
+  // Primary font family (Roboto system default)
+  primary: 'Roboto',
+  // Headline/display font (same as primary for MVP; can split later)
+  headline: 'Roboto',
+  // Monospace for technical UI (if needed)
+  mono: 'Menlo',
+} as const;
+
+/**
+ * Icon set configuration (D-07: Material Icons via react-native-vector-icons, locked W1 D1).
+ * Use `react-native-vector-icons/MaterialIcons` for all icons.
+ * This constant documents the choice; implementations use the icon name directly.
+ */
+export const WeRideIconSet = {
+  // Icon library name for react-native-vector-icons
+  library: 'MaterialIcons',
+  // Default icon size in pixels
+  defaultSize: 24,
+  // Common icon color (uses primary text color by default)
+  defaultColor: '#1A1A1A',
 } as const;
 
 /** Hazard type → color mapping. Single source of truth. */

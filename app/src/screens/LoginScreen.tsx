@@ -37,6 +37,6 @@ export default function LoginScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: WeRideColors.background },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 12 },
+  input: { borderWidth: 1, borderColor: WeRideColors.textSecondary, borderRadius: 8, padding: 12, marginBottom: 12 },
   error: { color: WeRideColors.error, marginTop: 12, textAlign: 'center' },
 });

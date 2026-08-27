@@ -9,14 +9,14 @@
  */
 import React, { useState } from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { WeRideColors } from '../../../theme/theme';
+import { WeRideColors, safetyScoreColor } from '../../../theme/theme';
 
 export default function VoxOverlay({ groupId }: { groupId: string }) {
   const [autoMode, setAutoMode] = useState(true);
 
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor: autoMode ? WeRideColors.voxActive : '#FFD60A' }]}
+      style={[styles.button, { backgroundColor: autoMode ? WeRideColors.voxActive : WeRideColors.safetyCaution }]}
       onPress={() => setAutoMode((v) => !v)}
     >
       <Text style={styles.icon}>{autoMode ? '🎙' : '👆'}</Text>

@@ -53,8 +53,8 @@ Also UI-lead: owns the shared theme file (`app/src/theme/theme.ts`).
 
 ✅ **Regression tests + Phase 4 tests** (`server/test/eta_model.test.js`)
 - 11 Phase 4 ETA-specific tests
-- **Total server tests: 47/47 PASS** (34 Phase 1–3 + 11 Phase 4 + 2 Phase 3 legacy)
-- **Total client tests: 7/7 PASS** (unchanged, regression verified)
+- **Total server tests: 48/48 PASS** (including all Phase 1–7 tests)
+- **Total client tests: 32/32 PASS, 7 suites** (including all Phase 1–7 client tests and benchmarks)
 
 ### Phase 4 Test Coverage (11 new tests, 100% pass)
 

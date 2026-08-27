@@ -113,6 +113,9 @@ describe('Client Routing Pipeline Performance', () => {
   });
 
   it('should measure debounce coalescing of multiple hazard triggers', (done) => {
+    // Enable fake timers for this test to control debounce behavior
+    jest.useFakeTimers();
+
     const measurements = {
       debounceTests: [] as Array<{ triggers: number; latency: number }>,
     };
@@ -170,6 +173,9 @@ describe('Client Routing Pipeline Performance', () => {
     }
 
     function finalizeDebounceTest() {
+      // Restore real timers before finishing
+      jest.useRealTimers();
+
       console.log('\n✓ Debounce Coalescing (50ms debounce window)');
       measurements.debounceTests.forEach((test) => {
         console.log(

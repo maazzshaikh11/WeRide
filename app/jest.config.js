@@ -14,6 +14,7 @@ module.exports = {
     '^@hazard/(.*)$': '<rootDir>/../modules/hazard-sos/src/$1',
     '^@routing/(.*)$': '<rootDir>/../modules/routing-eta/src/$1',
     '^@flvoice/(.*)$': '<rootDir>/../modules/fl-voice/src/$1',
+    '^@env$': '<rootDir>/env.d.ts',
   },
   testEnvironment: 'node',
 };

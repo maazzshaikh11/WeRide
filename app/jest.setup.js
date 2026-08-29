@@ -32,3 +32,7 @@ jest.mock('@rnmapbox/maps', () => ({
   LineLayer: 'LineLayer',
   SymbolLayer: 'SymbolLayer',
 }));
+
+jest.mock('@env', () => ({
+  MAPBOX_TOKEN: 'pk.test-mapbox-token-placeholder',
+}));

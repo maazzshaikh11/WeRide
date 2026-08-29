@@ -8,7 +8,8 @@
       "@tracking/*": ["../modules/tracking/src/*"],
       "@hazard/*": ["../modules/hazard-sos/src/*"],
       "@routing/*": ["../modules/routing-eta/src/*"],
-      "@flvoice/*": ["../modules/fl-voice/src/*"]
+      "@flvoice/*": ["../modules/fl-voice/src/*"],
+      "@env": [".env.d.ts"]
     },
     "strict": true,
     "esModuleInterop": true,

@@ -1,9 +1,9 @@
-/** @type {import('jest').Config} */
+﻿/** @type {import('jest').Config} */
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['<rootDir>/test/**/*.test.ts'],
-  moduleNameMapper: {
+moduleNameMapper: {
     '^@app/(.*)$': '<rootDir>/../../app/src/$1',
     '^@contracts/(.*)$': '<rootDir>/../../contracts/$1',
     '^@tracking/(.*)$': '<rootDir>/../tracking/src/$1',
@@ -13,9 +13,11 @@ module.exports = {
     'react-native-mmkv': '<rootDir>/test/__mocks__/mmkvMock.js',
     '@react-native-firebase/firestore': '<rootDir>/test/__mocks__/firebaseMock.js',
     '@react-native-firebase/auth': '<rootDir>/test/__mocks__/firebaseMock.js',
+    '@react-native-community/netinfo': '<rootDir>/test/__mocks__/netinfoMock.js',
     'react-native-webrtc': '<rootDir>/test/__mocks__/webrtcMock.js',
     'react-native-sensors': '<rootDir>/test/__mocks__/sensorsMock.js',
     'react-native-geolocation-service': '<rootDir>/test/__mocks__/geoMock.js',
     'socket.io-client': '<rootDir>/test/__mocks__/socketMock.js',
+    'uuid': '<rootDir>/test/__mocks__/uuidMock.js',
   },
 };

@@ -1,82 +1,301 @@
 /**
- * SOS trigger + CRDT queue + FCM trigger (via Cloud Function on Firestore write).
- * Ported from sos_service.dart.
- *
- * Flow:
- * 1. Trigger SOS → write SosEvent to LocalQueue (MMKV) immediately (zero data loss)
- * 2. Attempt Firestore write (if online)
- * 3. SyncWorker drains queue on reconnect
- * 4. Cloud Function on sos_events/ write sends FCM push to group members
- *
- * Anti-accidental trigger guard is in the UI (SosButton.tsx) — not here.
+ * Real SOS Service (Phase 5).
+ * Connects Phase 1–4 core algorithms/storage/sync to Firestore.
+ * 
+ * CRITICAL: Zero-data-loss order for SOS trigger:
+ * 1. Create SOS element
+ * 2. Add to OR-Set using orSetAdd()
+ * 3. Persist OR-Set to MMKV using orSetSave()
+ * 4. Only after durable local persistence succeeds should network/UI success continue
+ * 5. If online → write Firestore sos_events/{sos_id}
+ * 6. If offline → enqueue SOS operation to local queue (Phase 4)
+ * 
+ * - triggerSos: creates SOS with durable local persistence first
+ * - resolveSos: creates OR-Set tombstone, persists, updates/queues Firestore
+ * - subscribeToSosEvents: merges remote events into local OR-Set via orSetMerge()
  */
 
-import firestore from '@react-native-firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
+import /* eslint-disable-next-line @typescript-eslint/no-var-requires */ firestore from '@react-native-firebase/firestore';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { v4: uuidv4 } = require('uuid');
 import { HLC } from '../hlc/hlc';
-import { LocalQueue } from '../crdt/localQueue';
-import { SyncWorker } from '../crdt/syncWorker';
-import { SosEvent } from '../crdt/orSet';
+import {
+  SOSElement,
+  createORSet,
+  orSetAdd,
+  orSetAddWithTag,
+  orSetRemove,
+  orSetMerge,
+  orSetGetActive,
+  orSetSave,
+  orSetLoad,
+} from '../crdt/orSet';
+import {
+  queueEnqueue,
+  SOS_QUEUE,
+} from '../crdt/localQueue';
+import { isOnline } from '../crdt/syncWorker';
 
-export class SosService {
-  private _queue: LocalQueue;
-  private _firestore: ReturnType<typeof firestore>;
-  private _syncWorker: SyncWorker;
-  private _hlc: HLC;
-  private _uuid = uuidv4;
+const SOS_EVENTS_COLLECTION = 'sos_events';
 
-  constructor(params: { queue: LocalQueue; syncWorker: SyncWorker; hlc: HLC; firestoreInstance?: ReturnType<typeof firestore> }) {
-    this._queue = params.queue;
-    this._syncWorker = params.syncWorker;
-    this._hlc = params.hlc;
-    this._firestore = params.firestoreInstance ?? firestore();
-  }
+function getFirestore(): any {
+  // @ts-expect-error Firestore typing issue with getFirestore wrapper
+  return firestore();
+}
 
-  /** Trigger SOS. Returns the sos_id. Works offline. */
-  trigger(params: { riderId: string; groupId: string; lat: number; lng: number }): string {
-    const sosId = this._uuid();
-    const event: SosEvent = {
-      sosId,
-      riderId: params.riderId,
-      groupId: params.groupId,
-      lat: params.lat,
-      lng: params.lng,
-      createdAtHlc: this._hlc.now(),
-      resolved: false,
-      resolvedAtHlc: null,
+export interface SosEventData {
+  sos_id: string;
+  rider_id: string;
+  group_id: string;
+  lat: number;
+  lng: number;
+  created_at_hlc: string;
+  resolved: boolean;
+  resolved_at_hlc: string | null;
+}
+
+/**
+ * Trigger SOS with zero-data-loss guarantee.
+ * Local OR-Set persistence happens BEFORE any network attempt.
+ * Returns the sos_id.
+ */
+export async function triggerSos(
+  riderId: string,
+  groupId: string,
+  lat: number,
+  lng: number
+): Promise<string> {
+  const hlc = HLC.fresh();
+  const sosId = uuidv4();
+  const createdAtHlc = hlc.now();
+
+  const sosElement: SOSElement = {
+    sos_id: sosId,
+    rider_id: riderId,
+    group_id: groupId,
+    lat,
+    lng,
+    created_at_hlc: createdAtHlc,
+  };
+
+  // Step 1-3: CRITICAL - Local OR-Set persistence FIRST (zero data loss)
+  const storageKey = `sos_orset_${groupId}`;
+  let localSet = orSetLoad(storageKey);
+  localSet = orSetAdd(localSet, sosElement, hlc);
+  orSetSave(localSet, storageKey);
+
+  // Step 4-6: Network attempt (best-effort)
+  const online = await isOnline();
+
+  if (online) {
+    try {
+      const db = getFirestore();
+      await db
+        .collection(SOS_EVENTS_COLLECTION)
+        .doc(sosId)
+        .set({
+          sos_id: sosId,
+          rider_id: riderId,
+          group_id: groupId,
+          lat,
+          lng,
+          created_at_hlc: createdAtHlc,
+          tag: (localSet.adds.get([...localSet.adds.keys()].find(k => localSet.adds.get(k)!.sos_id === sosId) || ''))?.tag || '',
+          resolved: false,
+          resolved_at_hlc: null,
+        });
+    } catch (error) {
+      // Network failed - queue for sync worker to retry
+      console.error('[sosService] Firestore write failed, queuing for sync:', error);
+      const operation = {
+        id: uuidv4(),
+        type: 'sos_event' as const,
+        data: sosElement,
+        created_at_hlc: createdAtHlc,
+        retry_count: 0,
+      };
+      queueEnqueue(SOS_QUEUE, operation);
+    }
+  } else {
+    // Offline - queue for sync worker
+    const operation = {
+      id: uuidv4(),
+      type: 'sos_event' as const,
+      data: sosElement,
+      created_at_hlc: createdAtHlc,
+      retry_count: 0,
     };
-    // 1. Local write FIRST (zero data loss guarantee)
-    this._queue.enqueue(event);
-    // 2. Attempt immediate Firestore write (best-effort)
-    this._firestore
-      .collection('sos_events')
-      .doc(sosId)
-      .set({
-        sos_id: event.sosId,
-        rider_id: event.riderId,
-        group_id: event.groupId,
-        lat: event.lat,
-        lng: event.lng,
-        created_at_hlc: event.createdAtHlc,
-        resolved: event.resolved,
-        resolved_at_hlc: event.resolvedAtHlc,
-      })
-      .catch(() => {
-        // Will be drained by SyncWorker on reconnect
-      });
-    return sosId;
+    queueEnqueue(SOS_QUEUE, operation);
   }
 
-  /** Resolve an SOS (sender only). Adds tombstone to CRDT. */
-  resolve(sosId: string, _riderId: string): void {
-    const resolvedAt = this._hlc.now();
-    this._queue.dequeue(sosId); // remove from local queue if still pending
-    this._firestore
-      .collection('sos_events')
-      .doc(sosId)
-      .update({ resolved: true, resolved_at_hlc: resolvedAt })
-      .catch(() => {
-        // TODO: queue the resolve op for later sync
-      });
+  return sosId;
+}
+
+/**
+ * Resolve an SOS event.
+ * Creates OR-Set tombstone, persists locally, then updates/queues Firestore.
+ */
+export async function resolveSos(sosId: string, groupId: string): Promise<void> {
+  const hlc = HLC.fresh();
+  const resolvedAtHlc = hlc.now();
+
+  // Step 1-3: Local OR-Set tombstone + persistence FIRST
+  const storageKey = `sos_orset_${groupId}`;
+  let localSet = orSetLoad(storageKey);
+  localSet = orSetRemove(localSet, sosId);
+  orSetSave(localSet, storageKey);
+
+  // Step 4-5: Network attempt
+  const online = await isOnline();
+
+  if (online) {
+    try {
+      const db = getFirestore();
+      await db
+        .collection(SOS_EVENTS_COLLECTION)
+        .doc(sosId)
+        .update({
+          resolved: true,
+          resolved_at_hlc: resolvedAtHlc,
+        });
+    } catch (error) {
+      console.error('[sosService] Firestore resolve failed, queuing for sync:', error);
+      const operation = {
+        id: uuidv4(),
+        type: 'sos_resolve' as const,
+        data: { sos_id: sosId, resolved_at_hlc: resolvedAtHlc },
+        created_at_hlc: resolvedAtHlc,
+        retry_count: 0,
+      };
+      queueEnqueue(SOS_QUEUE, operation);
+    }
+  } else {
+    // Offline - queue for sync worker
+    const operation = {
+      id: uuidv4(),
+      type: 'sos_resolve' as const,
+      data: { sos_id: sosId, resolved_at_hlc: resolvedAtHlc },
+      created_at_hlc: resolvedAtHlc,
+      retry_count: 0,
+    };
+    queueEnqueue(SOS_QUEUE, operation);
   }
+}
+
+/**
+ * Subscribe to SOS events for a group.
+ * Merges remote events into local OR-Set using orSetMerge().
+ * Returns active SOS events via callback.
+ * Returns Firestore unsubscribe function.
+ */
+export function subscribeToSosEvents(
+  groupId: string,
+  callback: (sosEvents: SOSElement[]) => void
+): () => void {
+  const db = getFirestore();
+  const storageKey = `sos_orset_${groupId}`;
+
+  // Initial load: merge local with remote
+  const initialMerge = async () => {
+    const localSet = orSetLoad(storageKey);
+    
+    try {
+      const snapshot = await db
+        .collection(SOS_EVENTS_COLLECTION)
+        .where('group_id', '==', groupId)
+        .get();
+
+      let remoteSet = createORSet();
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const sosElement: SOSElement = {
+          sos_id: data.sos_id,
+          rider_id: data.rider_id,
+          group_id: data.group_id,
+          lat: data.lat,
+          lng: data.lng,
+          created_at_hlc: data.created_at_hlc,
+        };
+
+        // Use Firestore tag if present
+        const tag = data.tag || `${data.sos_id}:${data.rider_id}:${data.created_at_hlc}`;
+        remoteSet = orSetAddWithTag(remoteSet, sosElement, tag);
+
+        // If resolved, add tombstone
+        if (data.resolved) {
+          remoteSet = {
+            adds: remoteSet.adds,
+            tombstones: new Set([...remoteSet.tombstones, tag]),
+          };
+        }
+      }
+
+      // Merge local and remote
+      const merged = orSetMerge(localSet, remoteSet);
+      orSetSave(merged, storageKey);
+
+      // Callback with active events
+      const active = orSetGetActive(merged);
+      callback(active);
+    } catch (error) {
+      console.error('[sosService] Initial SOS merge failed:', error);
+      // Fall back to local only
+      callback(orSetGetActive(localSet));
+    }
+  };
+
+  initialMerge();
+
+  // Realtime listener for ongoing changes
+  const unsubscribe = db
+    .collection(SOS_EVENTS_COLLECTION)
+    .where('group_id', '==', groupId)
+    .onSnapshot(
+      async (snapshot: any) => {
+        const localSet = orSetLoad(storageKey);
+        
+        let remoteSet = createORSet();
+        for (const doc of snapshot.docs) {
+          const data = doc.data();
+          const sosElement: SOSElement = {
+            sos_id: data.sos_id,
+            rider_id: data.rider_id,
+            group_id: data.group_id,
+            lat: data.lat,
+            lng: data.lng,
+            created_at_hlc: data.created_at_hlc,
+          };
+
+          const tag = data.tag || `${data.sos_id}:${data.rider_id}:${data.created_at_hlc}`;
+          remoteSet = orSetAddWithTag(remoteSet, sosElement, tag);
+
+          if (data.resolved) {
+            remoteSet = {
+              adds: remoteSet.adds,
+              tombstones: new Set([...remoteSet.tombstones, tag]),
+            };
+          }
+        }
+
+        const merged = orSetMerge(localSet, remoteSet);
+        orSetSave(merged, storageKey);
+
+        const active = orSetGetActive(merged);
+        callback(active);
+      },
+      (error: any) => {
+        console.error('[sosService] SOS events listener error:', error);
+      }
+    );
+
+  return unsubscribe;
+}
+
+/**
+ * Get active SOS events from local OR-Set (synchronous, for immediate UI).
+ */
+export function getLocalActiveSosEvents(groupId: string): SOSElement[] {
+  const storageKey = `sos_orset_${groupId}`;
+  const localSet = orSetLoad(storageKey);
+  return orSetGetActive(localSet);
 }

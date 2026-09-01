@@ -1,11 +1,4 @@
-/**
- * Hybrid Logical Clock (Kulkarni et al.).
- * Shared utility — A, C, D all import this to timestamp their events.
- * Ported from hlc.dart.
- *
- * Tuple: (physical_ms, counter). Persisted on every update.
- * App restart must NOT reset the clock (breaks causal ordering).
- */
+import type { MMKV } from 'react-native-mmkv';
 
 export interface HlcState {
   physical: number;
@@ -13,6 +6,18 @@ export interface HlcState {
 }
 
 export type NowFn = () => number;
+
+// We cannot instantiate MMKV at module load time due to ts-jest mocking bugs.
+// The require() is deferred to call-time so Jest's jest.mock() runs first.
+let _storage: MMKV | null = null;
+function getStorage(): MMKV {
+  if (!_storage) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { MMKV: MMKVClass } = require('react-native-mmkv') as { MMKV: new (cfg: { id: string }) => MMKV };
+    _storage = new MMKVClass({ id: 'hlc' });
+  }
+  return _storage!;
+}
 
 export class HLC {
   private _physical: number;
@@ -27,40 +32,81 @@ export class HLC {
 
   static fresh(now?: NowFn): HLC {
     const n = now ?? (() => Date.now());
-    return new HLC({ physical: n(), counter: 0 }, n);
+    const saved = getStorage().getString('hlc_state');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as HlcState;
+        if (typeof parsed.physical === 'number' && typeof parsed.counter === 'number') {
+          return new HLC(parsed, n);
+        }
+      } catch (e) {
+        // Fallback if parsing fails
+      }
+    }
+
+    const newState = { physical: n(), counter: 0 };
+    getStorage().set('hlc_state', JSON.stringify(newState));
+    return new HLC(newState, n);
   }
 
-  /** Local event / send. Returns string form. */
   now(): string {
     const pt = this._now();
     if (pt > this._physical) {
       this._physical = pt;
       this._counter = 0;
     } else {
-      this._counter = this._counter + 1;
+      this._counter++;
     }
+    this.persist();
     return this.toString();
   }
 
-  /** Receive a remote HLC. Merge and return new string form. */
   receive(remote: string): string {
-    const r = HLC.parse(remote);
+    const remoteHlc = HLC.parse(remote);
     const pt = this._now();
-    this._physical = Math.max(this._physical, r.physical, pt);
-    if (this._physical === r.physical && this._physical === pt) {
-      this._counter = Math.max(this._counter, r.counter) + 1;
-    } else if (this._physical === r.physical) {
-      this._counter = (this._counter > r.counter ? this._counter : r.counter) + 1;
-    } else if (this._physical === pt) {
-      this._counter = this._counter + 1;
+
+    this._physical = Math.max(this._physical, remoteHlc.physical, pt);
+
+    if (this._physical > remoteHlc.physical) {
+      this._counter++;
     } else {
-      this._counter = 0;
+      this._counter = remoteHlc.counter + 1;
     }
+
+    this.persist();
     return this.toString();
   }
 
   toString(): string {
-    return `${this._physical}:${this._counter}`;
+    return `${this._physical}-${this._counter}`;
+  }
+
+  static parse(s: string): HlcState {
+    const parts = s.split('-');
+    const separator = parts.length > 1 ? '-' : ':';
+    const splitParts = s.split(separator);
+
+    const physical = parseInt(splitParts[0], 10);
+    const counter = parseInt(splitParts[1], 10);
+
+    if (isNaN(physical) || isNaN(counter)) {
+      throw new Error("Invalid HLC format");
+    }
+
+    return { physical, counter };
+  }
+
+  static compare(a: string, b: string): number {
+    const ha = HLC.parse(a);
+    const hb = HLC.parse(b);
+
+    if (ha.physical !== hb.physical) {
+      return ha.physical < hb.physical ? -1 : 1;
+    }
+    if (ha.counter !== hb.counter) {
+      return ha.counter < hb.counter ? -1 : 1;
+    }
+    return 0;
   }
 
   get physical(): number {
@@ -71,7 +117,6 @@ export class HLC {
     return this._counter;
   }
 
-  /** For persistence (MMKV). */
   toState(): HlcState {
     return { physical: this._physical, counter: this._counter };
   }
@@ -80,17 +125,14 @@ export class HLC {
     return new HLC(state, now);
   }
 
-  private static parse(s: string): HlcState {
-    const parts = s.split(':');
-    return { physical: parseInt(parts[0], 10), counter: parseInt(parts[1], 10) };
+  private persist() {
+    getStorage().set('hlc_state', JSON.stringify({
+      physical: this._physical,
+      counter: this._counter
+    }));
   }
 
-  /** Ordering: -1 if a < b, 0 if equal, 1 if a > b */
-  static compare(a: string, b: string): number {
-    const pa = HLC.parse(a);
-    const pb = HLC.parse(b);
-    if (pa.physical !== pb.physical) return pa.physical < pb.physical ? -1 : 1;
-    if (pa.counter !== pb.counter) return pa.counter < pb.counter ? -1 : 1;
-    return 0;
+  static _resetStorage() {
+    getStorage().remove('hlc_state');
   }
 }

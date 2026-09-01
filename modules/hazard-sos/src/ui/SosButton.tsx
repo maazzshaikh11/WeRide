@@ -37,7 +37,7 @@ export default function SosButton({ onTrigger, onResolve, showResolve = false, s
     // Single tap must NOT trigger. Track for double-tap.
     const now = Date.now();
     if (lastTapRef.current && now - lastTapRef.current < DOUBLE_TAP_MS) {
-      setTapCount((c) => {
+      setTapCount((c: number) => {
         if (c + 1 >= 2) fire();
         return c + 1;
       });

@@ -200,6 +200,18 @@ Deterministic validation tests (no Math.random()):
 3. **Latitude scaling:** R does not scale lng uncertainty by cos(lat) (acceptable for mid-latitudes)
 4. **No magnetometer:** Heading drift accumulates without absolute heading reference
 
+## Phase 8: CPU/Battery Profiling Harness (Task 8.1)
+
+The WeRide project specification requires the Tracking module to consume **< 1% CPU** (Spec §3.6 and §11 row 7).
+
+**To verify this:**
+1. Build the app in **Release Mode** and install it on a physical Android or iOS device.
+2. Launch the Android Studio Profiler (Android) or Instruments (iOS).
+3. Connect the profiler to the running `com.weride.app` process.
+4. Navigate to the Live Map to start the `TrackingService`.
+5. Observe the CPU usage graph for a sustained 5 minutes.
+6. The EKF computations, operating at 1 Hz, along with synchronous MMKV writes, must not exceed the 1% budget.
+
 ## See also
 - Plan: `Person_A_Tracking_AntiSpoofing.md`
 - Contract: `contracts/verified_location.json`

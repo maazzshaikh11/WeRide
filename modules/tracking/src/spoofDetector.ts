@@ -10,6 +10,7 @@ export interface SpoofDetectorParams {
   threshold: number;
   triggerTicks?: number;
   recoveryTicks?: number;
+  flagged?: boolean;
 }
 
 export class SpoofDetector {
@@ -25,6 +26,7 @@ export class SpoofDetector {
     this.threshold = params.threshold;
     this.triggerTicks = params.triggerTicks ?? 3;
     this.recoveryTicks = params.recoveryTicks ?? 5;
+    this._flagged = params.flagged ?? false;
   }
 
   get isFlagged(): boolean {

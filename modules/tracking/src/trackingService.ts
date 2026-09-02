@@ -19,6 +19,7 @@ import { SensorStream } from './sensorStream';
 import { LocationPublisher, VerifiedLocationPayload } from './locationPublisher';
 import { requestLocationPermission } from './permissions';
 import { persistHlc } from './hlcStore';
+import { persistEkf } from './ekfStore';
 import { HLC } from '@hazard/hlc/hlc';
 
 /**
@@ -116,6 +117,9 @@ export class TrackingService {
     // Advance HLC then immediately persist so restart-recovery always has latest state.
     const timestampHlc = this._hlc.now();
     persistHlc(this._hlc);
+
+    // Task 8.2: Persist EKF state so it can be resumed on cold start.
+    persistEkf(this._ekf);
 
     const payload: VerifiedLocationPayload = {
       timestampHlc,

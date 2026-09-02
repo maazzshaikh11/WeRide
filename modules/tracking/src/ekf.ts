@@ -41,6 +41,16 @@ export interface EkfParams {
   r?: number[];
 }
 
+export interface EkfState {
+  lat: number;
+  lng: number;
+  speed: number;
+  heading: number;
+  p: number[];
+  spoofFlag: boolean;
+  nisScore: number;
+}
+
 // Matrix helpers
 function mat4x4Multiply(a: number[], b: number[]): number[] {
   const result = new Array(16).fill(0);
@@ -265,6 +275,43 @@ export class Ekf {
 
   get spoofFlag(): boolean {
     return this._spoofDetector.isFlagged;
+  }
+
+  /**
+   * Serialize current EKF state.
+   */
+  toState(): EkfState {
+    return {
+      lat: this.lat,
+      lng: this.lng,
+      speed: this.speed,
+      heading: this.heading,
+      p: [...this.P],
+      spoofFlag: this.spoofFlag,
+      nisScore: this.nisScore,
+    };
+  }
+
+  /**
+   * Reconstruct an Ekf instance from serialized state.
+   */
+  static fromState(state: EkfState, params?: Partial<EkfParams>): Ekf {
+    const ekf = new Ekf({
+      lat: state.lat,
+      lng: state.lng,
+      speed: state.speed,
+      heading: state.heading,
+      ...params,
+    });
+    ekf.P = [...state.p];
+    ekf.nisScore = state.nisScore;
+    ekf._spoofDetector = new SpoofDetector({
+      threshold: ekf.nisThreshold,
+      triggerTicks: ekf.spoofTriggerTicks,
+      recoveryTicks: ekf.spoofRecoveryTicks,
+      flagged: state.spoofFlag,
+    });
+    return ekf;
   }
 
   /**

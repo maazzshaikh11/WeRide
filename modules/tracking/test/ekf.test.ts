@@ -37,6 +37,30 @@ describe('EKF', () => {
     for (let i = 0; i < 10; i++) ekf.update(ekf.lat, ekf.lng);
     expect(ekf.spoofFlag).toBe(false);
   });
+
+  test('serializes and deserializes state exactly', () => {
+    const original = new Ekf({ lat: 10, lng: 20 });
+    original.speed = 15;
+    original.heading = 90;
+    original.P = new Array(16).fill(0.5);
+    original.nisScore = 3.14;
+    // force flag
+    for (let i = 0; i < 5; i++) original.update(100, 100);
+    expect(original.spoofFlag).toBe(true);
+
+    const state = original.toState();
+    expect(state.lat).toBe(original.lat);
+    expect(state.spoofFlag).toBe(true);
+
+    const restored = Ekf.fromState(state);
+    expect(restored.lat).toBe(state.lat);
+    expect(restored.lng).toBe(state.lng);
+    expect(restored.speed).toBe(state.speed);
+    expect(restored.heading).toBe(state.heading);
+    expect(restored.P).toEqual(state.p);
+    expect(restored.nisScore).toBe(state.nisScore);
+    expect(restored.spoofFlag).toBe(true);
+  });
 });
 
 describe('SpoofDetector', () => {

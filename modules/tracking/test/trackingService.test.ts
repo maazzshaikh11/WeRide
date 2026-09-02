@@ -22,6 +22,11 @@ jest.mock('react-native', () => ({
 
 // Mock hlcStore so TrackingService.persistHlc() is a no-op in these tests.
 // HLC persistence correctness is verified in hlcStore.test.ts.
+jest.mock('../src/ekfStore', () => ({
+  persistEkf: jest.fn(),
+  loadEkfState: jest.fn(),
+}));
+
 jest.mock('../src/hlcStore', () => ({
   persistHlc: jest.fn(),
   loadHlc: jest.fn(),
@@ -143,6 +148,9 @@ describe('TrackingService', () => {
 
       expect(ekf.predict).not.toHaveBeenCalled();
       expect(publisher.publish).toHaveBeenCalled();
+
+      const { persistEkf } = require('../src/ekfStore');
+      expect(persistEkf).toHaveBeenCalledWith(ekf);
     });
 
     it('calls ekf.predict on tick with downsampled IMU data', () => {

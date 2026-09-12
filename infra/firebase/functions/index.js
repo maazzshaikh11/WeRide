@@ -2,7 +2,6 @@
 // On sos_events/{sosId} create → send FCM push to all group members.
 // Deploy: firebase deploy --only functions
 //
-// TODO: implement — Person B coordinates with infra.
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
@@ -16,7 +15,7 @@ exports.onSosCreate = functions.firestore
 
     // Fetch group members
     const groupDoc = await admin.firestore().doc(`groups/${groupId}`).get();
-    const memberIds = groupDoc.data().member_ids || [];
+    const memberIds = groupDoc.data()?.member_ids || [];
 
     // Fetch FCM tokens for each member
     const tokens = [];
@@ -27,7 +26,8 @@ exports.onSosCreate = functions.firestore
       if (token) tokens.push(token);
     }
 
-    if (tokens.length === 0) return;
+    const uniqueTokens = [...new Set(tokens)];
+    if (uniqueTokens.length === 0) return;
 
     // Send FCM multicast
     const message = {
@@ -36,7 +36,7 @@ exports.onSosCreate = functions.firestore
         body: `A rider in your group triggered SOS: ${sos.lat}, ${sos.lng}`,
       },
       data: { group_id: groupId, sos_id: context.params.sosId },
-      tokens: tokens,
+      tokens: uniqueTokens,
     };
 
     await admin.messaging().sendMulticast(message);

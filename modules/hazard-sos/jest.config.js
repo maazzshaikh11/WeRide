@@ -2,8 +2,23 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/test/**/*.test.ts'],
+  testMatch: ['<rootDir>/test/**/*.test.ts', '<rootDir>/test/**/*.test.tsx', '<rootDir>/test/phase6-ui-test-final.tsx'],
+  transform: {
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      diagnostics: false,
+      tsconfig: {
+        jsx: 'react',
+        esModuleInterop: true,
+        target: 'ES2020',
+        module: 'commonjs',
+      },
+    }],
+  },
+  moduleDirectories: ['node_modules'],
+  modulePaths: ['<rootDir>/node_modules'],
   moduleNameMapper: {
+    '^@app/store/appStore$': '<rootDir>/test/__mocks__/appStoreMock.js',
+    '.*/store/appStore$': '<rootDir>/test/__mocks__/appStoreMock.js',
     '^@app/(.*)$': '<rootDir>/../../app/src/$1',
     '^@contracts/(.*)$': '<rootDir>/../../contracts/$1',
     '^@tracking/(.*)$': '<rootDir>/../tracking/src/$1',
@@ -13,9 +28,13 @@ module.exports = {
     'react-native-mmkv': '<rootDir>/test/__mocks__/mmkvMock.js',
     '@react-native-firebase/firestore': '<rootDir>/test/__mocks__/firebaseMock.js',
     '@react-native-firebase/auth': '<rootDir>/test/__mocks__/firebaseMock.js',
+    '@react-native-community/netinfo': '<rootDir>/test/__mocks__/netinfoMock.js',
     'react-native-webrtc': '<rootDir>/test/__mocks__/webrtcMock.js',
     'react-native-sensors': '<rootDir>/test/__mocks__/sensorsMock.js',
     'react-native-geolocation-service': '<rootDir>/test/__mocks__/geoMock.js',
     'socket.io-client': '<rootDir>/test/__mocks__/socketMock.js',
+    'uuid': '<rootDir>/test/__mocks__/uuidMock.js',
+    '@rnmapbox/maps': '<rootDir>/test/__mocks__/mapboxMock.js',
+    'react-native': '<rootDir>/test/__mocks__/reactNativeMock.js',
   },
 };

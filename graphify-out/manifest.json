@@ -1,0 +1,794 @@
+{
+  ".claude/settings.json": {
+    "mtime": 1787837314.8687277,
+    "seen": 1787909969.9313147,
+    "ast_hash": "8af347b859a43a52f70946bfa995b2eb",
+    "semantic_hash": "8af347b859a43a52f70946bfa995b2eb"
+  },
+  "app/.eslintrc.js": {
+    "mtime": 1787813963.9076777,
+    "seen": 1787909969.9313147,
+    "ast_hash": "353d3c457a72c3b969e241edc71eb579",
+    "semantic_hash": "353d3c457a72c3b969e241edc71eb579"
+  },
+  "app/__tests__/geoUtils.test.ts": {
+    "mtime": 1787813963.9076777,
+    "seen": 1787909969.9313147,
+    "ast_hash": "ba37f11f4ad77d24fc429987a1521449",
+    "semantic_hash": "ba37f11f4ad77d24fc429987a1521449"
+  },
+  "app/app.json": {
+    "mtime": 1787813963.912277,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f99748cde2c054cbf0e0de3c47d927e3",
+    "semantic_hash": "f99748cde2c054cbf0e0de3c47d927e3"
+  },
+  "app/babel.config.js": {
+    "mtime": 1787813963.912277,
+    "seen": 1787909969.9313147,
+    "ast_hash": "28f1c55e544aea2b125717d39b5535b2",
+    "semantic_hash": "28f1c55e544aea2b125717d39b5535b2"
+  },
+  "app/index.js": {
+    "mtime": 1787813963.912277,
+    "seen": 1787909969.9313147,
+    "ast_hash": "45e64d3d145f17f5b55bcd9c3934de69",
+    "semantic_hash": "45e64d3d145f17f5b55bcd9c3934de69"
+  },
+  "app/jest.config.js": {
+    "mtime": 1787813963.9148097,
+    "seen": 1787909969.9313147,
+    "ast_hash": "7658f8f8bd5f8558d35e2f208140b465",
+    "semantic_hash": "7658f8f8bd5f8558d35e2f208140b465"
+  },
+  "app/jest.setup.js": {
+    "mtime": 1787813963.9148097,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f395d0e76fecdc8c1434e7e4eda842fa",
+    "semantic_hash": "f395d0e76fecdc8c1434e7e4eda842fa"
+  },
+  "app/package.json": {
+    "mtime": 1787813963.9148097,
+    "seen": 1787909969.9313147,
+    "ast_hash": "22a7e270e8ab8b402aa7e83638fd195d",
+    "semantic_hash": "22a7e270e8ab8b402aa7e83638fd195d"
+  },
+  "app/src/App.tsx": {
+    "mtime": 1787924609.3758008,
+    "seen": 1787925022.2680724,
+    "ast_hash": "9b07a10a82e675cd8215cdfdccdd7c09",
+    "semantic_hash": "9b07a10a82e675cd8215cdfdccdd7c09"
+  },
+  "app/src/models/hazardCluster.ts": {
+    "mtime": 1787813963.9148097,
+    "seen": 1787909969.9313147,
+    "ast_hash": "4c81f35ff6950ef38770cd8f87845249",
+    "semantic_hash": "4c81f35ff6950ef38770cd8f87845249"
+  },
+  "app/src/models/index.ts": {
+    "mtime": 1787813963.9148097,
+    "seen": 1787909969.9313147,
+    "ast_hash": "86624a900b72a9a72fa9be92e06dcc6d",
+    "semantic_hash": "86624a900b72a9a72fa9be92e06dcc6d"
+  },
+  "app/src/models/routeResponse.ts": {
+    "mtime": 1787813963.9148097,
+    "seen": 1787909969.9313147,
+    "ast_hash": "7cc14e4d0be404a9aef1fae936059fab",
+    "semantic_hash": "7cc14e4d0be404a9aef1fae936059fab"
+  },
+  "app/src/models/sosEvent.ts": {
+    "mtime": 1787813963.9238079,
+    "seen": 1787909969.9313147,
+    "ast_hash": "370172379ad8ac8ea580eff69d2a06dd",
+    "semantic_hash": "370172379ad8ac8ea580eff69d2a06dd"
+  },
+  "app/src/models/verifiedLocation.ts": {
+    "mtime": 1787813963.9252887,
+    "seen": 1787909969.9313147,
+    "ast_hash": "b6ef5bf52d30e54e6178ed19c12b3f70",
+    "semantic_hash": "b6ef5bf52d30e54e6178ed19c12b3f70"
+  },
+  "app/src/navigation/RootStack.tsx": {
+    "mtime": 1787813963.9252887,
+    "seen": 1787909969.9313147,
+    "ast_hash": "4de0e02e4c4a9e2835f0bf595b11d656",
+    "semantic_hash": "4de0e02e4c4a9e2835f0bf595b11d656"
+  },
+  "app/src/screens/GroupListScreen.tsx": {
+    "mtime": 1787813963.9277966,
+    "seen": 1787909969.9313147,
+    "ast_hash": "31e6200f3ecb6b374591fc7606f52b1b",
+    "semantic_hash": "31e6200f3ecb6b374591fc7606f52b1b"
+  },
+  "app/src/screens/LoginScreen.tsx": {
+    "mtime": 1787813963.9277966,
+    "seen": 1787909969.9313147,
+    "ast_hash": "34ba42b802cb2b639eb6d31ae050092d",
+    "semantic_hash": "34ba42b802cb2b639eb6d31ae050092d"
+  },
+  "app/src/screens/map/MapScreen.tsx": {
+    "mtime": 1787813963.9277966,
+    "seen": 1787909969.9313147,
+    "ast_hash": "ad223f28017a5e09715d3571b4c272e3",
+    "semantic_hash": "ad223f28017a5e09715d3571b4c272e3"
+  },
+  "app/src/screens/map/overlays/FlStatusOverlay.tsx": {
+    "mtime": 1787813963.9277966,
+    "seen": 1787909969.9313147,
+    "ast_hash": "198a1ff27f87b238d8715805fbe0c485",
+    "semantic_hash": "198a1ff27f87b238d8715805fbe0c485"
+  },
+  "app/src/screens/map/overlays/HazardOverlay.tsx": {
+    "mtime": 1787813963.934093,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f19f2be47a0f862be388b3989eb15403",
+    "semantic_hash": "f19f2be47a0f862be388b3989eb15403"
+  },
+  "app/src/screens/map/overlays/RiderMarkerOverlay.tsx": {
+    "mtime": 1787813963.934093,
+    "seen": 1787909969.9313147,
+    "ast_hash": "be22165cc25b33d181a147a8210dc3ed",
+    "semantic_hash": "be22165cc25b33d181a147a8210dc3ed"
+  },
+  "app/src/screens/map/overlays/RouteOverlay.tsx": {
+    "mtime": 1787813963.934093,
+    "seen": 1787909969.9313147,
+    "ast_hash": "82cb1cdadf9e2c80e836246c91179496",
+    "semantic_hash": "82cb1cdadf9e2c80e836246c91179496"
+  },
+  "app/src/screens/map/overlays/SosOverlay.tsx": {
+    "mtime": 1787813963.934093,
+    "seen": 1787909969.9313147,
+    "ast_hash": "345b918a023f9a489b2c5b27be972b12",
+    "semantic_hash": "345b918a023f9a489b2c5b27be972b12"
+  },
+  "app/src/screens/map/overlays/VoxOverlay.tsx": {
+    "mtime": 1787813963.934093,
+    "seen": 1787909969.9313147,
+    "ast_hash": "59b44b9231ecc6ac747b7a3caad21b5b",
+    "semantic_hash": "59b44b9231ecc6ac747b7a3caad21b5b"
+  },
+  "app/src/services/firebaseService.ts": {
+    "mtime": 1787813963.9405832,
+    "seen": 1787909969.9313147,
+    "ast_hash": "974861780acaed51cdc69928d3f32a4c",
+    "semantic_hash": "974861780acaed51cdc69928d3f32a4c"
+  },
+  "app/src/services/localStorage.ts": {
+    "mtime": 1787813963.9405832,
+    "seen": 1787909969.9313147,
+    "ast_hash": "c03972a46c67af56cb0d62ac5cfbb1ff",
+    "semantic_hash": "c03972a46c67af56cb0d62ac5cfbb1ff"
+  },
+  "app/src/services/socketService.ts": {
+    "mtime": 1787813963.9405832,
+    "seen": 1787909969.9313147,
+    "ast_hash": "402b031153c85a80ccfe1e2cdbfb79ab",
+    "semantic_hash": "402b031153c85a80ccfe1e2cdbfb79ab"
+  },
+  "app/src/store/appStore.ts": {
+    "mtime": 1787813963.9405832,
+    "seen": 1787909969.9313147,
+    "ast_hash": "a05c0baed426f98b1fc6496934e2bade",
+    "semantic_hash": "a05c0baed426f98b1fc6496934e2bade"
+  },
+  "app/src/theme/colors.ts": {
+    "mtime": 1787813963.9405832,
+    "seen": 1787909969.9313147,
+    "ast_hash": "b568fc87c2a94f14daff2b5e25ffcb57",
+    "semantic_hash": "b568fc87c2a94f14daff2b5e25ffcb57"
+  },
+  "app/src/theme/theme.ts": {
+    "mtime": 1787813963.9405832,
+    "seen": 1787909969.9313147,
+    "ast_hash": "9f2035134f2416be53daec33b9939f5c",
+    "semantic_hash": "9f2035134f2416be53daec33b9939f5c"
+  },
+  "app/src/utils/geoUtils.ts": {
+    "mtime": 1787813963.9405832,
+    "seen": 1787909969.9313147,
+    "ast_hash": "fc3935c641949c7febf94d0876c9bb55",
+    "semantic_hash": "fc3935c641949c7febf94d0876c9bb55"
+  },
+  "app/tsconfig.json": {
+    "mtime": 1787813963.9405832,
+    "seen": 1787909969.9313147,
+    "ast_hash": "9b312bbfb62b6785f4c1b1792b8fc370",
+    "semantic_hash": "9b312bbfb62b6785f4c1b1792b8fc370"
+  },
+  "contracts/fl_model_update.json": {
+    "mtime": 1787813963.9535587,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f2d80f57328ac75a90b0d0cb71ce435b",
+    "semantic_hash": "f2d80f57328ac75a90b0d0cb71ce435b"
+  },
+  "contracts/hazard_cluster.json": {
+    "mtime": 1787813963.9553022,
+    "seen": 1787909969.9313147,
+    "ast_hash": "65c01ddfabe7e0764ef04f10cdcb29fb",
+    "semantic_hash": "65c01ddfabe7e0764ef04f10cdcb29fb"
+  },
+  "contracts/hazard_report.json": {
+    "mtime": 1787813963.9561732,
+    "seen": 1787909969.9313147,
+    "ast_hash": "454579d9b8f9be5258fd09295a4456ef",
+    "semantic_hash": "454579d9b8f9be5258fd09295a4456ef"
+  },
+  "contracts/route_contract.json": {
+    "mtime": 1787813963.9561732,
+    "seen": 1787909969.9313147,
+    "ast_hash": "4e908a0cb66b3967969628c17d07a45a",
+    "semantic_hash": "4e908a0cb66b3967969628c17d07a45a"
+  },
+  "contracts/sos_event.json": {
+    "mtime": 1787813963.9561732,
+    "seen": 1787909969.9313147,
+    "ast_hash": "7ce84be7cf40c3b26731b52a86a7ea59",
+    "semantic_hash": "7ce84be7cf40c3b26731b52a86a7ea59"
+  },
+  "contracts/verified_location.json": {
+    "mtime": 1787813963.9561732,
+    "seen": 1787909969.9313147,
+    "ast_hash": "7e4b3b7bd8439b4883bc11273594cebd",
+    "semantic_hash": "7e4b3b7bd8439b4883bc11273594cebd"
+  },
+  "contracts/vox_signal.json": {
+    "mtime": 1787813963.9561732,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f4ed145c5f4f604a0559c950dde30fba",
+    "semantic_hash": "f4ed145c5f4f604a0559c950dde30fba"
+  },
+  "infra/firebase/firebase.json": {
+    "mtime": 1787813963.9753206,
+    "seen": 1787909969.9313147,
+    "ast_hash": "039f848f05b69dcb38f65112e2b51957",
+    "semantic_hash": "039f848f05b69dcb38f65112e2b51957"
+  },
+  "infra/firebase/functions/index.js": {
+    "mtime": 1787813963.9794183,
+    "seen": 1787909969.9313147,
+    "ast_hash": "dd9c8a9b543ec5581db067b00ad5cffb",
+    "semantic_hash": "dd9c8a9b543ec5581db067b00ad5cffb"
+  },
+  "infra/firebase/functions/package.json": {
+    "mtime": 1787813963.9814355,
+    "seen": 1787909969.9313147,
+    "ast_hash": "86bdaccfdcdc84b515af51880b0f19ac",
+    "semantic_hash": "86bdaccfdcdc84b515af51880b0f19ac"
+  },
+  "modules/fl-voice/jest.config.js": {
+    "mtime": 1787813963.986801,
+    "seen": 1787909969.9313147,
+    "ast_hash": "74a623f76904ce9f3ff8a1236eca71ba",
+    "semantic_hash": "74a623f76904ce9f3ff8a1236eca71ba"
+  },
+  "modules/fl-voice/package.json": {
+    "mtime": 1787813963.988765,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f5be3c609acac607733234f9239d6e0a",
+    "semantic_hash": "f5be3c609acac607733234f9239d6e0a"
+  },
+  "modules/fl-voice/src/fl/dpMasking.ts": {
+    "mtime": 1787813963.988765,
+    "seen": 1787909969.9313147,
+    "ast_hash": "e83ad6074b319c20ad90faf46f92e4e2",
+    "semantic_hash": "e83ad6074b319c20ad90faf46f92e4e2"
+  },
+  "modules/fl-voice/src/fl/flClient.ts": {
+    "mtime": 1787813963.9923618,
+    "seen": 1787909969.9313147,
+    "ast_hash": "95c028738d90dedf2bd9ad4eaf949253",
+    "semantic_hash": "95c028738d90dedf2bd9ad4eaf949253"
+  },
+  "modules/fl-voice/src/fl/flRoundLogger.ts": {
+    "mtime": 1787813963.9923618,
+    "seen": 1787909969.9313147,
+    "ast_hash": "98ec735b823d6c5a501b00acc979dc75",
+    "semantic_hash": "98ec735b823d6c5a501b00acc979dc75"
+  },
+  "modules/fl-voice/src/index.ts": {
+    "mtime": 1787813963.9923618,
+    "seen": 1787909969.9313147,
+    "ast_hash": "82a6c52fc59385696f36b75b3ac202ad",
+    "semantic_hash": "82a6c52fc59385696f36b75b3ac202ad"
+  },
+  "modules/fl-voice/src/ui/FlStatusIndicator.tsx": {
+    "mtime": 1787813963.9923618,
+    "seen": 1787909969.9313147,
+    "ast_hash": "dfbdfd23c6850333bafcaf15773ca059",
+    "semantic_hash": "dfbdfd23c6850333bafcaf15773ca059"
+  },
+  "modules/fl-voice/src/ui/MusicWidget.tsx": {
+    "mtime": 1787813963.9923618,
+    "seen": 1787909969.9313147,
+    "ast_hash": "14dce922e0c64ba818dd13b2346d1c39",
+    "semantic_hash": "14dce922e0c64ba818dd13b2346d1c39"
+  },
+  "modules/fl-voice/src/ui/VoxIndicator.tsx": {
+    "mtime": 1787813963.9923618,
+    "seen": 1787909969.9313147,
+    "ast_hash": "344dbd4a2e72b502749f2e16c505d786",
+    "semantic_hash": "344dbd4a2e72b502749f2e16c505d786"
+  },
+  "modules/fl-voice/src/vox/PttButton.tsx": {
+    "mtime": 1787813963.9923618,
+    "seen": 1787909969.9313147,
+    "ast_hash": "86035f2d5cbdd1d9036fd81698f25215",
+    "semantic_hash": "86035f2d5cbdd1d9036fd81698f25215"
+  },
+  "modules/fl-voice/src/vox/vad.ts": {
+    "mtime": 1787813963.9923618,
+    "seen": 1787909969.9313147,
+    "ast_hash": "0c64bae2f70adfa25d3425f3ae64fa10",
+    "semantic_hash": "0c64bae2f70adfa25d3425f3ae64fa10"
+  },
+  "modules/fl-voice/src/vox/voxClient.ts": {
+    "mtime": 1787813963.9923618,
+    "seen": 1787909969.9313147,
+    "ast_hash": "e6541fa5a489f94c53530ce62d6c2faf",
+    "semantic_hash": "e6541fa5a489f94c53530ce62d6c2faf"
+  },
+  "modules/fl-voice/test/__mocks__/firebaseMock.js": {
+    "mtime": 1787813964.0053356,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/fl-voice/test/__mocks__/geoMock.js": {
+    "mtime": 1787813964.0053356,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/fl-voice/test/__mocks__/mmkvMock.js": {
+    "mtime": 1787813964.0053356,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/fl-voice/test/__mocks__/sensorsMock.js": {
+    "mtime": 1787813964.0053356,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/fl-voice/test/__mocks__/socketMock.js": {
+    "mtime": 1787813964.0053356,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/fl-voice/test/__mocks__/webrtcMock.js": {
+    "mtime": 1787813964.0053356,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/fl-voice/test/flVoice.test.ts": {
+    "mtime": 1787813964.0053356,
+    "seen": 1787909969.9313147,
+    "ast_hash": "d21439837a0fba3ad31b2aa4964ad2c8",
+    "semantic_hash": "d21439837a0fba3ad31b2aa4964ad2c8"
+  },
+  "modules/fl-voice/tsconfig.json": {
+    "mtime": 1787813964.012908,
+    "seen": 1787909969.9313147,
+    "ast_hash": "9fa98fc2d782823f68eb7de7b589ff0c",
+    "semantic_hash": "9fa98fc2d782823f68eb7de7b589ff0c"
+  },
+  "modules/hazard-sos/.eslintrc.js": {
+    "mtime": 1787831015.3237262,
+    "seen": 1787909969.9313147,
+    "ast_hash": "45ba5055cfebef3958f7125534a8ff99",
+    "semantic_hash": "45ba5055cfebef3958f7125534a8ff99"
+  },
+  "modules/hazard-sos/jest.config.js": {
+    "mtime": 1788196357.7795205,
+    "seen": 1788198117.406719,
+    "ast_hash": "096e111395f6c57b203e06b4ce004537",
+    "semantic_hash": "096e111395f6c57b203e06b4ce004537"
+  },
+  "modules/hazard-sos/package.json": {
+    "mtime": 1787999696.0959816,
+    "seen": 1788186781.9643188,
+    "ast_hash": "69a6572e91c94914659fde6293058e69",
+    "semantic_hash": "69a6572e91c94914659fde6293058e69"
+  },
+  "modules/hazard-sos/src/crdt/localQueue.ts": {
+    "mtime": 1788027147.8380568,
+    "seen": 1788186781.9643188,
+    "ast_hash": "60bc5937cf63c79781efb8bc93650bb3",
+    "semantic_hash": "60bc5937cf63c79781efb8bc93650bb3"
+  },
+  "modules/hazard-sos/src/crdt/orSet.ts": {
+    "mtime": 1788027161.1046772,
+    "seen": 1788186781.9643188,
+    "ast_hash": "11d847ff9e3d3aa0dbd0b257ee4b73fc",
+    "semantic_hash": "11d847ff9e3d3aa0dbd0b257ee4b73fc"
+  },
+  "modules/hazard-sos/src/crdt/syncWorker.ts": {
+    "mtime": 1788066873.9525812,
+    "seen": 1788186781.9643188,
+    "ast_hash": "03df0b2ea3f8b0cb16bbe41c846ba800",
+    "semantic_hash": "03df0b2ea3f8b0cb16bbe41c846ba800"
+  },
+  "modules/hazard-sos/src/dbscan/dbscan.ts": {
+    "mtime": 1787987763.1123633,
+    "seen": 1788186781.9643188,
+    "ast_hash": "83669e75e5012f5349573288402b0644",
+    "semantic_hash": "83669e75e5012f5349573288402b0644"
+  },
+  "modules/hazard-sos/src/hlc/hlc.ts": {
+    "mtime": 1787914095.5337868,
+    "seen": 1787925022.2912498,
+    "ast_hash": "279f923bf2a747f98776a0fae996ecdd",
+    "semantic_hash": "279f923bf2a747f98776a0fae996ecdd"
+  },
+  "modules/hazard-sos/src/index.ts": {
+    "mtime": 1788189029.2629452,
+    "seen": 1788198117.406719,
+    "ast_hash": "3b9b362fc9136bab4333a41144c9c7f7",
+    "semantic_hash": "3b9b362fc9136bab4333a41144c9c7f7"
+  },
+  "modules/hazard-sos/src/services/hazardService.ts": {
+    "mtime": 1788196193.8625991,
+    "seen": 1788198117.406719,
+    "ast_hash": "d2eb3c73b26930a799871001af34f102",
+    "semantic_hash": "d2eb3c73b26930a799871001af34f102"
+  },
+  "modules/hazard-sos/src/services/mockHazardService.ts": {
+    "mtime": 1787833494.8001182,
+    "seen": 1787909969.9313147,
+    "ast_hash": "407112ac6183d3a1ac2e5995e64bed23",
+    "semantic_hash": "407112ac6183d3a1ac2e5995e64bed23"
+  },
+  "modules/hazard-sos/src/services/mockSosService.ts": {
+    "mtime": 1787833501.9301586,
+    "seen": 1787909969.9313147,
+    "ast_hash": "d2e9f5c4d2c3f9441edacf88dcda64f4",
+    "semantic_hash": "d2e9f5c4d2c3f9441edacf88dcda64f4"
+  },
+  "modules/hazard-sos/src/services/sosService.ts": {
+    "mtime": 1788196757.2350044,
+    "seen": 1788198117.406719,
+    "ast_hash": "ae5c5ae6f3ea49672c95bee2f7a5cb46",
+    "semantic_hash": "ae5c5ae6f3ea49672c95bee2f7a5cb46"
+  },
+  "modules/hazard-sos/src/ui/HazardReportSheet.tsx": {
+    "mtime": 1787813964.0310254,
+    "seen": 1787909969.9313147,
+    "ast_hash": "e96a4f94b9629a8e6cb1e1e9aa3a6595",
+    "semantic_hash": "e96a4f94b9629a8e6cb1e1e9aa3a6595"
+  },
+  "modules/hazard-sos/src/ui/SosButton.tsx": {
+    "mtime": 1787813964.0310254,
+    "seen": 1787909969.9313147,
+    "ast_hash": "46c2d35d3f0938e96615f4557fb54a73",
+    "semantic_hash": "46c2d35d3f0938e96615f4557fb54a73"
+  },
+  "modules/hazard-sos/src/ui/hazardMarker.ts": {
+    "mtime": 1787813964.0310254,
+    "seen": 1787909969.9313147,
+    "ast_hash": "e8e12e4b1e519410661939e063a8eefc",
+    "semantic_hash": "e8e12e4b1e519410661939e063a8eefc"
+  },
+  "modules/hazard-sos/test/__mocks__/firebaseMock.js": {
+    "mtime": 1788196479.3003135,
+    "seen": 1788198117.406719,
+    "ast_hash": "12e90caeea385c2ea467aac8a356cbcc",
+    "semantic_hash": "12e90caeea385c2ea467aac8a356cbcc"
+  },
+  "modules/hazard-sos/test/__mocks__/geoMock.js": {
+    "mtime": 1787813964.0356152,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/hazard-sos/test/__mocks__/mmkvMock.js": {
+    "mtime": 1787926991.193947,
+    "seen": 1788186781.9655428,
+    "ast_hash": "3fefec458080b53ef55ec2540aef175d",
+    "semantic_hash": "3fefec458080b53ef55ec2540aef175d"
+  },
+  "modules/hazard-sos/test/__mocks__/sensorsMock.js": {
+    "mtime": 1787813964.0391636,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/hazard-sos/test/__mocks__/socketMock.js": {
+    "mtime": 1787813964.0391636,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/hazard-sos/test/__mocks__/webrtcMock.js": {
+    "mtime": 1787813964.0391636,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/hazard-sos/test/hazardSos.test.ts": {
+    "mtime": 1788196906.5741637,
+    "seen": 1788198117.406719,
+    "ast_hash": "6261213f99a8ace4639009163aa300b2",
+    "semantic_hash": "6261213f99a8ace4639009163aa300b2"
+  },
+  "modules/hazard-sos/tsconfig.json": {
+    "mtime": 1787833376.5607142,
+    "seen": 1787909969.9313147,
+    "ast_hash": "2334db93c1d531440adb55213dacec2d",
+    "semantic_hash": "2334db93c1d531440adb55213dacec2d"
+  },
+  "modules/routing-eta/jest.config.js": {
+    "mtime": 1787813964.043929,
+    "seen": 1787909969.9313147,
+    "ast_hash": "74a623f76904ce9f3ff8a1236eca71ba",
+    "semantic_hash": "74a623f76904ce9f3ff8a1236eca71ba"
+  },
+  "modules/routing-eta/package.json": {
+    "mtime": 1787813964.043929,
+    "seen": 1787909969.9313147,
+    "ast_hash": "0a74d1fcdbcbd8fc25e7a77ac36e9ae6",
+    "semantic_hash": "0a74d1fcdbcbd8fc25e7a77ac36e9ae6"
+  },
+  "modules/routing-eta/server/astar.js": {
+    "mtime": 1787813964.0494635,
+    "seen": 1787909969.9313147,
+    "ast_hash": "51a7f9366b286d4e5ee165f4bfd0426c",
+    "semantic_hash": "51a7f9366b286d4e5ee165f4bfd0426c"
+  },
+  "modules/routing-eta/server/eta_model.js": {
+    "mtime": 1787813964.0494635,
+    "seen": 1787909969.9313147,
+    "ast_hash": "8d111cab1fa14b5d8b626b85007f8c0c",
+    "semantic_hash": "8d111cab1fa14b5d8b626b85007f8c0c"
+  },
+  "modules/routing-eta/server/fl_proxy.js": {
+    "mtime": 1787813964.0494635,
+    "seen": 1787909969.9313147,
+    "ast_hash": "d06628403fae80a897a5fba5e0765af9",
+    "semantic_hash": "d06628403fae80a897a5fba5e0765af9"
+  },
+  "modules/routing-eta/server/index.js": {
+    "mtime": 1787813964.0542533,
+    "seen": 1787909969.9313147,
+    "ast_hash": "cf7d6efe8c398cdd7b0c39f199e0051c",
+    "semantic_hash": "cf7d6efe8c398cdd7b0c39f199e0051c"
+  },
+  "modules/routing-eta/server/package.json": {
+    "mtime": 1787813964.0566638,
+    "seen": 1787909969.9313147,
+    "ast_hash": "1aa4400306243ee3f8c0d9528ff7f045",
+    "semantic_hash": "1aa4400306243ee3f8c0d9528ff7f045"
+  },
+  "modules/routing-eta/server/road_graph.js": {
+    "mtime": 1787813964.0566638,
+    "seen": 1787909969.9313147,
+    "ast_hash": "efc03500d51f42308dac0f3e6deef95d",
+    "semantic_hash": "efc03500d51f42308dac0f3e6deef95d"
+  },
+  "modules/routing-eta/server/safety_score.js": {
+    "mtime": 1787813964.0566638,
+    "seen": 1787909969.9313147,
+    "ast_hash": "6ba91d359d24128c8076636b73a51e59",
+    "semantic_hash": "6ba91d359d24128c8076636b73a51e59"
+  },
+  "modules/routing-eta/server/test/astar.test.js": {
+    "mtime": 1787813964.0566638,
+    "seen": 1787909969.9313147,
+    "ast_hash": "9d4220d4095f7871aff9f3191ce1ff7a",
+    "semantic_hash": "9d4220d4095f7871aff9f3191ce1ff7a"
+  },
+  "modules/routing-eta/server/training/collect_directions.py": {
+    "mtime": 1787813964.0655506,
+    "seen": 1787909969.9313147,
+    "ast_hash": "66b1eda71221040bfa33ec2284c695a7",
+    "semantic_hash": "66b1eda71221040bfa33ec2284c695a7"
+  },
+  "modules/routing-eta/server/training/train_eta.py": {
+    "mtime": 1787813964.0655506,
+    "seen": 1787909969.9313147,
+    "ast_hash": "4cf6e48fb19eca3656e6a5786b8d7670",
+    "semantic_hash": "4cf6e48fb19eca3656e6a5786b8d7670"
+  },
+  "modules/routing-eta/server/vox_signaling.js": {
+    "mtime": 1787813964.0655506,
+    "seen": 1787909969.9313147,
+    "ast_hash": "513257045b87fd70d2d146b122eff34b",
+    "semantic_hash": "513257045b87fd70d2d146b122eff34b"
+  },
+  "modules/routing-eta/src/client/RoutePanel.tsx": {
+    "mtime": 1787813964.0692644,
+    "seen": 1787909969.9313147,
+    "ast_hash": "a02a11c7932b5413f1b30b42cdc9b1de",
+    "semantic_hash": "a02a11c7932b5413f1b30b42cdc9b1de"
+  },
+  "modules/routing-eta/src/client/routeLine.ts": {
+    "mtime": 1787813964.0692644,
+    "seen": 1787909969.9313147,
+    "ast_hash": "6c1b1effa3456f03eb7cbe183bff041a",
+    "semantic_hash": "6c1b1effa3456f03eb7cbe183bff041a"
+  },
+  "modules/routing-eta/src/client/routingClient.ts": {
+    "mtime": 1787813964.0692644,
+    "seen": 1787909969.9313147,
+    "ast_hash": "10aa7e3f142dbb7a61b3c1e2d22bf6ad",
+    "semantic_hash": "10aa7e3f142dbb7a61b3c1e2d22bf6ad"
+  },
+  "modules/routing-eta/src/group/groupService.ts": {
+    "mtime": 1787813964.0692644,
+    "seen": 1787909969.9313147,
+    "ast_hash": "dedeafac12ee886faa27ab80b92cda36",
+    "semantic_hash": "dedeafac12ee886faa27ab80b92cda36"
+  },
+  "modules/routing-eta/src/index.ts": {
+    "mtime": 1787813964.0758085,
+    "seen": 1787909969.9313147,
+    "ast_hash": "cfc586c10cacfdc1bae280d8fa091edc",
+    "semantic_hash": "cfc586c10cacfdc1bae280d8fa091edc"
+  },
+  "modules/routing-eta/test/__mocks__/firebaseMock.js": {
+    "mtime": 1787813964.0758085,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/routing-eta/test/__mocks__/geoMock.js": {
+    "mtime": 1787813964.0758085,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/routing-eta/test/__mocks__/mmkvMock.js": {
+    "mtime": 1787813964.0758085,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/routing-eta/test/__mocks__/sensorsMock.js": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/routing-eta/test/__mocks__/socketMock.js": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/routing-eta/test/__mocks__/webrtcMock.js": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/routing-eta/test/routingClient.test.ts": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "deaab61e7580886535a1c456891a9786",
+    "semantic_hash": "deaab61e7580886535a1c456891a9786"
+  },
+  "modules/routing-eta/tsconfig.json": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "9fa98fc2d782823f68eb7de7b589ff0c",
+    "semantic_hash": "9fa98fc2d782823f68eb7de7b589ff0c"
+  },
+  "modules/tracking/jest.config.js": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "74a623f76904ce9f3ff8a1236eca71ba",
+    "semantic_hash": "74a623f76904ce9f3ff8a1236eca71ba"
+  },
+  "modules/tracking/package.json": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "2f76715c1a5ce419c716d3f80d9bb542",
+    "semantic_hash": "2f76715c1a5ce419c716d3f80d9bb542"
+  },
+  "modules/tracking/src/ekf.ts": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "2fcf58eb91a66744707a316646dd885c",
+    "semantic_hash": "2fcf58eb91a66744707a316646dd885c"
+  },
+  "modules/tracking/src/index.ts": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "4f3747c824dec5e09596edd8be043d88",
+    "semantic_hash": "4f3747c824dec5e09596edd8be043d88"
+  },
+  "modules/tracking/src/locationPublisher.ts": {
+    "mtime": 1787813964.082062,
+    "seen": 1787909969.9313147,
+    "ast_hash": "634dc0acf45e4ad7da24758b7c356e7c",
+    "semantic_hash": "634dc0acf45e4ad7da24758b7c356e7c"
+  },
+  "modules/tracking/src/mockLocationProducer.ts": {
+    "mtime": 1787813964.0948393,
+    "seen": 1787909969.9313147,
+    "ast_hash": "7055ecd20ab4f14843ab23fb851e9444",
+    "semantic_hash": "7055ecd20ab4f14843ab23fb851e9444"
+  },
+  "modules/tracking/src/sensorStream.ts": {
+    "mtime": 1787813964.0948393,
+    "seen": 1787909969.9313147,
+    "ast_hash": "5d052908599723027c39bfd106c7293f",
+    "semantic_hash": "5d052908599723027c39bfd106c7293f"
+  },
+  "modules/tracking/src/spoofDetector.ts": {
+    "mtime": 1787813964.0975122,
+    "seen": 1787909969.9313147,
+    "ast_hash": "3c81643ebe78f62d6015fcab789addb7",
+    "semantic_hash": "3c81643ebe78f62d6015fcab789addb7"
+  },
+  "modules/tracking/src/trackingService.ts": {
+    "mtime": 1787813964.0975122,
+    "seen": 1787909969.9313147,
+    "ast_hash": "41aa72ffd78a67e697f22832d4144e93",
+    "semantic_hash": "41aa72ffd78a67e697f22832d4144e93"
+  },
+  "modules/tracking/test/__mocks__/firebaseMock.js": {
+    "mtime": 1787813964.0975122,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/tracking/test/__mocks__/geoMock.js": {
+    "mtime": 1787813964.0975122,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/tracking/test/__mocks__/mmkvMock.js": {
+    "mtime": 1787813964.0975122,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/tracking/test/__mocks__/sensorsMock.js": {
+    "mtime": 1787813964.0975122,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/tracking/test/__mocks__/socketMock.js": {
+    "mtime": 1787813964.1077683,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/tracking/test/__mocks__/webrtcMock.js": {
+    "mtime": 1787813964.1077683,
+    "seen": 1787909969.9313147,
+    "ast_hash": "f366d089519c776c71fdbf86b62f3c8f",
+    "semantic_hash": "f366d089519c776c71fdbf86b62f3c8f"
+  },
+  "modules/tracking/test/ekf.test.ts": {
+    "mtime": 1787813964.1077683,
+    "seen": 1787909969.9313147,
+    "ast_hash": "e492238369b57c998d5ee57cf706ff14",
+    "semantic_hash": "e492238369b57c998d5ee57cf706ff14"
+  },
+  "modules/tracking/tsconfig.json": {
+    "mtime": 1787813964.1077683,
+    "seen": 1787909969.9313147,
+    "ast_hash": "9fa98fc2d782823f68eb7de7b589ff0c",
+    "semantic_hash": "9fa98fc2d782823f68eb7de7b589ff0c"
+  },
+  "modules/hazard-sos/test/__mocks__/netinfoMock.js": {
+    "mtime": 1788000012.3528032,
+    "seen": 1788186781.9655428,
+    "ast_hash": "64acc77145c16439d0d87e98cbc45623",
+    "semantic_hash": "64acc77145c16439d0d87e98cbc45623"
+  },
+  "modules/hazard-sos/test/__mocks__/uuidMock.js": {
+    "mtime": 1788196381.6514957,
+    "seen": 1788198117.406719,
+    "ast_hash": "7691bbbbf2a28fe34c904f75f66c9aa3",
+    "semantic_hash": "7691bbbbf2a28fe34c904f75f66c9aa3"
+  }
+}

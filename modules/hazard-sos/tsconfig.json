@@ -9,6 +9,7 @@
     "jsx": "react",
     "baseUrl": ".",
     "paths": {
+      "react-native": ["./node_modules/react-native/types/index.d.ts"],
       "@app/*": ["../../app/src/*"],
       "@contracts/*": ["../../contracts/*"],
       "@tracking/*": ["../tracking/src/*"],
@@ -16,6 +17,7 @@
       "@routing/*": ["../routing-eta/src/*"],
       "@flvoice/*": ["../fl-voice/src/*"]
     },
+    "typeRoots": ["./node_modules/@types"],
     "outDir": "dist"
   },
   "include": ["src/**/*", "test/**/*"],

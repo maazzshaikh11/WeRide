@@ -24,6 +24,7 @@ export interface HazardMarkerData {
 export function hazardMarkerColor(marker: HazardMarkerData): string {
   // Lazy import to avoid pulling the theme in test environments.
   // In RN, the theme module is always available.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { hazardColor } = require('@app/theme/theme') as typeof import('@app/theme/theme');
   if (marker.status === 'resolved') return marker.status;
   return hazardColor(marker.hazardType);

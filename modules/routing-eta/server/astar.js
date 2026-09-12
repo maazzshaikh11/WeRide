@@ -112,24 +112,158 @@ export function routeSafetyScore(path, graph, hazards, radiusM = 100) {
   return Math.max(0, 1 - totalPenalty / Math.max(1, hazards.length));
 }
 
+/**
+ * Validate route_response against the contract schema (T-03, Phase 1).
+ * Ensures mock/real responses are schema-exact.
+ */
+function validateRouteResponse(payload) {
+  const requiredFields = [
+    'route_id',
+    'path_points',
+    'distance_km',
+    'eta_minutes',
+    'safety_score',
+    'recalculated_at_hlc',
+  ];
+
+  for (const field of requiredFields) {
+    if (!(field in payload)) {
+      throw new Error(`Missing required field: ${field}`);
+    }
+  }
+
+  // Type checks
+  if (typeof payload.route_id !== 'string' || !payload.route_id) {
+    throw new Error('route_id must be a non-empty string');
+  }
+
+  if (!Array.isArray(payload.path_points)) {
+    throw new Error('path_points must be an array');
+  }
+
+  for (const point of payload.path_points) {
+    if (!Array.isArray(point) || point.length !== 2) {
+      throw new Error('Each path_point must be [lat, lng]');
+    }
+    if (typeof point[0] !== 'number' || typeof point[1] !== 'number') {
+      throw new Error('path_point coordinates must be numbers');
+    }
+  }
+
+  if (typeof payload.distance_km !== 'number' || payload.distance_km < 0) {
+    throw new Error('distance_km must be a non-negative number');
+  }
+
+  if (typeof payload.eta_minutes !== 'number' || payload.eta_minutes < 0) {
+    throw new Error('eta_minutes must be a non-negative number');
+  }
+
+  if (
+    typeof payload.safety_score !== 'number' ||
+    payload.safety_score < 0 ||
+    payload.safety_score > 1
+  ) {
+    throw new Error('safety_score must be a number in [0, 1]');
+  }
+
+  if (typeof payload.recalculated_at_hlc !== 'string' || !payload.recalculated_at_hlc) {
+    throw new Error('recalculated_at_hlc must be a non-empty string (HLC timestamp)');
+  }
+}
+
 // Express handler
 import { v4 as uuidv4 } from 'uuid';
+import { extractEtaFeatures, predictEta } from './eta_model.js';
+
+/**
+ * Generate HLC-format timestamp (physical:counter).
+ * 
+ * Server is plain Node.js (no TypeScript support).
+ * Real HLC is used by the client (TypeScript) when requesting routes.
+ * Server generates valid HLC-format timestamps using milliseconds + counter.
+ * 
+ * Format: "milliseconds:counter" (matches real HLC string format)
+ * This ensures response timestamps are valid and comparable.
+ */
+let _counter = 0;
+
+function generateHlcTimestamp() {
+  // Use current timestamp in milliseconds as physical component
+  // Increment counter to ensure monotonicity within same millisecond
+  const physical = Date.now();
+  const hlcTimestamp = `${physical}:${_counter}`;
+  _counter = (_counter + 1) % 1000000; // Reset counter to avoid overflow
+  return hlcTimestamp;
+}
+
 export async function handleRoute(req, res) {
   try {
-    const { group_id, origin, destination, avoid_hazard_types } = req.body;
+    // Validate required request fields (T-04.2)
+    const { group_id, origin, destination, avoid_hazard_types, active_hazards } = req.body;
+
+    if (!group_id || typeof group_id !== 'string') {
+      return res.status(400).json({ error: 'group_id is required (string)' });
+    }
+
+    if (!origin || typeof origin.lat !== 'number' || typeof origin.lng !== 'number') {
+      return res.status(400).json({ error: 'origin must have lat, lng (numbers)' });
+    }
+
+    if (!destination || typeof destination.lat !== 'number' || typeof destination.lng !== 'number') {
+      return res.status(400).json({ error: 'destination must have lat, lng (numbers)' });
+    }
+
+    if (!Array.isArray(avoid_hazard_types)) {
+      return res.status(400).json({ error: 'avoid_hazard_types must be an array' });
+    }
+
+    // Phase 6 T-17: Accept real hazards from client (or fetch from Firestore)
+    const hazardsToConsider = Array.isArray(active_hazards) ? active_hazards : [];
+
     // TODO: load road graph for the bbox (Option A: use Directions API; Option B: OSM graph)
-    // TODO: fetch active hazards from Firestore, filter by avoid_hazard_types
+    // TODO: fetch active hazards from Firestore if not passed by client
     // TODO: applyHazardPenalties, run astar, compute safety_score, call ETA model
-    // Mock response for now:
-    res.json({
+
+    // Mock response for now (T-04.1: schema-exact)
+    const distanceM = haversineMeters(origin.lat, origin.lng, destination.lat, destination.lng);
+    const distanceKm = distanceM / 1000;
+
+    // Phase 4: Extract ETA features and predict using LightGBM model
+    const etaFeatures = extractEtaFeatures(
+      { distance_km: distanceKm },
+      new Date()
+    );
+    const eta_minutes = await predictEta(etaFeatures);
+
+    // Phase 6 T-17: Compute safety score with real hazards
+    let safety_score = 0.85;
+    if (hazardsToConsider.length > 0) {
+      // Simple penalty model: reduce score by hazard density
+      // Real model would apply route-specific hazard proximity calculations
+      const hazardPenalty = Math.min(0.3, hazardsToConsider.length * 0.05);
+      safety_score = Math.max(0.5, 0.85 - hazardPenalty);
+    }
+
+    // Phase 6 T-17: Use real HLC format for recalculated_at_hlc
+    const recalculated_at_hlc = generateHlcTimestamp();
+
+    const mockResponse = {
       route_id: uuidv4(),
       path_points: [[origin.lat, origin.lng], [destination.lat, destination.lng]],
-      distance_km: haversineMeters(origin.lat, origin.lng, destination.lat, destination.lng) / 1000,
-      eta_minutes: 15,
-      safety_score: 0.85,
-      recalculated_at_hlc: `${Date.now()}:0`,
-    });
+      distance_km: distanceKm,
+      eta_minutes: eta_minutes,
+      safety_score: safety_score,
+      recalculated_at_hlc: recalculated_at_hlc,
+    };
+
+    // Validate the mock response against the contract (T-04.1)
+    validateRouteResponse(mockResponse);
+
+    res.json(mockResponse);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 }
+
+// Export for testing
+export { validateRouteResponse };

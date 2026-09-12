@@ -4,9 +4,18 @@
  * Ported from group_service.dart.
  */
 
-import firestore from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { v4 as uuidv4 } from 'uuid';
+
+export interface Group {
+  id: string;
+  name: string;
+  created_by: string;
+  member_ids: string[];
+  created_at: any;
+  active_ride_id: string | null;
+}
 
 export class GroupService {
   private _firestore: ReturnType<typeof firestore>;
@@ -21,11 +30,13 @@ export class GroupService {
   async createGroup(name?: string): Promise<string> {
     const groupId = this._uuid();
     const uid = this._auth.currentUser!.uid;
+    const FieldValue = (this._firestore as any).FieldValue;
+
     await this._firestore.collection('groups').doc(groupId).set({
       name: name ?? `Ride ${Date.now()}`,
       created_by: uid,
       member_ids: [uid],
-      created_at: this._firestore.FieldValue.serverTimestamp(),
+      created_at: FieldValue.serverTimestamp(),
       active_ride_id: null,
     });
     return groupId;
@@ -33,13 +44,42 @@ export class GroupService {
 
   async joinGroup(groupCode: string): Promise<void> {
     const uid = this._auth.currentUser!.uid;
-    await this._firestore.collection('groups').doc(groupCode).update({
-      member_ids: this._firestore.FieldValue.arrayUnion([uid]),
-    });
+    const FieldValue = (this._firestore as any).FieldValue;
+
+    try {
+      await this._firestore.collection('groups').doc(groupCode).update({
+        member_ids: FieldValue.arrayUnion(uid),
+      });
+    } catch (e: any) {
+      if (e.code === 'not-found') {
+        throw new Error(`Group "${groupCode}" not found`);
+      }
+      throw e;
+    }
   }
 
-  myGroups() {
+  /**
+   * Subscribe to groups where current user is a member.
+   * Returns a function to unsubscribe.
+   */
+  myGroups(onGroups: (groups: Group[]) => void): () => void {
     const uid = this._auth.currentUser!.uid;
-    return this._firestore.collection('groups').where('member_ids', 'array-contains', uid).onSnapshot();
+    const unsubscribe = this._firestore
+      .collection('groups')
+      .where('member_ids', 'array-contains', uid)
+      .onSnapshot(
+        (snapshot: any) => {
+          const groups: Group[] = snapshot.docs.map((doc: any) => ({
+            id: doc.id,
+            ...doc.data(),
+          } as Group));
+          onGroups(groups);
+        },
+        (error: any) => {
+          console.error('Error fetching groups:', error);
+          onGroups([]);
+        }
+      );
+    return unsubscribe;
   }
 }

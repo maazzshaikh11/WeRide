@@ -9,6 +9,7 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { WeRideColors } from '../../../theme/theme';
 
 export default function FlStatusOverlay() {
   return (
@@ -19,6 +20,6 @@ export default function FlStatusOverlay() {
 }
 
 const styles = StyleSheet.create({
-  badge: { position: 'absolute', top: 80, left: 16, backgroundColor: '#00000088', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  text: { color: '#fff', fontSize: 12 },
+  badge: { position: 'absolute', top: 80, left: 16, backgroundColor: '#00000099', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  text: { color: WeRideColors.onPrimary, fontSize: 12 },
 });

@@ -39,7 +39,7 @@ import { isOnline } from '../crdt/syncWorker';
 const SOS_EVENTS_COLLECTION = 'sos_events';
 
 function getFirestore(): any {
-  // @ts-expect-error Firestore typing issue with getFirestore wrapper
+  // @ts-ignore Firestore typing issue with getFirestore wrapper
   return firestore();
 }
 

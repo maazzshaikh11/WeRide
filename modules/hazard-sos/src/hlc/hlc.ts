@@ -144,6 +144,7 @@ export class HLC {
   }
 
   static _resetStorage() {
+    // @ts-ignore MMKV API differs between v2 (app, delete) and v4 (module types, remove)
     getStorage()?.delete('hlc_state');
   }
 }

@@ -45,7 +45,7 @@ export function _resetSyncCallCount(): void { _syncCallCount = 0; }
  * Get Firestore instance (lazy initialization for testing)
  */
 function getFirestore(): any {
-  // @ts-expect-error Firestore typing issue with getFirestore wrapper
+  // @ts-ignore Firestore typing issue with getFirestore wrapper
   return firestore();
 }
 

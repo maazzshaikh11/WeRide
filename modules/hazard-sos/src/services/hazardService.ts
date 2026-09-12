@@ -36,7 +36,7 @@ const HAZARD_CLUSTERS_COLLECTION = 'hazards';
 const CLUSTER_MATCH_THRESHOLD_METERS = 50;
 
 function getFirestore(): any {
-  // @ts-expect-error Firestore typing issue with getFirestore wrapper
+  // @ts-ignore Firestore typing issue with getFirestore wrapper
   return firestore();
 }
 

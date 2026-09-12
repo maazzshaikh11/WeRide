@@ -21,11 +21,9 @@ import { useRouteStore } from '@routing/client/routeStore';
 import { routeToGeoJsonLine } from '@routing/client/routeLine';
 import { googleMapsDeepLink } from '@routing/client/deepLink';
 import { VerifiedLocation, verifiedLocationFromJson } from '@app/models/verifiedLocation';
-import { HazardCluster, hazardClusterFromJson } from '@app/models/hazardCluster';
+import { HazardCluster } from '@app/models/hazardCluster';
 import { getLocationSocket } from '@app/services/socketService';
-import { firebaseFirestore } from '@app/services/firebaseService';
-import { HazardService } from '@hazard/services/hazardService';
-import { HLC } from '@hazard/hlc/hlc';
+import { subscribeToHazardClusters } from '@hazard/services/hazardService';
 
 interface Props {
   groupId: string;
@@ -57,7 +55,7 @@ export default function RouteOverlay({ groupId }: Props) {
   const clientRef = React.useRef<RoutingClient | null>(null);
   if (!clientRef.current) {
     clientRef.current = new RoutingClient({
-      baseUrl: process.env.SERVER_URL ?? 'http://localhost:3000',
+      baseUrl: 'http://localhost:3000',
       onUpdate: (r) => setRoute(r),
     });
   }
@@ -118,26 +116,17 @@ export default function RouteOverlay({ groupId }: Props) {
 
   // Phase 6 T-17: Listen to real hazard_cluster stream (Person B)
   useEffect(() => {
-    const hlc = HLC.fresh();
-    const hazardService = new HazardService(hlc);
-    const unsubscribe = hazardService.watchClusters(groupId).onSnapshot((snapshot: any) => {
-      try {
-        const clusters = snapshot.docs.map((doc: any) =>
-          hazardClusterFromJson(doc.data() as Record<string, any>)
-        );
-        setActiveClusters(clusters);
+    const unsubscribe = subscribeToHazardClusters(groupId, (clusters: HazardCluster[]) => {
+      setActiveClusters(clusters);
 
-        // Trigger recalculation on hazard changes (Phase 6 T-17 marquee test)
-        if (lastValidLocation) {
-          client.scheduleRecalculation({
-            group_id: groupId,
-            origin: { lat: lastValidLocation.lat, lng: lastValidLocation.lng },
-            destination: MOCK_DESTINATION,
-            avoid_hazard_types: avoidHazardTypes,
-          });
-        }
-      } catch (e) {
-        console.error('Failed to process hazard update:', e);
+      // Trigger recalculation on hazard changes (Phase 6 T-17 marquee test)
+      if (lastValidLocation) {
+        client.scheduleRecalculation({
+          group_id: groupId,
+          origin: { lat: lastValidLocation.lat, lng: lastValidLocation.lng },
+          destination: MOCK_DESTINATION,
+          avoid_hazard_types: avoidHazardTypes,
+        });
       }
     });
 
@@ -216,7 +205,7 @@ export default function RouteOverlay({ groupId }: Props) {
   return (
     <View style={styles.container}>
       {/* Route line on map */}
-      <MapboxGL.ShapeSource id="routeSource" shape={routeGeoJson}>
+      <MapboxGL.ShapeSource id="routeSource" shape={routeGeoJson as any}>
         <MapboxGL.LineLayer
           id="routeLine"
           style={{

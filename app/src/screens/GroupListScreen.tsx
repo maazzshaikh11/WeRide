@@ -4,7 +4,7 @@
  * Replaces group_list_screen.dart.
  */
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, FlatList, TouchableOpacity, Text, StyleSheet, Pressable } from 'react-native';
+import { View, TextInput, FlatList, TouchableOpacity, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { firebaseAuth } from '../services/firebaseService';
 import { useAppStore } from '../store/appStore';
 import { WeRideColors } from '../theme/theme';
@@ -35,23 +35,22 @@ export default function GroupListScreen({ navigation }: any) {
       // Groups will update via onSnapshot subscription
     } catch (e) {
       console.error('Create group failed:', e);
-      alert('Failed to create group');
+      Alert.alert('Error', 'Failed to create group');
     }
   };
 
   const joinGroup = async () => {
     const code = joinCode.trim();
     if (!code) {
-      alert('Please enter a join code');
+      Alert.alert('Error', 'Please enter a join code');
       return;
     }
     try {
       await groupService.joinGroup(code);
       setJoinCode('');
-      // Groups will update via onSnapshot subscription
     } catch (e: any) {
       console.error('Join group failed:', e);
-      alert(e.message || 'Failed to join group');
+      Alert.alert('Error', e.message || 'Failed to join group');
     }
   };
 
@@ -67,7 +66,7 @@ export default function GroupListScreen({ navigation }: any) {
           placeholder="Join code"
           value={joinCode}
           onChangeText={setJoinCode}
-          placeholderTextColor={WeRideColors.text.secondary}
+          placeholderTextColor={WeRideColors.textSecondary}
         />
         <Pressable style={styles.joinButton} onPress={joinGroup}>
           <Text style={styles.joinButtonText}>Join</Text>

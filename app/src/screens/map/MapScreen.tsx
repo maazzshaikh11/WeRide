@@ -112,7 +112,7 @@ export default function MapScreen({ route }: any) {
       </MapboxGL.MapView>
 
       {/* UI overlays stacked on top of map */}
-      <SosOverlay groupId={groupId} />
+      <SosOverlay groupId={groupId} userId={userId ?? undefined} />
       <HazardOverlay groupId={groupId} />
       <VoxOverlay groupId={groupId} />
       <RouteOverlay groupId={groupId} />

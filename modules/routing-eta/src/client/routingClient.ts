@@ -35,7 +35,7 @@ export class RoutingClient {
   private _lastRequestOrigin?: { lat: number; lng: number };
 
   constructor(params: RoutingClientParams = {}) {
-    this._baseUrl = params.baseUrl ?? process.env.SERVER_URL ?? 'http://localhost:3000';
+    this._baseUrl = params.baseUrl ?? 'http://localhost:3000';
     this._onUpdate = params.onUpdate;
     this.debounce = params.debounceMs ?? 500;
   }

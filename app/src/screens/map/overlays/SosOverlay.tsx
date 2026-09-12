@@ -35,8 +35,8 @@ interface ActiveSos {
 
 interface MapLayerProps {
   groupId: string;
-  userId: string;
-  onSosEventsChange: (events: ActiveSos[]) => void;
+  userId?: string;
+  onSosEventsChange?: (events: ActiveSos[]) => void;
 }
 
 interface InfoCardsProps {
@@ -137,7 +137,7 @@ export function SosOverlayMapLayer({ groupId, userId, onSosEventsChange }: MapLa
 
         const merged = [...newActive, ...newResolved];
         // Report to parent so InfoCards can render
-        onSosEventsChange(merged);
+        onSosEventsChange?.(merged);
         return merged;
       });
     });

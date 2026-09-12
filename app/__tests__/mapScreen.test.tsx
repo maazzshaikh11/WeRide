@@ -99,8 +99,8 @@ jest.mock('../src/screens/map/overlays/RiderMarkerOverlay', () => {
     RiderInfoCard: () => React.createElement('View', null),
   };
 });
-jest.mock('../src/screens/map/overlays/HazardOverlay',   () => ({ __esModule: true, default: () => null }));
-jest.mock('../src/screens/map/overlays/SosOverlay',      () => ({ __esModule: true, default: () => null }));
+jest.mock('../src/screens/map/overlays/HazardOverlay',   () => ({ __esModule: true, HazardOverlayMapLayer: () => null, HazardOverlayInfoCard: () => null }));
+jest.mock('../src/screens/map/overlays/SosOverlay',      () => ({ __esModule: true, SosOverlayMapLayer: () => null, SosOverlayInfoCards: () => null }));
 jest.mock('../src/screens/map/overlays/RouteOverlay',    () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/screens/map/overlays/VoxOverlay',      () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/screens/map/overlays/FlStatusOverlay', () => ({ __esModule: true, default: () => null }));

@@ -144,6 +144,6 @@ export class HLC {
   }
 
   static _resetStorage() {
-    getStorage()?.remove('hlc_state');
+    getStorage()?.delete('hlc_state');
   }
 }

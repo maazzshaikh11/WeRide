@@ -31,8 +31,8 @@ import MapboxGL from '@rnmapbox/maps';
 
 import { MAPBOX_TOKEN } from '@env';
 import RiderMarkerOverlay, { RiderInfoCard } from './overlays/RiderMarkerOverlay';
-import HazardOverlay from './overlays/HazardOverlay';
-import SosOverlay from './overlays/SosOverlay';
+import { HazardOverlayMapLayer as HazardOverlay, HazardOverlayInfoCard } from './overlays/HazardOverlay';
+import { SosOverlayMapLayer as SosOverlay, SosOverlayInfoCards } from './overlays/SosOverlay';
 import RouteOverlay from './overlays/RouteOverlay';
 import VoxOverlay from './overlays/VoxOverlay';
 import FlStatusOverlay from './overlays/FlStatusOverlay';

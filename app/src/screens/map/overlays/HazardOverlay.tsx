@@ -14,7 +14,7 @@ import MapboxGL from '@rnmapbox/maps';
 import { WeRideColors, hazardColor } from '../../../theme/theme';
 import { subscribeToHazardClusters, HazardCluster, resolveHazard } from '@hazard/services/hazardService';
 
-const { ShapeSource, ShapeLayer, FillLayer, SymbolLayer, MarkerView } = MapboxGL;
+const { ShapeSource, FillLayer, SymbolLayer, MarkerView } = MapboxGL;
 
 interface MapLayerProps {
   groupId: string;
@@ -210,25 +210,29 @@ export function HazardOverlayMapLayer({ groupId, onHazardPress }: MapLayerProps)
         <MarkerView
           key={cluster.cluster_id}
           coordinate={[cluster.centroid_lng, cluster.centroid_lat]}
-          onPress={() => handleMarkerPress(cluster)}
           anchor={{ x: 0.5, y: 0.5 }}
         >
-          <View
-            style={[
-              styles.marker,
-              {
-                backgroundColor: cluster.status === 'resolved'
-                  ? WeRideColors.hazardResolved
-                  : hazardColor(cluster.hazard_type),
-                width: 24 + cluster.hazard_score * 16,
-                height: 24 + cluster.hazard_score * 16,
-              },
-            ]}
+          <TouchableOpacity
+            onPress={() => handleMarkerPress(cluster)}
+            activeOpacity={0.7}
           >
-            <Text style={styles.markerText}>
-              {cluster.report_count > 9 ? '9+' : cluster.report_count}
-            </Text>
-          </View>
+            <View
+              style={[
+                styles.marker,
+                {
+                  backgroundColor: cluster.status === 'resolved'
+                    ? WeRideColors.hazardResolved
+                    : hazardColor(cluster.hazard_type),
+                  width: 24 + cluster.hazard_score * 16,
+                  height: 24 + cluster.hazard_score * 16,
+                },
+              ]}
+            >
+              <Text style={styles.markerText}>
+                {cluster.report_count > 9 ? '9+' : cluster.report_count}
+              </Text>
+            </View>
+          </TouchableOpacity>
         </MarkerView>
       ))}
     </>

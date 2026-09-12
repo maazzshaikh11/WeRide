@@ -16,3 +16,8 @@ export * from './crdt/syncWorker';
 // Phase 5: Real Service Layer (Firestore integration)
 export * from './services/hazardService';
 export * from './services/sosService';
+
+// Phase 6: UI Components
+export * from './ui/HazardReportSheet';
+export * from './ui/HazardReportButton';
+export * from './ui/SosButton';

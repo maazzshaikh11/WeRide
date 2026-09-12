@@ -65,7 +65,5 @@ export async function writeMockSosEvent(
   // Write to Firestore sos_events/{sos_id} per contract transport
   await db.collection('sos_events').doc(sosEvent.sos_id).set(sosEvent);
   
-  console.log(`[MockSosService] Generated mock SOS event: ${sosEvent.sos_id} for rider ${riderId}`);
-  
   return sosEvent;
 }

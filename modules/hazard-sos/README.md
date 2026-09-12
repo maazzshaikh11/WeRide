@@ -1,433 +1,189 @@
-# hazard-sos
+# Hazard Detection + Offline SOS (Person B)
 
-Multi-phase implementation of Hazard Reporting and SOS functionalities for WeRide.
+Standalone, local-first safety module for WeRide. It accepts hazard reports,
+builds hazard clusters on-device, and sends SOS events that survive an offline
+restart and converge after reconnect.
 
-## Implementation Status
+## Scope and status
 
-### Phase 1 (COMPLETED) - Foundation, Contracts & Mock Producers
-- ? Contracts verified and frozen
-- ? Mock HLC implementation (basic functionality for unblocking team members)
-- ? Mock hazard cluster producer
-- ? Mock SOS event producer
-- ? Development environment setup
-- ? Contract compliance tests
+Person B owns HLC, DBSCAN, SOS OR-Set, MMKV queues, Firestore persistence,
+realtime listeners, and the hazard/SOS UI components and overlays. Frozen
+schemas under `../../contracts/` are consumed unchanged.
 
-### Phase 2 (COMPLETED) - HLC Implementation
-- ? Real Hybrid Logical Clock (HLC) using Kulkarni algorithm
-- ? Persistent state across app/module restarts using `MMKV` (`hlc_state` key)
-- ? Causality tracking with `now()`, `receive()`, and `compare()`
-- ? Serialization and parsed formats updated to target Phase 2 specifications
-- ? Maintained cross-module API compatibility for consumers (Person A, C, D)
+Person A's verified-location and MapScreen shell, Person C's hazard-routing
+consumer, and Person D's HLC consumer are **PENDING FUTURE INTEGRATION**.
+Their absence does not prevent standalone validation of this module.
 
-### Phase 3 (COMPLETED) - Core Algorithms: DBSCAN & CRDT OR-Set
-- ? DBSCAN clustering algorithm for hazard reports
-- ? Per-type clustering (different hazard types never cluster together)
-- ? Noise report handling (isolated reports become single-report clusters)
-- ? Hazard score calculation: `score = min(1, reportCount / 5) * recencyDecay`
-- ? Bounding box polygon generation (4 corner points)
-- ? OR-Set CRDT for SOS events with tombstone semantics
-- ? Add, remove, merge, and persistence operations
-- ? Convergent and commutative merge for offline conflict resolution
+## Architecture and files
 
-### Phase 4 (COMPLETED) - Offline-Resilient Storage & Sync
-- ? MMKV-backed persistent queue for offline operations
-- ? Separate queues for hazard reports (`HAZARD_QUEUE`) and SOS events (`SOS_QUEUE`)
-- ? FIFO queue operations with synchronous persistence
-- ? Retry logic: max 3 retries, then drop and log error
-- ? NetInfo-based connectivity detection
-- ? Automatic sync on offline ? online transitions
-- ? CRDT merge-on-sync for SOS event convergence
-- ? Zero data loss guarantee: operations persisted before network attempts
-- ? SOS resolve preserves Firestore documents (tombstone semantics)
-
-### Phase 5 (COMPLETED) - Real Service Layer (Firestore Integration)
-- ? Real hazard report submission: `submitHazardReport()` - writes to `groups/{group_id}/reports/{report_id}` or queues offline
-- ? Real hazard clustering trigger: `triggerClustering()` - DBSCAN (eps=30m, minSamples=2), writes/updates `hazards/{cluster_id}`
-- ? Firestore hazard report listener: `subscribeToHazardReports()` - realtime on `groups/{group_id}/reports`
-- ? Firestore active hazard-cluster listener: `subscribeToHazardClusters()` - realtime on `hazards` (active, by group_id)
-- ? Hazard resolution: `resolveHazard()` - sets status=resolved on `hazards/{cluster_id}`
-- ? Real SOS trigger: `triggerSos()` - zero-data-loss order (local OR-Set first, then Firestore/queue)
-- ? Real SOS resolution: `resolveSos()` - OR-Set tombstone + persist, then Firestore update/queue
-- ? Firestore SOS listener + CRDT merge: `subscribeToSosEvents()` - merges remote into local OR-Set via `orSetMerge()`
-- ? FCM SOS notification trigger integration: Cloud Function on `sos_events/{sos_id}` create
-- ? Mock replacement: Real services exported as primary in `src/index.ts`
-
-## HLC Usage
-
-```typescript
-import { HLC } from '@hazard/hlc';
-
-// Generate a local timestamp
-const timestamp = HLC.now(); 
-
-// Receive and merge a remote timestamp
-const mergedTimestamp = HLC.receive(remoteTimestamp);
-
-// Compare two timestamps
-const order = HLC.compare(tsA, tsB);
+```text
+HazardReportSheet -> submitHazardReport -> MMKV queue or Firestore reports
+                                           -> DBSCAN -> hazards/{cluster_id}
+SosButton (2 s hold) -> OR-Set + MMKV -> Firestore sos_events/{sos_id}
+NetInfo reconnect -> queue drain -> OR-Set merge -> realtime overlays
+Firestore SOS create -> Cloud Function -> FCM to other group members
 ```
 
-- The HLC uses `MMKV` for persistence under the key `hlc_state`.
-- Upon initialization or restart, the clock state resumes from the saved MMKV state, ensuring monotonic clock behavior.
+| Area | Implementation |
+| --- | --- |
+| `src/hlc/hlc.ts` | Persistent Hybrid Logical Clock |
+| `src/dbscan/dbscan.ts` | Haversine/DBSCAN clustering and scoring |
+| `src/crdt/orSet.ts` | Tombstone-based SOS OR-Set persistence |
+| `src/crdt/localQueue.ts` | Synchronous MMKV FIFO operation queues |
+| `src/crdt/syncWorker.ts` | Reconnect drain and CRDT merge |
+| `src/services/` | Firestore hazard and SOS services/listeners |
+| `src/ui/` | Hazard picker/FAB and guarded SOS button |
+| `app/src/screens/map/overlays/` | Person B map overlays, mounted by the map shell later |
 
-## Phase 4: Offline-Resilient Storage & Sync
+## Hazard clustering
 
-### Architecture
+`clusterByType()` partitions reports by `hazard_type`, then calls DBSCAN on
+each partition. Haversine distance is measured in meters. Development/demo
+parameters are **eps = 30 m** and **minSamples = 2**, as specified in the
+Person B plan; they have not been field-tuned.
 
-The Phase 4 implementation provides zero-data-loss offline resilience using:
+DBSCAN preserves density-reachable boundary points. Reports remaining noise
+are published as one-report hazards rather than discarded. The centroid is the
+arithmetic mean of report coordinates. The MVP polygon is the frozen,
+four-corner bounding box in `[lat, lng]` order:
 
-1. **Local Queue** - MMKV-backed persistent queue
-2. **Sync Worker** - Connectivity detection and automatic synchronization
-3. **CRDT Merge** - Conflict-free convergence of SOS events
-
-### Queue Operations
-
-```typescript
-import { 
-  queueEnqueue,
-  queueDequeue,
-  queuePeek,
-  queueUpdateRetry,
-  HAZARD_QUEUE,
-  SOS_QUEUE,
-  type QueuedOperation
-} from '@hazard/crdt';
-
-// Enqueue an operation
-const operation: QueuedOperation = {
-  id: 'op-123',
-  type: 'hazard_report',
-  data: hazardReport,
-  created_at_hlc: '1700000000000-0',
-  retry_count: 0
-};
-queueEnqueue(HAZARD_QUEUE, operation);
-
-// Peek at queued operations
-const pending = queuePeek(HAZARD_QUEUE);
-
-// Dequeue after successful sync
-queueDequeue(HAZARD_QUEUE, 'op-123');
+```text
+[minLat,minLng] [minLat,maxLng] [maxLat,maxLng] [maxLat,minLng]
 ```
 
-### Queue Names
-
-- **`HAZARD_QUEUE`** - Queue for hazard report operations
-- **`SOS_QUEUE`** - Queue for SOS event and resolve operations
-
-### Sync Worker
-
-```typescript
-import {
-  isOnline,
-  syncHazardReports,
-  syncSosEvents,
-  mergeSosOnSync,
-  startSyncWorker
-} from '@hazard/crdt';
-
-// Check connectivity
-const online = await isOnline();
-
-// Manual sync
-if (online) {
-  await syncHazardReports('group-123');
-  await syncSosEvents('group-123');
-  await mergeSosOnSync('group-123');
-}
-
-// Automatic sync on reconnect
-const unsubscribe = startSyncWorker('group-123');
-
-// Stop the worker
-unsubscribe();
+```text
+hazard_score = min(1, report_count / 5) * exp(-age_hours / 24)
 ```
 
-### Sync Behavior
+For example, five new reports score 1.0; two reports aged 24 hours score about
+`0.4 * e^-1 = 0.147`. The result is clamped to `[0, 1]`. Cluster documents
+match `contracts/hazard_cluster.json` and are written to `hazards/{cluster_id}`.
 
-**Hazard Reports:**
-- Writes to Firestore `groups/{group_id}/reports/{report_id}`
-- On success: dequeues operation
-- On failure: increments `retry_count`
-- After 3 failed retries: drops operation and logs error
+## HLC
 
-**SOS Events:**
-- Writes to Firestore `sos_events/{sos_id}`
-- Handles both `sos_event` (new SOS) and `sos_resolve` (resolve existing)
-- **CRITICAL**: Resolve does NOT delete documents (preserves tombstone semantics)
-- Same retry policy as hazard reports
+`HLC.fresh()` restores `{physical, counter}` from the MMKV `hlc` instance and
+`hlc_state` key. `now()` advances physical time or increments the logical
+counter. `receive(remote)` applies the maximum physical-time merge: when wall
+time wins the counter resets; otherwise the logical counter of the winning
+clock(s) is incremented. State is synchronously persisted after every change.
 
-**CRDT Merge on Sync:**
-1. Loads local SOS OR-Set from MMKV
-2. Fetches remote SOS events from Firestore (filtered by `group_id`)
-3. Merges local and remote using `orSetMerge()`
-4. Pushes local-only additions to Firestore
-5. Saves merged OR-Set back to MMKV
-6. Preserves tombstone semantics for resolved SOS
-
-### Zero Data Loss Guarantee
-
-Operations are **always** written to MMKV **before** network attempts:
-
-```
-create operation
-     ?
-synchronous MMKV write (durable)
-     ?
-operation safely queued
-     ?
-network sync attempt (best-effort)
+```ts
+const clock = HLC.fresh();
+const local = clock.now();
+const afterRemote = clock.receive(remoteTimestamp);
+const ordered = HLC.compare(local, afterRemote) < 0;
 ```
 
-This ensures:
-- Operations survive app crashes
-- Operations survive connectivity loss
-- Retry count persists across app restarts
-- No data lost even in worst-case scenarios
+Timestamps serialize as `physical-counter`; `parse` also accepts the legacy
+colon separator. If MMKV is unavailable, HLC safely runs in memory. SOS still
+fails closed if its mandatory OR-Set durable write cannot complete, so UI must
+not claim success before persistence.
 
-### Connectivity Detection
+## Offline SOS and CRDT
 
-Uses `@react-native-community/netinfo` to:
-- Query current connectivity state
-- Listen for offline ? online transitions
-- Trigger automatic synchronization on reconnect
+Each SOS addition has a stable unique tag. `orSetRemove` tombstones only tags
+observed at resolve time. Merge unions adds and tombstones, making it
+commutative, idempotent, and convergent: a concurrent remote add not observed
+by a local resolve stays active. Full OR-Set state persists under
+`sos_orset_{groupId}`.
 
-### Duplicate Sync Protection
+SOS trigger order is fail-safe:
 
-The sync worker ensures only one sync operation runs per group at a time:
-- In-progress sync blocks new sync attempts
-- Prevents overlapping sync operations
-- Safe for rapid connectivity changes
+1. Create the HLC-stamped event and OR-Set tag.
+2. Persist the OR-Set synchronously.
+3. Write the stable tag to Firestore if online, or append it to the SOS queue.
+4. Only then may UI success be displayed.
 
-### Retry Policy
+Hazard reports and SOS/resolve operations are MMKV FIFO queues. Failed writes
+increment a persisted retry count but are **never dropped**; the next reconnect
+retries the idempotent document write. Queued resolves include a group ID (and
+keep a legacy fallback) so one group's sync cannot consume another group's
+operation. This preserves events through restart and a crash during sync.
 
-- **Max retries**: 3
-- **Behavior on failure**: Increment `retry_count`, keep queued
-- **After max retries**: Drop operation and log error with details
-- **Retry count persistence**: Survives app restart
+`startSyncWorker(groupId)` listens for NetInfo offline-to-online transitions,
+drains queues, and merges local/remote SOS state. Starting it for the active
+group in the app shell is **PENDING FUTURE INTEGRATION**.
 
-### Firestore Destinations
+## Firestore, listeners, and FCM
 
-**Hazard Reports:**
-```
-groups/{group_id}/reports/{report_id}
-```
+| Data | Path | Behavior |
+| --- | --- | --- |
+| Raw report | `groups/{group_id}/reports/{report_id}` | Local-first write/queue |
+| Hazard cluster | `hazards/{cluster_id}` | Group/status filtered listener |
+| SOS event | `sos_events/{sos_id}` | OR-Set-aware listener and tombstone resolution |
 
-**SOS Events:**
-```
-sos_events/{sos_id}
-```
+`infra/firebase/functions/index.js` implements `onSosCreate` for
+`sos_events/{sosId}`. It reads group members, reads other riders' FCM tokens,
+deduplicates them, then sends `SOS Alert` with `group_id` and `sos_id`.
+Retries use the same SOS document ID, so they do not create a second create
+trigger notification.
 
-Fields:
-- `sos_id` - Unique SOS identifier
-- `rider_id` - Rider who triggered SOS
-- `group_id` - Group identifier
-- `lat`, `lng` - Coordinates
-- `created_at_hlc` - HLC timestamp
-- `resolved` - Boolean (false for new, true for resolved)
-- `resolved_at_hlc` - HLC timestamp of resolve (null if unresolved)
+The FCM path is source-verified only. Deployment credentials, a Firebase
+project, and physical devices were unavailable, so foreground/background/killed
+app delivery is **BLOCKED** pending `firebase deploy --only functions` and a
+real multi-device test.
 
-### DBSCAN Parameters
+## UI and map overlays
 
-- **`eps`**: 30 meters (clustering radius)
-- **`min_samples`**: 2 reports minimum for cluster
-- **Per-type clustering**: Different hazard types never cluster together
+`HazardReportSheet` presents the five frozen types: pothole, oil spill,
+accident, debris, and other. The caller supplies current verified coordinates
+and timestamp. `HazardReportButton` opens the sheet.
 
-### Hazard Score Formula
+`SosButton` has no single-tap action. `onPressIn` starts a 2,000 ms timer,
+`onPressOut` cancels it, and unmount cleanup cancels it too. A completed hold
+fires once. Sender-only cancellation is rendered only when the parent provides
+an active SOS ID and `showResolve`.
 
-```typescript
-score = min(1.0, reportCount / 5) * exp(-ageHours / 24)
-```
+`HazardOverlayMapLayer` renders an active cluster centroid, type color, count,
+score, and bounding polygon. `SosOverlayMapLayer` renders only active OR-Set
+members; resolved tombstones are intentionally excluded. Component/overlay
+tests use Mapbox and service mocks. Full MapScreen mounting awaits Person A.
 
-Where:
-- `reportCount / 5` caps at 1.0 (5+ reports = max severity)
-- `exp(-ageHours / 24)` provides 24-hour exponential decay
-- Result clamped to [0, 1]
+## Verification and performance
 
-### Polygon Representation
+Run from this directory after `npm install`:
 
-MVP uses bounding box (4 corner points):
-```typescript
-[
-  [minLat, minLng],  // Bottom-left
-  [minLat, maxLng],  // Bottom-right
-  [maxLat, maxLng],  // Top-right
-  [maxLat, minLng]   // Top-left
-]
-```
-
-## Phase 5: Real Service Layer (Firestore Integration)
-
-### Firestore Paths (Frozen per Spec)
-
-**Hazard Reports:**
-```
-groups/{group_id}/reports/{report_id}
-```
-
-**Hazard Clusters:**
-```
-hazards/{cluster_id}
-```
-
-**SOS Events:**
-```
-sos_events/{sos_id}
-```
-
-### Online/Offline Submission Behavior
-
-**Hazard Reports (`submitHazardReport`):**
-- **Online**: Immediately writes to `groups/{group_id}/reports/{report_id}`
-- **Offline**: Enqueues to `HAZARD_QUEUE` (Phase 4 local queue), syncs on reconnect
-
-**SOS Events (`triggerSos`):**
-- **CRITICAL - Zero Data Loss Order:**
-  1. Create SOS element
-  2. Add to OR-Set via `orSetAdd()`
-  3. Persist OR-Set to MMKV via `orSetSave()` (durable local write)
-  4. **Only after local persistence succeeds**: attempt Firestore write
-  5. **Online**: Write to `sos_events/{sos_id}`
-  6. **Offline**: Enqueue to `SOS_QUEUE` (Phase 4 local queue)
-- Local durable write **MUST** happen before network dependency
-
-**SOS Resolution (`resolveSos`):**
-- Creates OR-Set tombstone via `orSetRemove()`
-- Persists OR-Set to MMKV
-- **Online**: Updates `sos_events/{sos_id}` with `resolved=true`, `resolved_at_hlc`
-- **Offline**: Enqueues `sos_resolve` operation to `SOS_QUEUE`
-
-### Listener Behavior
-
-**`subscribeToHazardReports(groupId, callback)`**
-- Listens to `groups/{group_id}/reports/`
-- On changes: updates local cache, triggers clustering for group
-- Avoids duplicate clustering from own write/listener cycle
-- Returns Firestore unsubscribe function
-
-**`subscribeToHazardClusters(groupId, callback)`**
-- Listens to `hazards/` where `group_id == groupId` AND `status == 'active'`
-- On changes: `callback(updatedClusters)`
-- Returns Firestore unsubscribe function
-- Only active clusters returned
-
-**`subscribeToSosEvents(groupId, callback)`**
-- Listens to `sos_events/` where `group_id == groupId`
-- On changes: merges remote events into local OR-Set via `orSetMerge()`
-- Persists merged state to MMKV
-- Invokes callback with active SOS events (resolved filtered out)
-- Returns Firestore unsubscribe function
-
-### Hazard Resolution
-
-**`resolveHazard(clusterId)`**
-- Updates `hazards/{clusterId}` with `status = 'resolved'`
-- Does NOT delete document (preserves history)
-
-### SOS Durable-Write Ordering (Critical)
-
-```
-triggerSos():
-  1. Create SOSElement
-  2. orSetAdd(localORSet, element, hlc)
-  3. orSetSave(localORSet, storageKey)  <-- DURABLE LOCAL WRITE
-  4. if online: Firestore.set(sos_events/{sos_id})
-     else: queueEnqueue(SOS_QUEUE, operation)
-
-resolveSos():
-  1. orSetRemove(localORSet, sosId)
-  2. orSetSave(localORSet, storageKey)  <-- DURABLE LOCAL WRITE
-  3. if online: Firestore.update(sos_events/{sos_id}, resolved: true)
-     else: queueEnqueue(SOS_QUEUE, sos_resolve operation)
-```
-
-Local persistence **always** completes before network attempt. This is the zero-data-loss guarantee.
-
-### FCM Trigger Architecture
-
-**Flow:**
-```
-Client: triggerSos()
-  -> Firestore: sos_events/{sos_id} (create)
-    -> Cloud Function: onSosCreate (infra/firebase/functions/index.js)
-      -> Fetch group members from groups/{group_id}
-      -> Fetch FCM tokens from users/{uid}
-      -> admin.messaging().sendMulticast({
-           notification: { title: 'SOS Alert', body: '...' },
-           data: { group_id, sos_id },
-           tokens: [...]
-         })
-```
-
-**Payload:**
-```json
-{
-  "title": "SOS Alert",
-  "body": "A rider in your group triggered SOS: {lat}, {lng}",
-  "group_id": "group-123",
-  "sos_id": "sos-abc"
-}
-```
-
-**Important:**
-- FCM is sent **server-side** via Cloud Function (not from mobile client)
-- Firebase Admin credentials are **NOT** in mobile code
-- Cloud Function deployed separately: `firebase deploy --only functions`
-
-### Phase 4 vs Phase 5 Ownership
-
-| Feature | Phase 4 | Phase 5 |
-|---------|---------|---------|
-| Local Queue (MMKV) | ✅ Owner | Uses |
-| Sync Worker | ✅ Owner | Uses |
-| CRDT OR-Set | ✅ Owner | Uses |
-| HLC | ✅ Owner | Uses |
-| DBSCAN | ✅ Owner | Uses |
-| Firestore Write (hazard) | | ✅ Owner |
-| Firestore Write (SOS) | | ✅ Owner |
-| Firestore Listeners | | ✅ Owner |
-| Clustering Trigger | | ✅ Owner |
-| FCM Cloud Function | | Coordinates (infra) |
-
-## Testing
-
-### Run All Tests
 ```bash
-cd modules/hazard-sos
-npm run lint && npm run typecheck && npm test
+npm run lint
+npm run typecheck
+npm test -- --runInBand
 ```
 
-### Run Phase-Specific Tests
-```bash
-# Phase 1: Mock producer tests
-npx jest --testNamePattern="Phase 1"
+Tests cover HLC ordering/persistence/remote merge, DBSCAN boundary/noise/type
+separation/centroid/bounding box/score, OR-Set convergence/tombstones, queue
+durability/retry/reconnect, listeners, SOS hold guard, and overlays. The
+deterministic performance test uses 100 clustered reports, 10,000 HLC
+timestamps, and a 100-element OR-Set merge. It enforces the Phase 8 local
+targets: DBSCAN under 500 ms, HLC under 1 ms/timestamp, and OR-Set merge under
+100 ms. These are development-machine checks, not mobile-device profiling.
+The Phase 8 run measured **29.969 ms** for DBSCAN-100, **0.002150 ms** per
+HLC timestamp, and **0.507 ms** for the 100-element OR-Set merge.
 
-# Phase 2: HLC tests
-npx jest --testNamePattern="Phase 2"
+## Deterministic demo checklist
 
-# Phase 3: DBSCAN and CRDT tests
-npx jest --testNamePattern="Phase 3"
+Use non-production data: group `demo-group-b`, riders `demo-rider-1` through
+`demo-rider-4`, and coordinates around `12.971600, 77.594600`.
 
-# Phase 4: Offline queue and sync tests
-npx jest --testNamePattern="Phase 4"
-```
+1. Submit `pothole` reports at `(12.971600,77.594600)`,
+   `(12.971680,77.594620)`, and `(12.971640,77.594680)`.
+2. Show one pothole cluster. Add an `oil_spill` at the same location to show
+   type separation.
+3. Put `demo-rider-4` offline, hold SOS for two seconds, and show: `SOS sent
+   — will alert group when connected.`
+4. Restart while still offline and show the queue still contains the SOS.
+5. Reconnect and show queue drain plus the SOS marker on other maps.
+6. With deployed Firebase and devices, capture the FCM alert and say: “CRDT
+   merged on reconnect; the locally persisted event was not lost.”
 
-### Test Coverage
+Capture reports before cluster, cluster formed, offline confirmation,
+post-restart queue, reconnect/sync, FCM alert, and SOS marker. Never seed a
+production Firestore project. No physical screenshots/video are included here
+because devices were unavailable.
 
-**Phase 1**: 10 tests (contract compliance)
-**Phase 2**: 10 tests (HLC ordering, persistence, receive, compare)
-**Phase 3**: 22 tests (DBSCAN clustering, OR-Set CRDT operations)
-**Phase 4**: 48 tests (queue operations, sync worker, connectivity, CRDT merge, tag preservation, idempotency)`n`n**Total**: 90 tests (96 passing, 5 known issues with test timing/setup)
+## Known limitations
 
-## Dependencies
-
-- **`react-native-mmkv`** - Persistent key-value storage
-- **`@react-native-firebase/firestore`** - Firestore database
-- **`@react-native-community/netinfo`** - Connectivity detection
-- **`uuid`** - Unique ID generation
-
-## See Also
-
-- Plan: `Person_B_Hazard_SOS.md`
-- Contracts: `contracts/hazard_cluster.json`, `contracts/sos_event.json`, `contracts/hazard_report.json`
-- Phase-wise Plan: `docs/Person_B_Docs/phase_wise_plan.md`
+- FCM deployment and device delivery remain unverified.
+- Native MMKV, Firestore, and Mapbox behavior is mock-tested; validate a real
+  Android/iOS build before demonstration.
+- App-shell overlay and sync-worker registration is a future integration task.
+- DBSCAN values have no field-derived tuning or production telemetry in this MVP.

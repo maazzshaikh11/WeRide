@@ -6,7 +6,7 @@
  * Merges local and remote SOS CRDTs on reconnect
  * Automatic sync on offline ? online transitions
  * 
- * Retry policy: max 3 retries, then drop and log error
+ * Failed writes stay queued and are retried on the next synchronization.
  */
 
 import NetInfo from '@react-native-community/netinfo';
@@ -29,9 +29,6 @@ import {
   SOS_QUEUE,
 
 } from './localQueue';
-import { HLC } from '../hlc/hlc';
-
-const MAX_RETRIES = 3;
 
 // ---------------------------------------------------------------------------
 // Test-only instrumentation
@@ -74,7 +71,7 @@ export async function isOnline(): Promise<boolean> {
  *    - Write to Firestore groups/{group_id}/reports/{report_id}
  *    - On success: dequeue
  *    - On failure: increment retry_count, keep queued
- *    - If retry_count > 3: dequeue and log error
+   *    - Never discard on retry; zero data loss takes precedence over a cap
  * 
  * @param groupId - Group ID to filter reports
  */
@@ -114,18 +111,9 @@ export async function syncHazardReports(groupId: string): Promise<void> {
     } catch (error) {
       // Failure - increment retry count
       const newRetryCount = operation.retry_count + 1;
-
-      if (newRetryCount > MAX_RETRIES) {
-        // Max retries exceeded - dequeue and log
-        queueDequeue(HAZARD_QUEUE, operation.id);
-        console.error(
-          `[syncWorker] Hazard report ${report.report_id} dropped after ${MAX_RETRIES} retries:`,
-          error
-        );
-      } else {
-        // Update retry count and keep queued
-        queueUpdateRetry(HAZARD_QUEUE, operation.id, newRetryCount);
-      }
+      // Update retry count and keep queued (Zero Data Loss)
+      queueUpdateRetry(HAZARD_QUEUE, operation.id, newRetryCount);
+      console.warn(`[syncWorker] Hazard report ${report.report_id} failed to sync (retry ${newRetryCount}):`, error);
     }
   }
 }
@@ -137,7 +125,7 @@ export async function syncHazardReports(groupId: string): Promise<void> {
  * 1. sos_event: Write new SOS to sos_events/{sos_id}
  * 2. sos_resolve: Update existing SOS with resolved=true, resolved_at_hlc
  * 
- * Retry policy: same as hazard reports (max 3 retries)
+   * Failed writes remain queued until the idempotent remote write succeeds.
  * 
  * CRITICAL: sos_resolve does NOT delete the Firestore document.
  * This preserves CRDT tombstone semantics.
@@ -152,10 +140,10 @@ export async function syncSosEvents(groupId: string): Promise<void> {
       const sos = op.data as SOSElement;
       return sos.group_id === groupId;
     } else if (op.type === 'sos_resolve') {
-      // For resolve operations, we need to check group_id from data
-      // Resolve data only has sos_id, so we filter less strictly here
-      // The actual group check happens when we look up the SOS
-      return true;
+        const resolve = op.data as { group_id?: string };
+        // Legacy queued resolves have no group_id; retain the old lookup path
+        // for them. Newly queued resolves are accurately group-scoped.
+        return !resolve.group_id || resolve.group_id === groupId;
     }
     return false;
   });
@@ -186,7 +174,7 @@ export async function syncSosEvents(groupId: string): Promise<void> {
 
       } else if (operation.type === 'sos_resolve') {
         // Resolve existing SOS
-        const resolveData = operation.data as { sos_id: string; resolved_at_hlc: string };
+        const resolveData = operation.data as { sos_id: string; resolved_at_hlc: string; group_id?: string };
 
         // Check if SOS exists and belongs to this group
         const sosDoc = await db
@@ -196,29 +184,9 @@ export async function syncSosEvents(groupId: string): Promise<void> {
 
         if (!sosDoc.exists) {
           // SOS doesn't exist remotely yet - queue resolve intent for later
-          // Do NOT dequeue - keep trying until create arrives or max retries
+          // Do NOT dequeue - keep trying until create arrives
           const newRetryCount = operation.retry_count + 1;
-
-          if (newRetryCount > MAX_RETRIES) {
-            // Max retries - create a tombstoned entry to preserve intent
-            await db
-              .collection('sos_events')
-              .doc(resolveData.sos_id)
-              .set({
-                sos_id: resolveData.sos_id,
-                rider_id: '',
-                group_id: groupId,
-                lat: 0,
-                lng: 0,
-                created_at_hlc: resolveData.resolved_at_hlc,
-                tag: '',
-                resolved: true,
-                resolved_at_hlc: resolveData.resolved_at_hlc,
-              });
-            queueDequeue(SOS_QUEUE, operation.id);
-          } else {
-            queueUpdateRetry(SOS_QUEUE, operation.id, newRetryCount);
-          }
+          queueUpdateRetry(SOS_QUEUE, operation.id, newRetryCount);
           continue;
         }
 
@@ -246,18 +214,9 @@ export async function syncSosEvents(groupId: string): Promise<void> {
     } catch (error) {
       // Failure - increment retry count
       const newRetryCount = operation.retry_count + 1;
-
-      if (newRetryCount > MAX_RETRIES) {
-        // Max retries exceeded - dequeue and log
-        queueDequeue(SOS_QUEUE, operation.id);
-        console.error(
-          `[syncWorker] SOS operation ${operation.id} (type: ${operation.type}) dropped after ${MAX_RETRIES} retries:`,
-          error
-        );
-      } else {
-        // Update retry count and keep queued
-        queueUpdateRetry(SOS_QUEUE, operation.id, newRetryCount);
-      }
+      // Update retry count and keep queued (Zero Data Loss)
+      queueUpdateRetry(SOS_QUEUE, operation.id, newRetryCount);
+      console.warn(`[syncWorker] SOS operation ${operation.id} (type: ${operation.type}) failed to sync (retry ${newRetryCount}):`, error);
     }
   }
 }
@@ -282,8 +241,6 @@ export async function syncSosEvents(groupId: string): Promise<void> {
 export async function mergeSosOnSync(groupId: string): Promise<void> {
   const db = getFirestore();
   const storageKey = `sos_orset_${groupId}`;
-  const hlc = HLC.fresh();
-
   // Step 1: Load local OR-Set
   const localSet = orSetLoad(storageKey);
 

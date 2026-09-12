@@ -83,6 +83,10 @@ export async function triggerSos(
   let localSet = orSetLoad(storageKey);
   localSet = orSetAdd(localSet, sosElement, hlc);
   orSetSave(localSet, storageKey);
+  const tag = Array.from(localSet.adds.values()).find(
+    (entry) => entry.sos_id === sosId,
+  )?.tag;
+  const queuedSos: SOSElement = { ...sosElement, tag };
 
   // Step 4-6: Network attempt (best-effort)
   const online = await isOnline();
@@ -100,7 +104,7 @@ export async function triggerSos(
           lat,
           lng,
           created_at_hlc: createdAtHlc,
-          tag: (localSet.adds.get([...localSet.adds.keys()].find(k => localSet.adds.get(k)!.sos_id === sosId) || ''))?.tag || '',
+          tag: tag ?? '',
           resolved: false,
           resolved_at_hlc: null,
         });
@@ -110,7 +114,7 @@ export async function triggerSos(
       const operation = {
         id: uuidv4(),
         type: 'sos_event' as const,
-        data: sosElement,
+        data: queuedSos,
         created_at_hlc: createdAtHlc,
         retry_count: 0,
       };
@@ -121,7 +125,7 @@ export async function triggerSos(
     const operation = {
       id: uuidv4(),
       type: 'sos_event' as const,
-      data: sosElement,
+      data: queuedSos,
       created_at_hlc: createdAtHlc,
       retry_count: 0,
     };
@@ -163,7 +167,7 @@ export async function resolveSos(sosId: string, groupId: string): Promise<void> 
       const operation = {
         id: uuidv4(),
         type: 'sos_resolve' as const,
-        data: { sos_id: sosId, resolved_at_hlc: resolvedAtHlc },
+        data: { sos_id: sosId, resolved_at_hlc: resolvedAtHlc, group_id: groupId },
         created_at_hlc: resolvedAtHlc,
         retry_count: 0,
       };
@@ -174,7 +178,7 @@ export async function resolveSos(sosId: string, groupId: string): Promise<void> 
     const operation = {
       id: uuidv4(),
       type: 'sos_resolve' as const,
-      data: { sos_id: sosId, resolved_at_hlc: resolvedAtHlc },
+      data: { sos_id: sosId, resolved_at_hlc: resolvedAtHlc, group_id: groupId },
       created_at_hlc: resolvedAtHlc,
       retry_count: 0,
     };
@@ -299,3 +303,5 @@ export function getLocalActiveSosEvents(groupId: string): SOSElement[] {
   const localSet = orSetLoad(storageKey);
   return orSetGetActive(localSet);
 }
+
+export type { SOSElement } from '../crdt/orSet';

@@ -1,9 +1,24 @@
-﻿/** @type {import('jest').Config} */
+/** @type {import('jest').Config} */
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/test/**/*.test.ts'],
-moduleNameMapper: {
+  testMatch: ['<rootDir>/test/**/*.test.ts', '<rootDir>/test/**/*.test.tsx', '<rootDir>/test/phase6-ui-test-final.tsx'],
+  transform: {
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      diagnostics: false,
+      tsconfig: {
+        jsx: 'react',
+        esModuleInterop: true,
+        target: 'ES2020',
+        module: 'commonjs',
+      },
+    }],
+  },
+  moduleDirectories: ['node_modules'],
+  modulePaths: ['<rootDir>/node_modules'],
+  moduleNameMapper: {
+    '^@app/store/appStore$': '<rootDir>/test/__mocks__/appStoreMock.js',
+    '.*/store/appStore$': '<rootDir>/test/__mocks__/appStoreMock.js',
     '^@app/(.*)$': '<rootDir>/../../app/src/$1',
     '^@contracts/(.*)$': '<rootDir>/../../contracts/$1',
     '^@tracking/(.*)$': '<rootDir>/../tracking/src/$1',
@@ -19,5 +34,7 @@ moduleNameMapper: {
     'react-native-geolocation-service': '<rootDir>/test/__mocks__/geoMock.js',
     'socket.io-client': '<rootDir>/test/__mocks__/socketMock.js',
     'uuid': '<rootDir>/test/__mocks__/uuidMock.js',
+    '@rnmapbox/maps': '<rootDir>/test/__mocks__/mapboxMock.js',
+    'react-native': '<rootDir>/test/__mocks__/reactNativeMock.js',
   },
 };

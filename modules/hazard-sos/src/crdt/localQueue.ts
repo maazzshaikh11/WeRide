@@ -5,7 +5,8 @@
  * Survives app restart. Zero data loss: writes are synchronous.
  * 
  * Queue operations are FIFO. Retry count persists across restarts.
- * Operations with retry_count > 3 are dropped by sync worker.
+ * Retries are retained until a successful, idempotent remote write. This is
+ * intentional: a retry cap would violate the SOS zero-data-loss invariant.
  */
 
 import type { HazardReport } from '../dbscan/dbscan';
@@ -24,7 +25,7 @@ const MMKV = require('react-native-mmkv').MMKV;
 export interface QueuedOperation {
   id: string;
   type: 'hazard_report' | 'sos_event' | 'sos_resolve';
-  data: HazardReport | SOSElement | { sos_id: string; resolved_at_hlc: string };
+  data: HazardReport | SOSElement | { sos_id: string; resolved_at_hlc: string; group_id?: string };
   created_at_hlc: string;
   retry_count: number;
 }

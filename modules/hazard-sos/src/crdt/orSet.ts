@@ -21,6 +21,8 @@ export interface SOSElement {
   lat: number;
   lng: number;
   created_at_hlc: string;
+  /** Stable OR-Set tag when an already-created event is queued for sync. */
+  tag?: string;
 }
 
 /** @deprecated Use SOSElement (snake_case) instead. Kept for backward compatibility. */
@@ -201,8 +203,14 @@ export function orSetGetActive(set: ORSet): SOSElement[] {
   for (const [tag, element] of set.adds) {
     if (!set.tombstones.has(tag) && !seenSosIds.has(element.sos_id)) {
       seenSosIds.add(element.sos_id);
-      const { tag: _unusedTag, ...sosElement } = element;
-      active.push(sosElement);
+      active.push({
+        sos_id: element.sos_id,
+        rider_id: element.rider_id,
+        group_id: element.group_id,
+        lat: element.lat,
+        lng: element.lng,
+        created_at_hlc: element.created_at_hlc,
+      });
     }
   }
 

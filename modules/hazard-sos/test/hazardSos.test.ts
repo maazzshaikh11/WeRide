@@ -247,6 +247,18 @@ describe('Phase 3 Part A: DBSCAN Hazard Clustering', () => {
       expect(clusters.length).toBe(1);
       expect(clusters[0].reports.length).toBe(3);
     });
+
+    test('a provisional noise point is reassigned when it is density-reachable', () => {
+      const reports = [
+        createReport({ report_id: 'edge', lat: 0, lng: 0 }),
+        createReport({ report_id: 'core', lat: 0.0001, lng: 0 }),
+        createReport({ report_id: 'tail', lat: 0.0002, lng: 0 }),
+      ];
+      const clusters = dbscan(reports, 15, 3);
+      expect(clusters).toHaveLength(1);
+      expect(clusters[0].reports.map((report) => report.report_id).sort())
+        .toEqual(['core', 'edge', 'tail']);
+    });
   });
 
   describe('clusterByType', () => {
@@ -423,6 +435,14 @@ describe('Phase 2: Real HLC Implementation', () => {
 
       const merged2 = hlc.receive('500-10');
       expect(merged2).toBe('2000-7');
+    });
+
+    test('wall-clock time winning a receive resets the logical counter', () => {
+      let time = 1000;
+      const hlc = HLC.fresh(() => time);
+      hlc.now();
+      time = 3000;
+      expect(hlc.receive('2000-5')).toBe('3000-0');
     });
   });
 
@@ -1124,7 +1144,7 @@ describe('Phase 4: Offline-Resilient Storage & Sync - Component 2: SyncWorker', 
       expect(queue[0].retry_count).toBe(1);
     });
 
-    test('drops operation after retry_count > 3', async () => {
+    test('retains an operation after repeated failures for zero data loss', async () => {
       const report = {
         report_id: 'r1',
         rider_id: 'rider1',
@@ -1149,8 +1169,9 @@ describe('Phase 4: Offline-Resilient Storage & Sync - Component 2: SyncWorker', 
 
       await syncHazardReports('group1');
 
-      // Should be dequeued (dropped)
-      expect(queuePeek(HAZARD_QUEUE).length).toBe(0);
+      // Should NOT be dequeued (Zero Data Loss)
+      expect(queuePeek(HAZARD_QUEUE).length).toBe(1);
+      expect(queuePeek(HAZARD_QUEUE)[0].retry_count).toBe(4);
     });
 
     test('only syncs reports for specified groupId', async () => {
@@ -1304,7 +1325,7 @@ describe('Phase 4: Offline-Resilient Storage & Sync - Component 2: SyncWorker', 
       expect(queue[0].retry_count).toBe(1);
     });
 
-    test('drops operation after retry_count > 3', async () => {
+    test('retains an SOS after repeated failures for zero data loss', async () => {
       const sos = {
         sos_id: 's1',
         rider_id: 'rider1',
@@ -1327,7 +1348,9 @@ describe('Phase 4: Offline-Resilient Storage & Sync - Component 2: SyncWorker', 
 
       await syncSosEvents('group1');
 
-      expect(queuePeek(SOS_QUEUE).length).toBe(0);
+      // Should NOT be dequeued (Zero Data Loss)
+      expect(queuePeek(SOS_QUEUE).length).toBe(1);
+      expect(queuePeek(SOS_QUEUE)[0].retry_count).toBe(4);
     });
 
     test('cross-group sos_resolve is NOT dequeued by a different group\'s syncSosEvents', async () => {
@@ -1967,17 +1990,16 @@ describe('Phase 4: Offline-Resilient Storage & Sync - Component 2: SyncWorker', 
 
         queueEnqueue(SOS_QUEUE, resolveOp);
 
-        // Sync - should create tombstoned entry and dequeue
+        // Sync - should NOT create tombstoned entry (Zero Data Loss - keeps waiting for create)
         await syncSosEvents(groupId);
 
         const queue = queuePeek(SOS_QUEUE);
-        expect(queue).toHaveLength(0);
+        expect(queue).toHaveLength(1);
 
-        // Verify tombstoned entry created
+        // Verify tombstoned entry NOT created yet
         const db = firestore();
         const doc = await db.collection('sos_events').doc('s2').get();
-        expect(doc.exists).toBe(true);
-        expect(doc.data()?.resolved).toBe(true);
+        expect(doc.exists).toBe(false);
       });
     });
 

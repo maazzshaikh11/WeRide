@@ -77,7 +77,6 @@ export async function writeMockHazardCluster(groupId: string): Promise<void> {
   // Write to Firestore hazards/{cluster_id} per contract transport
   await db.collection('hazards').doc(cluster.cluster_id).set(cluster);
   
-  console.log(`[MockHazardService] Generated mock hazard cluster: ${cluster.cluster_id} (${cluster.hazard_type})`);
 }
 
 /**
@@ -94,10 +93,7 @@ export function startMockHazardEmission(groupId: string): () => void {
     });
   }, 10000); // Every 10 seconds
   
-  console.log('[MockHazardService] Started mock hazard emission for group:', groupId);
-  
   return () => {
     clearInterval(interval);
-    console.log('[MockHazardService] Stopped mock hazard emission');
   };
 }

@@ -133,8 +133,10 @@ export function dbscan(
   if (reports.length === 0) return [];
 
   const visited = new Array(reports.length).fill(false);
-  const clusterLabels = new Array(reports.length).fill(-1);
-  const clusters: DBCluster[] = [];
+  // undefined means unassigned; -1 means provisional noise. A point marked
+  // noise can later be density-reachable from a core point, so it must remain
+  // eligible to join that cluster (standard DBSCAN semantics).
+  const clusterLabels: Array<number | undefined> = new Array(reports.length);
   let clusterIdx = 0;
 
   const rangeQuery = (idx: number): number[] => {
@@ -154,8 +156,8 @@ export function dbscan(
     return result;
   };
 
-  const expandCluster = (startIdx: number, neighbors: number[]): number[] => {
-    const clusterMembers = [startIdx];
+  const expandCluster = (startIdx: number, neighbors: number[]): void => {
+    clusterLabels[startIdx] = clusterIdx;
     const queue = [...neighbors];
 
     while (queue.length > 0) {
@@ -165,18 +167,16 @@ export function dbscan(
         const qNeighbors = rangeQuery(q);
         if (qNeighbors.length + 1 >= minSamples) {
           for (const n of qNeighbors) {
-            if (!queue.includes(n) && clusterLabels[n] === -1) {
+            if (!queue.includes(n) && clusterLabels[n] !== clusterIdx) {
               queue.push(n);
             }
           }
         }
       }
-      if (clusterLabels[q] === -1) {
+      if (clusterLabels[q] === undefined || clusterLabels[q] === -1) {
         clusterLabels[q] = clusterIdx;
-        clusterMembers.push(q);
       }
     }
-    return clusterMembers;
   };
 
   for (let i = 0; i < reports.length; i++) {
@@ -185,23 +185,26 @@ export function dbscan(
     const neighbors = rangeQuery(i);
 
     if (neighbors.length + 1 < minSamples) {
-      clusterLabels[i] = clusterIdx;
-      clusters.push({
-        reports: [reports[i]],
-        cluster_id: `cluster_${clusterIdx}`,
-      });
-      clusterIdx++;
+      clusterLabels[i] = -1;
     } else {
-      clusterLabels[i] = clusterIdx;
-      const members = expandCluster(i, neighbors);
-      clusters.push({
-        reports: members.map((idx) => reports[idx]),
-        cluster_id: `cluster_${clusterIdx}`,
-      });
+      expandCluster(i, neighbors);
       clusterIdx++;
     }
   }
 
+  const clusters: DBCluster[] = [];
+  for (let label = 0; label < clusterIdx; label++) {
+    clusters.push({
+      reports: reports.filter((_, index) => clusterLabels[index] === label),
+      cluster_id: `cluster_${label}`,
+    });
+  }
+  // We publish noise as singleton hazards rather than discarding it.
+  for (let index = 0; index < reports.length; index++) {
+    if (clusterLabels[index] === -1) {
+      clusters.push({ reports: [reports[index]], cluster_id: `cluster_${clusters.length}` });
+    }
+  }
   return clusters;
 }
 

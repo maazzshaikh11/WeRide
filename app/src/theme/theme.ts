@@ -1,81 +1,116 @@
 /**
- * Shared design system for WeRide. Owned by Person C (UI-lead).
- * Everyone imports this. No one hardcodes colors.
- * To change a value here, open a PR — C reviews all UI PRs for consistency.
+ * WeRide UI Master Design System.
+ * Source of truth: docs/UIUX_MASTER_DESIGN_SPEC.md §1.
  *
- * Replaces the Flutter `theme.dart`. Same color values, RN-native.
- * Phase 1 Day 1 (W1 D1): Locked fonts + icon set + all color maps + safety thresholds.
- *
- * Decision Register (ratified W1 D1):
- * - D-07: Material Icons (react-native-vector-icons) + system font (Roboto)
- * - D-08: Safety thresholds ≥0.7 (green), 0.4–0.7 (yellow), <0.4 (red)
- * - Hazard severity: accident(5) > oil_spill(4) > debris(3) > pothole(2) > other(1)
- * - Hazard radius R: 100m (tuned in Phase 3)
+ * Colors follow the dark WeRide theme (dark bg, orange primary accent).
+ * Legacy green theme (#1B4332, #2D6A4F, #40916C) removed per spec §1.1.
  */
 
 export const WeRideColors = {
-  // Brand
-  primary: '#1B4332',
-  primaryLight: '#2D6A4F',
-  accent: '#40916C',
-  background: '#F8F9FA',
-  surface: '#FFFFFF',
-  onPrimary: '#FFFFFF',
-  error: '#E63946',
+  // Core dark palette (spec §1.1)
+  dark: '#0A0A0A',          // page background
+  dark2: '#111111',         // screen/card inner background
+  dark3: '#1A1A1A',         // card, stat-box, button-fill background
+  muted: '#333333',         // sheet handle, muted borders
+  border: '#2A2A2A',        // all card borders, dividers, input borders
 
-  // Rider marker colors (Person A)
-  riderVerified: '#2D6A4F', // green
-  riderFlagged: '#E63946', // red (spoof_flag=true)
-  riderStale: '#9AA0A6', // grey (no recent update)
+  // Brand
+  primary: '#FF5C00',       // primary accent (orange)
+  primaryDim: '#FF5C0022',  // primary at 8% opacity — badge bg, button tints
+  onPrimary: '#FFFFFF',
+  error: '#FF3B3B',
+
+  // Status colors
+  green: '#22C55E',
+  greenDim: '#22C55E18',
+  red: '#FF3B3B',
+  redDim: '#FF3B3B1F',
+  blue: '#3B82F6',
+  gold: '#FBBF24',
+
+  // Rider colors (per-rider assignment)
+  pink: '#EC4899',
+  purple: '#A855F7',
+  teal: '#14B8A6',
+
+  // Rider marker states (Person A) — spec §1.1 semantic aliases
+  riderVerified: '#22C55E', // green — fresh verified
+  riderFlagged: '#FF3B3B',  // red — spoofed
+  riderStale: '#9AA0A6',    // grey — stale (>10s)
 
   // Hazard type colors (Person B)
-  hazardPothole: '#FB8500', // orange
-  hazardOilSpill: '#5C4033', // dark brown
-  hazardAccident: '#E63946', // red
-  hazardDebris: '#FFD60A', // yellow
-  hazardOther: '#9AA0A6', // grey
-  hazardResolved: '#9AA0A655', // faded grey (alpha 33%)
+  hazardPothole: '#FB8500',
+  hazardOilSpill: '#5C4033',
+  hazardAccident: '#FF3B3B',
+  hazardDebris: '#FBBF24',
+  hazardOther: '#9AA0A6',
+  hazardResolved: '#9AA0A655',
 
   // Safety score bar thresholds (Person C)
-  safetyGood: '#2D6A4F', // >= 0.7
-  safetyCaution: '#FFD60A', // 0.4 - 0.7
-  safetyPoor: '#E63946', // < 0.4
+  safetyGood: '#22C55E',    // >= 0.7
+  safetyCaution: '#FBBF24', // 0.4 - 0.7
+  safetyPoor: '#FF3B3B',    // < 0.4
 
   // VOX indicator (Person D)
-  voxActive: '#40916C',
+  voxActive: '#22C55E',
   voxIdle: 'transparent',
 
   // Text
-  textPrimary: '#1A1A1A',
-  textSecondary: '#6C757D',
+  text: '#F0F0F0',          // primary body text
+  textPrimary: '#F0F0F0',   // alias kept for existing imports
+  textSub: '#888888',       // secondary/muted text
+  textSecondary: '#888888', // alias kept for existing imports
+  white: '#FFFFFF',
+
+  // Surfaces (semantic aliases per spec §1.1)
+  background: '#0A0A0A',
+  surface: '#1A1A1A',
 } as const;
 
 /**
- * Font configuration (D-07: Material Icons + Roboto system font, locked W1 D1).
- * Roboto is the standard system font for React Native on both iOS/Android.
- * For custom fonts, this would reference font family names registered in native config.
+ * Typography tokens (spec §1.2).
+ * Custom fonts (Bebas Neue, Inter, Space Mono) fall back to system fonts
+ * when not bundled: Bebas → bold sans-serif, Space Mono → monospace,
+ * Inter → default sans-serif. Font family constants reference the
+ * post-link names; RN falls back automatically when unregistered.
  */
 export const WeRideFonts = {
-  // Primary font family (Roboto system default)
-  primary: 'Roboto',
-  // Headline/display font (same as primary for MVP; can split later)
-  headline: 'Roboto',
-  // Monospace for technical UI (if needed)
-  mono: 'Menlo',
+  display: 'BebasNeue',       // page-level titles
+  heading: 'BebasNeue',       // screen titles, modal headings
+  body: 'Inter',              // default body text
+  mono: 'SpaceMono',         // technical/status/badge elements
+  // Legacy aliases kept for existing imports
+  primary: 'Inter',
+  headline: 'BebasNeue',
 } as const;
 
-/**
- * Icon set configuration (D-07: Material Icons via react-native-vector-icons, locked W1 D1).
- * Use `react-native-vector-icons/MaterialIcons` for all icons.
- * This constant documents the choice; implementations use the icon name directly.
- */
+/** Spacing scale (spec §1.3). */
+export const WeRideSpacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 36,
+} as const;
+
+/** Border radius scale (spec §1.4). */
+export const WeRideRadius = {
+  sm: 6,
+  md: 8,
+  lg: 10,
+  xl: 12,
+  xxl: 14,
+  xxxl: 18,
+  pill: 99,
+} as const;
+
+/** Icon set configuration (D-07 unchanged). */
 export const WeRideIconSet = {
-  // Icon library name for react-native-vector-icons
   library: 'MaterialIcons',
-  // Default icon size in pixels
   defaultSize: 24,
-  // Common icon color (uses primary text color by default)
-  defaultColor: '#1A1A1A',
+  defaultColor: '#F0F0F0',
 } as const;
 
 /** Hazard type → color mapping. Single source of truth. */
@@ -101,4 +136,17 @@ export function safetyScoreColor(score: number): string {
   if (score >= 0.7) return WeRideColors.safetyGood;
   if (score >= 0.4) return WeRideColors.safetyCaution;
   return WeRideColors.safetyPoor;
+}
+
+/** Rider color assignment for multi-rider visuals (spec §1.1 rider colors). */
+const RIDER_PALETTE = [
+  WeRideColors.purple, // Maaz
+  WeRideColors.pink,   // Hritika, Mom
+  WeRideColors.teal,   // Piyush
+  WeRideColors.blue,
+  WeRideColors.gold,
+  WeRideColors.green,
+];
+export function riderColor(index: number): string {
+  return RIDER_PALETTE[index % RIDER_PALETTE.length];
 }

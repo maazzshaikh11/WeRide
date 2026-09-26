@@ -9,7 +9,9 @@
  * - resolveHazard: sets status=resolved on hazards/{cluster_id}
  */
 
-import /* eslint-disable-next-line @typescript-eslint/no-var-requires */ firestore from '@react-native-firebase/firestore';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
+import firestore from '@react-native-firebase/firestore';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { v4: uuidv4 } = require('uuid');
 import { HLC } from '../hlc/hlc';
@@ -36,7 +38,9 @@ const HAZARD_CLUSTERS_COLLECTION = 'hazards';
 const CLUSTER_MATCH_THRESHOLD_METERS = 50;
 
 function getFirestore(): any {
-  // @ts-ignore Firestore typing issue with getFirestore wrapper
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore Firestore typing differs between module and app compile contexts
   return firestore();
 }
 

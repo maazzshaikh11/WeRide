@@ -6,6 +6,8 @@ buildscript {
         targetSdkVersion = 34
         ndkVersion = "25.1.8937393"
         kotlinVersion = "1.8.0"
+	tslocationmanagerVersion = "3.7.0"
+
     }
     repositories {
         google()
@@ -15,7 +17,36 @@ buildscript {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+	classpath("com.google.gms:google-services:4.5.0")
     }
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// react-native-background-geolocation bundles tslocationmanager as a local Maven repo
+// inside the npm package — it is NOT on mavenCentral. We must expose it at allprojects
+// level so that :app can resolve it as a transitive dependency.
+// NOTE: use $rootDir (= android/) relative path — project(':...') is not yet configured
+// when this block runs, which causes a null-project evaluation error.
+allprojects {
+    repositories {
+        // tslocationmanager — bundled local Maven repo inside npm package
+        maven {
+            url "$rootDir/../node_modules/react-native-background-geolocation/android/libs"
+        }
+        // logback-android (background-geolocation logging)
+        maven { url 'https://jitpack.io' }
+        // Mapbox Maps SDK — private authenticated Maven registry
+        // Token must be set in ~/.gradle/gradle.properties as MAPBOX_DOWNLOADS_TOKEN=sk.eyJ1...
+        maven {
+            url 'https://api.mapbox.com/downloads/v2/releases/maven'
+            authentication {
+                basic(BasicAuthentication)
+            }
+            credentials {
+                username = "mapbox"
+                password = project.properties['MAPBOX_DOWNLOADS_TOKEN'] ?: ""
+            }
+        }
+    }
+}

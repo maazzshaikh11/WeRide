@@ -18,7 +18,7 @@ import { subscribeToSosEvents, resolveSos, SOSElement } from '@hazard/services/s
 
 const { MarkerView } = MapboxGL;
 
-interface ActiveSos {
+export interface ActiveSos {
   sos_id: string;
   rider_id: string;
   group_id: string;
@@ -250,10 +250,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowColor: '#FF3B3B',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 9,
     elevation: 8,
   },
   sosMarkerText: {
@@ -267,16 +267,19 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 16,
     right: 16,
-    backgroundColor: WeRideColors.surface,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: '#161616f7',
+    borderWidth: 1,
+    borderColor: WeRideColors.border,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    borderRadius: 14,
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: 16,
     marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
     elevation: 8,
   },
   infoHeader: {
@@ -286,27 +289,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   infoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '700',
+    color: WeRideColors.white,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 4,
     borderBottomWidth: 1,
-    borderBottomColor: WeRideColors.textSecondary + '20',
+    borderBottomColor: WeRideColors.border,
   },
   infoLabel: {
-    fontSize: 13,
-    color: WeRideColors.textSecondary,
+    fontSize: 10,
+    color: WeRideColors.textSub,
   },
   infoValue: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
-    color: WeRideColors.textPrimary,
+    color: WeRideColors.text,
   },
   cancelButton: {
-    backgroundColor: WeRideColors.error,
+    backgroundColor: WeRideColors.red,
     paddingVertical: 10,
     borderRadius: 10,
     alignItems: 'center',
@@ -314,13 +318,13 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
   resolvedText: {
     textAlign: 'center',
-    color: WeRideColors.textSecondary,
-    fontSize: 12,
+    color: WeRideColors.textSub,
+    fontSize: 10,
     marginTop: 8,
   },
 });

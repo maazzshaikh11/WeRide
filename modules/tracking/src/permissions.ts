@@ -1,5 +1,6 @@
 import { PermissionsAndroid, Platform } from 'react-native';
-// @ts-ignore
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import Geolocation from 'react-native-geolocation-service';
 
 /**

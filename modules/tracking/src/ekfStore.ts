@@ -9,6 +9,8 @@
  *   persistEkf(ekf)   — write current EKF state to MMKV.
  */
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import { MMKV } from 'react-native-mmkv';
 import { Ekf, EkfState } from './ekf';
 

@@ -144,7 +144,12 @@ export class HLC {
   }
 
   static _resetStorage() {
-    // @ts-ignore MMKV API differs between v2 (app, delete) and v4 (module types, remove)
-    getStorage()?.delete('hlc_state');
+    // MMKV v2 uses delete(), v4 uses remove() — support both.
+    const storage = getStorage() as unknown as { delete?: (k: string) => void; remove?: (k: string) => boolean } | null;
+    if (storage?.delete) {
+      storage.delete('hlc_state');
+    } else if (storage?.remove) {
+      storage.remove('hlc_state');
+    }
   }
 }

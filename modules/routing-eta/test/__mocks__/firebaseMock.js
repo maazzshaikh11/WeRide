@@ -57,3 +57,8 @@ const authFactory = () => ({
 
 module.exports = firestoreFactory;
 module.exports.default = firestoreFactory;
+// Static FieldValue on the module (matches @react-native-firebase/firestore API)
+module.exports.FieldValue = {
+  serverTimestamp: () => new Date(),
+  arrayUnion: (value) => ({ type: 'arrayUnion', value }),
+};

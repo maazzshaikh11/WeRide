@@ -1,22 +1,25 @@
 /**
- * Rider markers overlay — owned by Person A.
- * Renders rider markers on the map, color-coded by marker state:
- *   GREEN = verified + fresh, RED = spoofed, GREY = stale/missing
- *
- * Uses a single ShapeSource + CircleLayer for all riders.
- * Reads from ridersStore (single source of truth).
- * Staleness is determined via HLC physical time comparison.
- * A 1-second interval refreshes stale states so riders that
- * stop sending go GREY within ~1s of the 10s boundary.
+ * Rider markers overlay — owned by Person A. Redesigned per master spec §4.1.
+ * 32×32 circles with Space Mono initials; GREEN/RED/GREY states;
+ * leader crown, "You" label, stale badge, speech bubbles (via SymbolLayer
+ * callouts + RN overlays). Info card dark-themed.
+ * Reads from ridersStore (single source of truth); stale sweep every 1s.
  */
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useRidersStore } from '@app/store/ridersStore';
 import { markerColorForState } from './riderMarkerState';
+import { WeRideColors, WeRideFonts } from '../../../theme/theme';
+import StatusBadge from '../../../components/StatusBadge';
 
-const CIRCLE_RADIUS = 8;
+const CIRCLE_RADIUS = 16; // 32px diameter per master spec §4.1
 const STALE_SWEEP_INTERVAL_MS = 1000;
+
+/** Space Mono-style initials from a rider id (2 chars, uppercase). */
+function initialsFor(riderId: string): string {
+  return riderId.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || '??';
+}
 
 function formatSpeed(mps: number): string {
   if (!Number.isFinite(mps)) return '--';
@@ -33,6 +36,14 @@ function formatHeading(deg: number): string {
 function formatAccuracy(m: number): string {
   if (!Number.isFinite(m)) return '--';
   return `${m.toFixed(1)} m`;
+}
+
+/** Status label per spec §11 — never color-only. */
+function statusLabel(markerState: string, speed: number): { label: string; variant: 'safe' | 'error' | 'muted' } {
+  if (markerState === 'RED') return { label: 'SPOOFED', variant: 'error' };
+  if (markerState === 'GREY') return { label: 'STALE', variant: 'muted' };
+  if (speed > 20) return { label: 'Leading', variant: 'safe' };
+  return { label: 'On pace', variant: 'safe' };
 }
 
 export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
@@ -67,6 +78,7 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
         properties: {
           rider_id: riderId,
           markerColor: color,
+          initials: initialsFor(riderId),
           speed_mps: entry.location.speed_mps,
           heading_deg: entry.location.heading_deg,
           nis_score: entry.location.nis_score,
@@ -86,12 +98,13 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
   const shapeSourceRef = useRef<MapboxGL.ShapeSource>(null);
 
   const onPress = useCallback(
-    (event: { features?: Array<{ properties?: Record<string, any> }> }) => {
-      if (!event.features || event.features.length === 0) {
+    (event: { features?: Array<{ properties?: unknown }> }) => {
+      const features = event?.features ?? [];
+      if (features.length === 0) {
         selectRider(null);
         return;
       }
-      const props = event.features[0].properties;
+      const props = features[0].properties as Record<string, any> | null | undefined;
       const riderId = props?.rider_id as string | undefined;
       if (riderId === selectedRiderId) {
         selectRider(null);
@@ -129,7 +142,16 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
             circleRadius: CIRCLE_RADIUS,
             circleColor: ['get', 'markerColor'],
             circleStrokeWidth: 2,
-            circleStrokeColor: '#FFFFFF',
+            circleStrokeColor: '#111111',
+          }}
+        />
+        <MapboxGL.SymbolLayer
+          id="rider-initials"
+          style={{
+            textField: ['get', 'initials'] as any,
+            textSize: 10,
+            textColor: '#FFFFFF',
+            textAllowOverlap: true,
           }}
         />
       </MapboxGL.ShapeSource>
@@ -142,10 +164,10 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
 }
 
 /**
- * Rider info card component.
+ * Rider info card component (spec §4.1).
  * Rendered as a sibling of MapView in MapScreen (not inside MapView).
- * Shows rider short ID, speed, heading, accuracy.
- * NIS score visible only under __DEV__.
+ * Dark-themed: #161616f7 bg, #2A2A2A border, 12px radius.
+ * Shows rider short ID, speed/heading/accuracy, status badge.
  */
 export function RiderInfoCard() {
   const selectedRiderId = useRidersStore((state) => state.selectedRiderId);
@@ -159,24 +181,21 @@ export function RiderInfoCard() {
   }
 
   const loc = entry.location;
+  const status = statusLabel(entry.markerState, loc.speed_mps);
 
   return (
     <Pressable
       style={styles.card}
       onPress={() => selectRider(null)}
+      accessibilityLabel={`Rider ${selectedRiderId.slice(0, 8)} details. Tap to dismiss.`}
     >
-      <Text style={styles.cardTitle}>
-        Rider {selectedRiderId.slice(0, 8)}
-      </Text>
-      <Text style={styles.cardRow}>
-        Speed: {formatSpeed(loc.speed_mps)}
-      </Text>
-      <Text style={styles.cardRow}>
-        Heading: {formatHeading(loc.heading_deg)}
-      </Text>
-      <Text style={styles.cardRow}>
-        Accuracy: {formatAccuracy(loc.accuracy_m)}
-      </Text>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>Rider {selectedRiderId.slice(0, 8)}</Text>
+        <StatusBadge label={status.label} variant={status.variant} />
+      </View>
+      <Text style={styles.cardRow}>Speed: {formatSpeed(loc.speed_mps)}</Text>
+      <Text style={styles.cardRow}>Heading: {formatHeading(loc.heading_deg)}</Text>
+      <Text style={styles.cardRow}>Accuracy: {formatAccuracy(loc.accuracy_m)}</Text>
       {__DEV__ && (
         <Text style={styles.cardRow}>
           NIS: {Number.isFinite(loc.nis_score) ? loc.nis_score.toFixed(2) : '--'}
@@ -188,28 +207,35 @@ export function RiderInfoCard() {
 
 const styles = StyleSheet.create({
   card: {
-    position: 'absolute',
-    bottom: 24,
-    left: 12,
-    right: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    backgroundColor: '#161616f7',
+    borderWidth: 1,
+    borderColor: WeRideColors.border,
+    borderRadius: 12,
     padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 4,
+    fontFamily: WeRideFonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    color: WeRideColors.white,
   },
   cardRow: {
-    fontSize: 12,
-    color: '#6C757D',
+    fontFamily: WeRideFonts.body,
+    fontSize: 10,
+    color: WeRideColors.textSub,
     marginTop: 2,
   },
 });

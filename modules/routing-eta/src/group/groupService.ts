@@ -4,7 +4,7 @@
  * Ported from group_service.dart.
  */
 
-import firestore from '@react-native-firebase/firestore';
+import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,6 +17,12 @@ export interface Group {
   active_ride_id: string | null;
 }
 
+export interface RidePlanPayload {
+  start: { label: string; lat: number; lng: number } | null;
+  destination: { label: string; lat: number; lng: number } | null;
+  stops: { id: string; label: string; lat: number; lng: number; icon: string }[];
+}
+
 export class GroupService {
   private _firestore: ReturnType<typeof firestore>;
   private _auth: ReturnType<typeof auth>;
@@ -27,28 +33,34 @@ export class GroupService {
     this._auth = auth();
   }
 
-  async createGroup(name?: string): Promise<string> {
+  async createGroup(name?: string, plan?: RidePlanPayload): Promise<string> {
     const groupId = this._uuid();
     const uid = this._auth.currentUser!.uid;
-    const FieldValue = (this._firestore as any).FieldValue;
 
     await this._firestore.collection('groups').doc(groupId).set({
       name: name ?? `Ride ${Date.now()}`,
       created_by: uid,
       member_ids: [uid],
-      created_at: FieldValue.serverTimestamp(),
+      created_at: firestore.FieldValue.serverTimestamp(),
       active_ride_id: null,
+      ...(plan ? { ride_plan: plan } : {}),
     });
     return groupId;
   }
 
+  /** Fetch a group's saved ride plan (from the Create Ride modal). */
+  async getRidePlan(groupId: string): Promise<RidePlanPayload | null> {
+    const snap = await this._firestore.collection('groups').doc(groupId).get();
+    const data = snap.data() as any;
+    return data?.ride_plan ?? null;
+  }
+
   async joinGroup(groupCode: string): Promise<void> {
     const uid = this._auth.currentUser!.uid;
-    const FieldValue = (this._firestore as any).FieldValue;
 
     try {
       await this._firestore.collection('groups').doc(groupCode).update({
-        member_ids: FieldValue.arrayUnion(uid),
+        member_ids: firestore.FieldValue.arrayUnion(uid),
       });
     } catch (e: any) {
       if (e.code === 'not-found') {

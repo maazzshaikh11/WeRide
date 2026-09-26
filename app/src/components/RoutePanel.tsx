@@ -1,151 +1,208 @@
 /**
- * Route/ETA bottom sheet on the map.
- * Collapsed: ETA + distance + safety bar + controls.
- * Expanded: turn list placeholder + Google Maps deep link button.
- * Auto-updates when route_response changes (no manual refresh).
- * Ported from route_panel.dart.
+ * RoutePanel — dark bottom sheet on the map (spec §3.3.8, §4.6).
+ * Collapsed: ride name/meta, avatar stack, stat row (km left, min eta, next stop).
+ * Expanded: music player, safety score bar, avoid-hazards toggle,
+ * Google Maps deep link, turn-by-turn placeholder.
+ * Data: useRouteStore() (Person C), useRidersStore() (Person A).
  */
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { WeRideColors, safetyScoreColor } from '@app/theme/theme';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { WeRideColors, WeRideFonts, safetyScoreColor } from '@app/theme/theme';
+import { useRouteStore } from '@routing/client/routeStore';
+import { useRidersStore } from '@app/store/ridersStore';
+import BottomSheet from './BottomSheet';
+import StatBox from './StatBox';
+import AvatarStack from './AvatarStack';
+import MusicPlayer from './MusicPlayer';
 
 interface Props {
-  etaMinutes: number;
-  distanceKm: number;
-  safetyScore: number;
   avoidHazards?: boolean;
   onToggleAvoidHazards?: () => void;
   onOpenInGoogleMaps?: () => void;
+  /** SOS/music duck integration (spec: music ducks on SOS) */
+  duckReason?: string | null;
 }
 
+const COLLAPSED_HEIGHT = 150;
+const MAX_HEIGHT = 320;
+
 export default function RoutePanel({
-  etaMinutes,
-  distanceKm,
-  safetyScore,
-  avoidHazards = true,
+  avoidHazards = false,
   onToggleAvoidHazards,
   onOpenInGoogleMaps,
+  duckReason,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const route = useRouteStore((s) => s.route);
+  const isLoading = useRouteStore((s) => s.isLoading);
+  const riders = useRidersStore((s) => s.riders);
+
+  const riderNames = Array.from(riders.keys());
+  const eta = route ? Math.round(route.eta_minutes) : null;
+  const distance = route ? route.distance_km.toFixed(1) : null;
+  const safety = route?.safety_score ?? null;
 
   return (
-    <View style={styles.panel}>
-      {/* Collapsed header — always visible, tap to expand */}
-      <TouchableOpacity onPress={() => setExpanded(!expanded)} style={styles.header}>
-        <View style={styles.row}>
-          <Text style={styles.eta}>{Math.round(etaMinutes)} min</Text>
-          <Text style={styles.dim}> · {distanceKm.toFixed(1)} km</Text>
-          <View style={[styles.safetyBar, { backgroundColor: safetyScoreColor(safetyScore) }]} />
-        </View>
-      </TouchableOpacity>
-
-      {/* Expanded content */}
-      {expanded && (
-        <ScrollView style={styles.expanded}>
-          {/* Turn list placeholder (Phase 6 will populate) */}
-          <View style={styles.turnListPlaceholder}>
-            <Text style={styles.placeholderText}>Turn-by-turn navigation (Phase 5 UI only)</Text>
-          </View>
-
-          {/* Controls */}
-          <View style={styles.controls}>
-            <TouchableOpacity style={styles.controlButton} onPress={onToggleAvoidHazards}>
-              <Text style={styles.controlButtonText}>
-                {avoidHazards ? '✓ Avoiding hazards' : '✗ Hazards ignored'}
+    <BottomSheet collapsedHeight={COLLAPSED_HEIGHT} maxHeight={MAX_HEIGHT}>
+      {({ expanded, toggle }) => (
+        <TouchableOpacity
+          activeOpacity={0.95}
+          onPress={toggle}
+          accessibilityLabel={expanded ? 'Collapse ride details' : 'Expand ride details'}
+          accessibilityRole="button"
+        >
+          <View style={styles.inner} pointerEvents="box-none">
+            {/* Row 1: ride name + meta */}
+            <View style={styles.titleRow}>
+              <Text style={styles.rideName}>
+                {riderNames.length} rider{riderNames.length !== 1 ? 's' : ''} · Convoy synced
               </Text>
-            </TouchableOpacity>
+              <Text style={styles.rideMeta}>
+                {isLoading ? 'Recalculating…' : 'Route active'}
+              </Text>
+            </View>
 
-            <TouchableOpacity style={styles.controlButton} onPress={onOpenInGoogleMaps}>
-              <Text style={styles.controlButtonText}>→ Open in Google Maps</Text>
-            </TouchableOpacity>
+            {/* Row 2: avatar stack */}
+            <AvatarStack names={riderNames} max={4} />
+
+            {/* Row 3: stat row */}
+            <View style={styles.statRow}>
+              {isLoading ? (
+                <View style={styles.loadingWrap}>
+                  <ActivityIndicator color={WeRideColors.primary} size="small" />
+                  <Text style={styles.loadingText}>Recalculating route…</Text>
+                </View>
+              ) : (
+                <>
+                  <StatBox value={distance ?? '—'} label="km left" />
+                  <StatBox value={eta != null ? String(eta) : '—'} label="min eta" />
+                  <StatBox value="☕ —" label="next stop" display={false} />
+                </>
+              )}
+            </View>
+
+            {/* Expanded content */}
+            {expanded && (
+              <ScrollView style={styles.expanded} pointerEvents="box-none">
+                <MusicPlayer duckReason={duckReason} />
+
+                {/* Safety score bar (spec §4.6) */}
+                <View style={styles.safetyRow}>
+                  <Text style={styles.safetyLabel}>Safety score</Text>
+                  <View style={styles.safetyTrack}>
+                    <View
+                      style={[
+                        styles.safetyFill,
+                        { backgroundColor: safety != null ? safetyScoreColor(safety) : '#333333', width: `${(safety ?? 0) * 100}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.safetyValue}>
+                    {safety != null ? `${Math.round(safety * 100)}%` : '—'}
+                  </Text>
+                </View>
+
+                <View style={styles.controls} pointerEvents="box-none">
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, avoidHazards ? styles.toggleActive : styles.toggleInactive]}
+                    onPress={onToggleAvoidHazards}
+                    accessibilityLabel={avoidHazards ? 'Avoiding hazards: on. Tap to disable' : 'Avoiding hazards: off. Tap to enable'}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.toggleText, avoidHazards ? styles.toggleTextActive : null]}>
+                      {avoidHazards ? 'Avoiding hazards' : 'Hazards ignored'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.gmapsBtn}
+                    onPress={onOpenInGoogleMaps}
+                    accessibilityLabel="Open route in Google Maps"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.gmapsText}>Open in Google Maps</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.tbtPlaceholder}>Turn-by-turn navigation (coming soon)</Text>
+              </ScrollView>
+            )}
           </View>
-        </ScrollView>
+        </TouchableOpacity>
       )}
-
-      {/* Collapsed controls (always visible) */}
-      {!expanded && (
-        <View style={styles.collapsedControls}>
-          <TouchableOpacity onPress={onToggleAvoidHazards}>
-            <Text style={styles.controlText}>{avoidHazards ? 'Avoiding hazards' : 'Hazards ignored'}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  panel: {
-    backgroundColor: WeRideColors.surface,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+  inner: {
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    gap: 8,
   },
-  header: {
-    paddingVertical: 8,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  row: {
+  rideName: {
+    fontFamily: WeRideFonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+    color: WeRideColors.white,
+  },
+  rideMeta: {
+    fontFamily: WeRideFonts.body,
+    fontSize: 10,
+    color: WeRideColors.textSub,
+  },
+  statRow: { flexDirection: 'row', gap: 8 },
+  loadingWrap: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingVertical: 12,
   },
-  eta: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: WeRideColors.textPrimary,
-  },
-  dim: {
-    color: WeRideColors.textSecondary,
-  },
-  safetyBar: {
-    width: 60,
+  loadingText: { fontFamily: WeRideFonts.body, fontSize: 11, color: WeRideColors.textSub },
+  expanded: { maxHeight: 170, marginTop: 2 },
+  safetyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  safetyLabel: { fontFamily: WeRideFonts.body, fontSize: 10, color: WeRideColors.textSub },
+  safetyTrack: {
+    flex: 1,
     height: 8,
-    borderRadius: 4,
-    marginLeft: 'auto',
+    borderRadius: 99,
+    backgroundColor: WeRideColors.dark3,
+    overflow: 'hidden',
   },
-  expanded: {
-    maxHeight: 300,
-    marginTop: 16,
+  safetyFill: { height: 8, borderRadius: 99 },
+  safetyValue: { fontFamily: WeRideFonts.mono, fontSize: 10, color: WeRideColors.text },
+  controls: { gap: 8, marginTop: 10 },
+  toggleBtn: {
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
   },
-  turnListPlaceholder: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    backgroundColor: WeRideColors.background,
-    borderRadius: 8,
-    marginBottom: 16,
+  toggleActive: { backgroundColor: WeRideColors.green },
+  toggleInactive: {
+    backgroundColor: WeRideColors.dark3,
+    borderWidth: 1,
+    borderColor: WeRideColors.border,
   },
-  placeholderText: {
+  toggleText: { fontFamily: WeRideFonts.body, fontSize: 12.5, fontWeight: '700', color: WeRideColors.textSub },
+  toggleTextActive: { color: WeRideColors.white },
+  gmapsBtn: {
+    backgroundColor: WeRideColors.blue,
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  gmapsText: { fontFamily: WeRideFonts.body, fontSize: 12.5, fontWeight: '700', color: WeRideColors.white },
+  tbtPlaceholder: {
+    fontFamily: WeRideFonts.body,
     fontSize: 12,
-    color: WeRideColors.textSecondary,
-    fontStyle: 'italic',
-  },
-  controls: {
-    gap: 8,
-  },
-  controlButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: WeRideColors.primaryLight,
-    borderRadius: 8,
-  },
-  controlButtonText: {
-    color: WeRideColors.onPrimary,
-    fontWeight: '500',
-  },
-  collapsedControls: {
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: WeRideColors.background,
-  },
-  controlText: {
-    fontSize: 14,
-    color: WeRideColors.accent,
-    fontWeight: '500',
+    color: WeRideColors.textSub,
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 4,
   },
 });

@@ -65,7 +65,7 @@ describe('hlcStore', () => {
       const after = Date.now();
 
       const ts = hlc.now();
-      expect(ts).toMatch(/^\d+:\d+$/);
+      expect(ts).toMatch(/^\d+-\d+$/);
       expect(hlc.physical).toBeGreaterThanOrEqual(before);
       expect(hlc.physical).toBeLessThanOrEqual(after + 10);
     });
@@ -83,7 +83,7 @@ describe('hlcStore', () => {
 
       const hlc = loadHlc();
       // Should not throw; result is a valid fresh HLC
-      expect(hlc.now()).toMatch(/^\d+:\d+$/);
+      expect(hlc.now()).toMatch(/^\d+-\d+$/);
     });
   });
 

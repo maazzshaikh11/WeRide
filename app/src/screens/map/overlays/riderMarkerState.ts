@@ -132,9 +132,9 @@ export function getMarkerStateForMissing(): MarkerState {
 export function markerColorForState(state: MarkerState): string {
   switch (state) {
     case 'GREEN':
-      return '#2D6A4F'; // WeRideColors.riderVerified
+      return '#22C55E'; // WeRideColors.riderVerified
     case 'RED':
-      return '#E63946'; // WeRideColors.riderFlagged
+      return '#FF3B3B'; // WeRideColors.riderFlagged
     case 'GREY':
       return '#9AA0A6'; // WeRideColors.riderStale
   }

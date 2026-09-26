@@ -11,12 +11,15 @@
  * Phase 2+ requirement: Integrate device attitude or use platform-provided motion API.
  */
 
-// @ts-ignore
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import Geolocation from 'react-native-geolocation-service';
-// @ts-ignore
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import BackgroundGeolocation from 'react-native-background-geolocation';
-// @ts-ignore
-import { accelerometer, gyroscope } from 'react-native-sensors';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
+import { accelerometer, gyroscope, setUpdateIntervalForType } from 'react-native-sensors';
 
 const GRAVITY_MPS2 = 9.81;
 
@@ -87,6 +90,11 @@ export class SensorStream {
         { enableHighAccuracy: true, distanceFilter: 0, interval: 1000, fastestInterval: 500 }
       );
     }
+
+    // 10 Hz sensor collection (unit is milliseconds; 0 = fastest, which
+    // triggers HIGH_SAMPLING_RATE_SENSORS SecurityException on Android 12+).
+    setUpdateIntervalForType('accelerometer', 100);
+    setUpdateIntervalForType('gyroscope', 100);
 
     if (!this._accelSub) {
       this._accelSub = accelerometer.subscribe(({ x, y, z }: { x: number, y: number, z: number }) => {

@@ -17,6 +17,8 @@
  * App-level wiring is deferred to Phase 6 integration.
  */
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import { MMKV } from 'react-native-mmkv';
 import { HLC, HlcState } from '@hazard/hlc/hlc';
 

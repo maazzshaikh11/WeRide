@@ -38,7 +38,7 @@ describe('RiderMarkerOverlay', () => {
     const root = renderer.root;
 
     // The mock for @rnmapbox/maps exports ShapeSource as the string 'ShapeSource'
-    const shapeSource = root.findByType('ShapeSource');
+    const shapeSource = root.findByType('ShapeSource' as unknown as React.ElementType);
     const geojson = shapeSource.props.shape;
     
     // There should be exactly one feature
@@ -52,7 +52,7 @@ describe('RiderMarkerOverlay', () => {
     expect(feature.properties.markerColor).toBe(expectedColor);
 
     // The CircleLayer should be bound to use the 'markerColor' property dynamically
-    const circleLayer = root.findByType('CircleLayer');
+    const circleLayer = root.findByType('CircleLayer' as unknown as React.ElementType);
     expect(circleLayer.props.style.circleColor).toEqual(['get', 'markerColor']);
     
     // Clean up interval to prevent open handles

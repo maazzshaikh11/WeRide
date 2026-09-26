@@ -157,9 +157,9 @@ export const useRidersStore = create<RidersState>((set, get) => ({
     }
 
     const socket = getLocationSocket();
-    socket.off('location:update', socketHandler);
-    socket.off('connect', connectHandler);
-    socket.off('disconnect', disconnectHandler);
+    if (socketHandler) socket.off('location:update', socketHandler);
+    if (connectHandler) socket.off('connect', connectHandler);
+    if (disconnectHandler) socket.off('disconnect', disconnectHandler);
 
     socketHandler = null;
     connectHandler = null;

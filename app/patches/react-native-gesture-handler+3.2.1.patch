@@ -1,0 +1,24 @@
+diff --git a/node_modules/react-native-gesture-handler/android/build.gradle b/node_modules/react-native-gesture-handler/android/build.gradle
+index 372c0c2..0f24a48 100644
+--- a/node_modules/react-native-gesture-handler/android/build.gradle
++++ b/node_modules/react-native-gesture-handler/android/build.gradle
+@@ -218,15 +218,15 @@ android {
+     sourceSets.main {
+         kotlin {
+             if (shouldUseCommonInterfaceFromReanimated()) {
+-                directories.add('reanimated/src/main/java')
++                srcDir 'reanimated/src/main/java'
+             } else {
+-                directories.add('noreanimated/src/main/java')
++                srcDir 'noreanimated/src/main/java'
+             }
+ 
+             if (shouldUseCommonInterfaceFromRNSVG()) {
+-                directories.add('svg/src/main/java')
++                srcDir 'svg/src/main/java'
+             } else {
+-                directories.add('nosvg/src/main/java')
++                srcDir 'nosvg/src/main/java'
+             }
+         }
+     }

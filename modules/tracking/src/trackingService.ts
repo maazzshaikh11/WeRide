@@ -141,5 +141,6 @@ export class TrackingService {
     }
     await this._sensors.stop();
     this._running = false;
+    this._hasInitialFix = false;
   }
 }

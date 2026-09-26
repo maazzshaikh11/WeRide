@@ -17,6 +17,10 @@ module.exports = {
   moduleDirectories: ['node_modules'],
   modulePaths: ['<rootDir>/node_modules'],
   moduleNameMapper: {
+    // Single React instance: app components must resolve to the same react
+    // copy the test renderer uses, or hooks fail ("reading 'useState' of null").
+    '^react$': '<rootDir>/node_modules/react',
+    '^react/(.*)$': '<rootDir>/node_modules/react/$1',
     '^@app/store/appStore$': '<rootDir>/test/__mocks__/appStoreMock.js',
     '.*/store/appStore$': '<rootDir>/test/__mocks__/appStoreMock.js',
     '^@app/(.*)$': '<rootDir>/../../app/src/$1',

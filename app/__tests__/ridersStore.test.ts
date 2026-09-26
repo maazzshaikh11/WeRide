@@ -258,11 +258,11 @@ describe('getMarkerStateForMissing', () => {
 
 describe('markerColorForState', () => {
   test('GREEN returns riderVerified color', () => {
-    expect(markerColorForState('GREEN')).toBe('#2D6A4F');
+    expect(markerColorForState('GREEN')).toBe('#22C55E');
   });
 
   test('RED returns riderFlagged color', () => {
-    expect(markerColorForState('RED')).toBe('#E63946');
+    expect(markerColorForState('RED')).toBe('#FF3B3B');
   });
 
   test('GREY returns riderStale color', () => {

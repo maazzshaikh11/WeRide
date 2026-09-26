@@ -4,7 +4,11 @@
  * Ported from location_publisher.dart.
  */
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import { Socket } from 'socket.io-client';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import firestore from '@react-native-firebase/firestore';
 
 export interface LocationPublisherParams {

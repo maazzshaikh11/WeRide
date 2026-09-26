@@ -31,8 +31,19 @@ jest.mock('@rnmapbox/maps', () => ({
   CircleLayer: 'CircleLayer',
   LineLayer: 'LineLayer',
   SymbolLayer: 'SymbolLayer',
+  MarkerView: 'MarkerView',
+  UserLocation: 'UserLocation',
+  UserTrackingMode: {
+    Follow: 'normal',
+    FollowWithHeading: 'compass',
+    FollowWithCourse: 'course',
+  },
+  StyleURL: { Dark: 'mapbox://styles/mapbox/dark-v11' },
+  setAccessToken: jest.fn(),
 }));
 
 jest.mock('@env', () => ({
   MAPBOX_TOKEN: 'pk.test-mapbox-token-placeholder',
+  SOCKET_URL: 'http://localhost:3000',
+  ROUTING_URL: 'http://localhost:3000',
 }));

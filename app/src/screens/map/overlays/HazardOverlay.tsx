@@ -242,10 +242,9 @@ export function HazardOverlayMapLayer({ groupId, onHazardPress }: MapLayerProps)
 /**
  * Info card component — renders outside MapView as absolutely positioned bottom sheet.
  */
-export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve }: InfoCardProps) {
-  if (!selectedCluster) return null;
-
+export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve: _onResolve }: InfoCardProps) {
   const handleResolve = useCallback(async () => {
+    if (!selectedCluster) return;
     try {
       await resolveHazard(selectedCluster.cluster_id);
       onDismiss();
@@ -253,7 +252,9 @@ export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve }:
       console.error('[HazardOverlayInfoCard] Failed to resolve hazard:', err);
       Alert.alert('Error', 'Failed to resolve hazard');
     }
-  }, [selectedCluster.cluster_id, onDismiss]);
+  }, [selectedCluster, onDismiss]);
+
+  if (!selectedCluster) return null;
 
   return (
     <View style={styles.infoCard}>
@@ -336,70 +337,70 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   infoCard: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: WeRideColors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 30,
+    backgroundColor: '#161616f7',
+    borderWidth: 1,
+    borderColor: WeRideColors.border,
+    borderRadius: 14,
+    padding: 14,
+    marginHorizontal: 16,
+    marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
     elevation: 8,
   },
   infoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   infoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '700',
+    color: WeRideColors.white,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderBottomWidth: 1,
-    borderBottomColor: WeRideColors.textSecondary + '20',
+    borderBottomColor: WeRideColors.border,
   },
   infoLabel: {
-    fontSize: 14,
-    color: WeRideColors.textSecondary,
+    fontSize: 10,
+    color: WeRideColors.textSub,
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
+    color: WeRideColors.text,
   },
   resolveButton: {
-    backgroundColor: WeRideColors.hazardAccident,
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: WeRideColors.red,
+    paddingVertical: 11,
+    borderRadius: 10,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 14,
   },
   resolveButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
   dismissButton: {
-    backgroundColor: WeRideColors.surface,
+    backgroundColor: WeRideColors.dark3,
     borderWidth: 1,
-    borderColor: WeRideColors.textSecondary + '40',
-    paddingVertical: 12,
-    borderRadius: 12,
+    borderColor: WeRideColors.border,
+    paddingVertical: 11,
+    borderRadius: 10,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 8,
   },
   dismissButtonText: {
-    color: WeRideColors.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
+    color: WeRideColors.textSub,
+    fontSize: 12.5,
+    fontWeight: '700',
   },
 });

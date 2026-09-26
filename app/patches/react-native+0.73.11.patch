@@ -1,0 +1,206 @@
+diff --git a/node_modules/react-native/index.js b/node_modules/react-native/index.js
+index 7149c64..5868bf1 100644
+--- a/node_modules/react-native/index.js
++++ b/node_modules/react-native/index.js
+@@ -428,6 +428,7 @@ if (__DEV__) {
+    * attempting to access ART. */
+   Object.defineProperty(module.exports, 'ART', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -444,6 +445,7 @@ if (__DEV__) {
+    * attempting to access ListView. */
+   Object.defineProperty(module.exports, 'ListView', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -460,6 +462,7 @@ if (__DEV__) {
+    * attempting to access SwipeableListView. */
+   Object.defineProperty(module.exports, 'SwipeableListView', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -476,6 +479,7 @@ if (__DEV__) {
+    * attempting to access WebView. */
+   Object.defineProperty(module.exports, 'WebView', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -492,6 +496,7 @@ if (__DEV__) {
+    * attempting to access NetInfo. */
+   Object.defineProperty(module.exports, 'NetInfo', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -508,6 +513,7 @@ if (__DEV__) {
+    * attempting to access CameraRoll. */
+   Object.defineProperty(module.exports, 'CameraRoll', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -524,6 +530,7 @@ if (__DEV__) {
+    * attempting to access ImageStore. */
+   Object.defineProperty(module.exports, 'ImageStore', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -541,6 +548,7 @@ if (__DEV__) {
+    * attempting to access ImageEditor. */
+   Object.defineProperty(module.exports, 'ImageEditor', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -557,6 +565,7 @@ if (__DEV__) {
+    * attempting to access TimePickerAndroid. */
+   Object.defineProperty(module.exports, 'TimePickerAndroid', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -573,6 +582,7 @@ if (__DEV__) {
+    * attempting to access ToolbarAndroid. */
+   Object.defineProperty(module.exports, 'ToolbarAndroid', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -589,6 +599,7 @@ if (__DEV__) {
+    * attempting to access ViewPagerAndroid. */
+   Object.defineProperty(module.exports, 'ViewPagerAndroid', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -605,6 +616,7 @@ if (__DEV__) {
+    * attempting to access CheckBox. */
+   Object.defineProperty(module.exports, 'CheckBox', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -621,6 +633,7 @@ if (__DEV__) {
+    * attempting to access SegmentedControlIOS. */
+   Object.defineProperty(module.exports, 'SegmentedControlIOS', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -637,6 +650,7 @@ if (__DEV__) {
+    * attempting to access StatusBarIOS. */
+   Object.defineProperty(module.exports, 'StatusBarIOS', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -653,6 +667,7 @@ if (__DEV__) {
+    * attempting to access PickerIOS. */
+   Object.defineProperty(module.exports, 'PickerIOS', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -669,6 +684,7 @@ if (__DEV__) {
+    * attempting to access Picker. */
+   Object.defineProperty(module.exports, 'Picker', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -684,6 +700,7 @@ if (__DEV__) {
+    * attempting to access DatePickerAndroid. */
+   Object.defineProperty(module.exports, 'DatePickerAndroid', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -699,6 +716,7 @@ if (__DEV__) {
+    * attempting to access MaskedViewIOS. */
+   Object.defineProperty(module.exports, 'MaskedViewIOS', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -714,6 +732,7 @@ if (__DEV__) {
+    * attempting to access AsyncStorage. */
+   Object.defineProperty(module.exports, 'AsyncStorage', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -729,6 +748,7 @@ if (__DEV__) {
+    * attempting to access ImagePickerIOS. */
+   Object.defineProperty(module.exports, 'ImagePickerIOS', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -745,6 +765,7 @@ if (__DEV__) {
+    * attempting to access ProgressViewIOS. */
+   Object.defineProperty(module.exports, 'ProgressViewIOS', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -760,6 +781,7 @@ if (__DEV__) {
+    * attempting to access DatePickerIOS. */
+   Object.defineProperty(module.exports, 'DatePickerIOS', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -775,6 +797,7 @@ if (__DEV__) {
+    * attempting to access Slider. */
+   Object.defineProperty(module.exports, 'Slider', {
+     configurable: true,
++  enumerable: true,
+     get() {
+       invariant(
+         false,
+@@ -785,3 +808,17 @@ if (__DEV__) {
+     },
+   });
+ }
++Object.defineProperty(module.exports, 'codegenNativeComponent', {
++  configurable: true,
++  enumerable: true,
++  get() {
++    return require('./Libraries/Utilities/codegenNativeComponent').default;
++  },
++});
++Object.defineProperty(module.exports, 'codegenNativeComponent', {
++  configurable: true,
++  enumerable: true,
++  get() {
++    return require('./Libraries/Utilities/codegenNativeComponent').default;
++  },
++});

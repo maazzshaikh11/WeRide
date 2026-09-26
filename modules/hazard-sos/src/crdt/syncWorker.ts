@@ -11,6 +11,8 @@
 
 import NetInfo from '@react-native-community/netinfo';
 /* eslint-disable-next-line @typescript-eslint/no-var-requires */
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import firestore from '@react-native-firebase/firestore';
 import type { HazardReport } from '../dbscan/dbscan';
 import type { SOSElement } from './orSet';
@@ -45,7 +47,8 @@ export function _resetSyncCallCount(): void { _syncCallCount = 0; }
  * Get Firestore instance (lazy initialization for testing)
  */
 function getFirestore(): any {
-  // @ts-ignore Firestore typing issue with getFirestore wrapper
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore Firestore typing differs between module and app compile contexts
   return firestore();
 }
 

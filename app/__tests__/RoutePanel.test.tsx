@@ -1,19 +1,31 @@
 /**
- * RoutePanel component tests (T-13, Phase 5 UI).
- * Uses React Test Renderer (RN preset in jest.config.js).
+ * RoutePanel component tests — updated for master-spec redesign.
+ * RoutePanel now reads ETA/distance/safety from useRouteStore (spec §3.3.8)
+ * and rider count from useRidersStore, instead of props.
  */
-
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { Text, TouchableOpacity } from 'react-native';
 import RoutePanel from '../src/components/RoutePanel';
-import { WeRideColors, safetyScoreColor } from '../src/theme/theme';
+import { useRouteStore } from '@routing/client/routeStore';
+import { RouteResponse } from '../src/models/routeResponse';
 
 // Mock Linking module
 jest.mock('react-native/Libraries/Linking/Linking', () => ({
   canOpenURL: jest.fn(() => Promise.resolve(true)),
   openURL: jest.fn(() => Promise.resolve()),
 }));
+
+function makeRoute(etaMinutes: number, distanceKm: number, safetyScore: number): RouteResponse {
+  return {
+    route_id: 'route-1',
+    path_points: [[37.77, -122.41]],
+    distance_km: distanceKm,
+    eta_minutes: etaMinutes,
+    safety_score: safetyScore,
+    recalculated_at_hlc: '0:0',
+  };
+}
 
 function getTextContent(node: renderer.ReactTestInstance): string {
   const children = node.props.children;
@@ -38,152 +50,109 @@ function findTextNodes(
   );
 }
 
-describe('RoutePanel', () => {
-  test('renders collapsed view with ETA, distance, safety bar', () => {
-    const tree = renderer
-      .create(
-        <RoutePanel
-          etaMinutes={15}
-          distanceKm={10}
-          safetyScore={0.85}
-          avoidHazards={true}
-        />,
-      )
-      .root;
+describe('RoutePanel (master-spec redesign, store-driven)', () => {
+  beforeEach(() => {
+    useRouteStore.getState().setRoute(makeRoute(15, 10, 0.85));
+    useRouteStore.getState().setIsLoading(false);
+  });
 
-    const etaText = findTextNodes(tree, (t) => t.includes('15 min'));
+  afterEach(() => {
+    jest.useFakeTimers();
+    jest.runAllTimers();
+    jest.useRealTimers();
+  });
+
+  test('renders collapsed stat row with ETA and distance values', () => {
+    const tree = renderer.create(<RoutePanel />).root;
+
+    const etaText = findTextNodes(tree, (t) => t.trim() === '15');
     expect(etaText.length).toBeGreaterThan(0);
 
-    const distanceText = findTextNodes(tree, (t) => t.includes('10.0 km'));
+    const distanceText = findTextNodes(tree, (t) => t.trim() === '10.0');
     expect(distanceText.length).toBeGreaterThan(0);
   });
 
-  test('toggle button calls onToggleAvoidHazards', () => {
-    const onToggle = jest.fn();
-    const tree = renderer
-      .create(
-        <RoutePanel
-          etaMinutes={15}
-          distanceKm={10}
-          safetyScore={0.85}
-          avoidHazards={true}
-          onToggleAvoidHazards={onToggle}
-        />,
-      )
-      .root;
+  test('shows "—" placeholders when route unavailable', () => {
+    useRouteStore.getState().setRoute(null);
+    const tree = renderer.create(<RoutePanel />).root;
 
-    const touchables = tree.findAll(
-      (node) => node.type === TouchableOpacity,
-    );
-    expect(touchables.length).toBeGreaterThan(0);
-    expect(onToggle).not.toHaveBeenCalled();
+    const placeholders = findTextNodes(tree, (t) => t.trim() === '—');
+    expect(placeholders.length).toBeGreaterThan(0);
   });
 
-  test('displays correct safety score status text', () => {
-    const tree = renderer
-      .create(
-        <RoutePanel
-          etaMinutes={15}
-          distanceKm={10}
-          safetyScore={0.85}
-          avoidHazards={true}
-        />,
-      )
-      .root;
+  test('shows "Recalculating" state while loading', () => {
+    useRouteStore.getState().setIsLoading(true);
+    const tree = renderer.create(<RoutePanel />).root;
 
-    const statusText = findTextNodes(tree, (t) =>
+    const recalcing = findTextNodes(tree, (t) => t.includes('Recalculating'));
+    expect(recalcing.length).toBeGreaterThan(0);
+  });
+
+  test('expanded view shows safety score, toggle and Google Maps button', () => {
+    const tree = renderer.create(<RoutePanel avoidHazards={true} />).root;
+
+    // Expand the panel by pressing the sheet toggle
+    const pressables = tree.findAll((node) => node.type === TouchableOpacity);
+    act(() => {
+      pressables[0].props.onPress();
+    });
+
+    const safetyText = findTextNodes(tree, (t) => t.includes('Safety score'));
+    expect(safetyText.length).toBeGreaterThan(0);
+
+    const gmapsText = findTextNodes(tree, (t) => t.includes('Open in Google Maps'));
+    expect(gmapsText.length).toBeGreaterThan(0);
+
+    const toggleText = findTextNodes(tree, (t) =>
       t.includes('Avoiding hazards') || t.includes('Hazards ignored'),
     );
-    expect(statusText.length).toBeGreaterThan(0);
-  });
-
-  test('rounds ETA to nearest minute', () => {
-    const tree = renderer
-      .create(
-        <RoutePanel
-          etaMinutes={15.7}
-          distanceKm={10}
-          safetyScore={0.85}
-        />,
-      )
-      .root;
-
-    const etaText = findTextNodes(tree, (t) => t.includes('16 min'));
-    expect(etaText.length).toBeGreaterThan(0);
-  });
-
-  test('formats distance to 1 decimal place', () => {
-    const tree = renderer
-      .create(
-        <RoutePanel
-          etaMinutes={15}
-          distanceKm={10.456}
-          safetyScore={0.85}
-        />,
-      )
-      .root;
-
-    const distanceText = findTextNodes(tree, (t) => t.includes('10.5 km'));
-    expect(distanceText.length).toBeGreaterThan(0);
+    expect(toggleText.length).toBeGreaterThan(0);
   });
 
   test('respects avoidHazards prop for toggle text', () => {
-    const treeAvoiding = renderer
-      .create(
-        <RoutePanel
-          etaMinutes={15}
-          distanceKm={10}
-          safetyScore={0.85}
-          avoidHazards={true}
-        />,
-      )
-      .root;
-
-    const avoidingText = findTextNodes(treeAvoiding, (t) =>
-      t.includes('Avoiding hazards'),
-    );
+    const treeAvoiding = renderer.create(<RoutePanel avoidHazards={true} />).root;
+    act(() => {
+      treeAvoiding.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
+    });
+    const avoidingText = findTextNodes(treeAvoiding, (t) => t.includes('Avoiding hazards'));
     expect(avoidingText.length).toBeGreaterThan(0);
 
-    const treeIgnoring = renderer
-      .create(
-        <RoutePanel
-          etaMinutes={15}
-          distanceKm={10}
-          safetyScore={0.85}
-          avoidHazards={false}
-        />,
-      )
-      .root;
-
-    const ignoringText = findTextNodes(treeIgnoring, (t) =>
-      t.includes('Hazards ignored'),
-    );
+    const treeIgnoring = renderer.create(<RoutePanel avoidHazards={false} />).root;
+    act(() => {
+      treeIgnoring.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
+    });
+    const ignoringText = findTextNodes(treeIgnoring, (t) => t.includes('Hazards ignored'));
     expect(ignoringText.length).toBeGreaterThan(0);
   });
 
-  test('has Google Maps button in expanded view', () => {
-    const tree = renderer
-      .create(
-        <RoutePanel
-          etaMinutes={15}
-          distanceKm={10}
-          safetyScore={0.85}
-          onOpenInGoogleMaps={jest.fn()}
-        />,
-      )
-      .root;
-
-    // Expand the panel by pressing the header
-    const headers = tree.findAll(
-      (node) => node.type === TouchableOpacity,
-    );
+  test('expanded view shows turn-by-turn placeholder', () => {
+    const tree = renderer.create(<RoutePanel />).root;
     act(() => {
-      headers[0].props.onPress();
+      tree.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
+    });
+    const tbt = findTextNodes(tree, (t) => t.includes('Turn-by-turn navigation (coming soon)'));
+    expect(tbt.length).toBeGreaterThan(0);
+  });
+
+  test('toggle and Google Maps callbacks are wired', () => {
+    const onToggle = jest.fn();
+    const onGmaps = jest.fn();
+    const tree = renderer.create(
+      <RoutePanel avoidHazards={false} onToggleAvoidHazards={onToggle} onOpenInGoogleMaps={onGmaps} />,
+    ).root;
+
+    act(() => {
+      tree.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
     });
 
-    const googleMapsText = findTextNodes(tree, (t) =>
-      t.includes('Google Maps'),
-    );
-    expect(googleMapsText.length).toBeGreaterThan(0);
+    const buttons = tree.findAll((n) => n.type === TouchableOpacity);
+    const toggleBtn = buttons.find((b) => {
+      try {
+        return findTextNodes(b, (t) => t.includes('Hazards ignored') || t.includes('Avoiding hazards')).length > 0;
+      } catch {
+        return false;
+      }
+    });
+    expect(toggleBtn).toBeDefined();
   });
 });

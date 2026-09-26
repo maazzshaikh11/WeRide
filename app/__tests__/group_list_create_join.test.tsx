@@ -68,20 +68,42 @@ jest.mock('@routing/group/groupService', () => {
   };
 });
 
-// Mock theme colors
+// Mock theme tokens to match the master design system export shape
 jest.mock('../src/theme/theme', () => ({
   WeRideColors: {
-    surface: '#FFFFFF',
-    text: {
-      primary: '#000000',
-      secondary: '#999999',
-    },
-    brand: {
-      border: '#CCCCCC',
-      surface: '#F0F0F0',
-    },
-    accent: '#0066FF',
+    dark: '#0A0A0A',
+    dark2: '#111111',
+    dark3: '#1A1A1A',
+    border: '#2A2A2A',
+    primary: '#FF5C00',
+    primaryDim: '#FF5C0022',
+    green: '#22C55E',
+    greenDim: '#22C55E18',
+    red: '#FF3B3B',
+    redDim: '#FF3B3B1F',
+    blue: '#3B82F6',
+    gold: '#FBBF24',
+    onPrimary: '#FFFFFF',
+    error: '#FF3B3B',
+    text: '#F0F0F0',
+    textPrimary: '#F0F0F0',
+    textSub: '#888888',
+    textSecondary: '#888888',
+    white: '#FFFFFF',
+    background: '#0A0A0A',
+    surface: '#1A1A1A',
   },
+  WeRideFonts: {
+    display: 'BebasNeue',
+    heading: 'BebasNeue',
+    body: 'Inter',
+    mono: 'SpaceMono',
+    primary: 'Inter',
+    headline: 'BebasNeue',
+  },
+  hazardColor: jest.fn(() => '#9AA0A6'),
+  safetyScoreColor: jest.fn(() => '#22C55E'),
+  riderColor: jest.fn(() => '#A855F7'),
 }));
 
 import GroupListScreen from '../src/screens/GroupListScreen';

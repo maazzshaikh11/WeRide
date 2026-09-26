@@ -9,11 +9,11 @@ import { WeRideColors, hazardColor, safetyScoreColor, WeRideFonts, WeRideIconSet
 describe('WeRide Theme', () => {
   describe('WeRideColors', () => {
     it('exports all required brand colors', () => {
-      expect(WeRideColors.primary).toBeDefined();
-      expect(WeRideColors.accent).toBeDefined();
-      expect(WeRideColors.background).toBeDefined();
-      expect(WeRideColors.surface).toBeDefined();
-      expect(WeRideColors.error).toBeDefined();
+      expect(WeRideColors.primary).toBe('#FF5C00');
+      expect(WeRideColors.primaryDim).toBeDefined();
+      expect(WeRideColors.background).toBe('#0A0A0A');
+      expect(WeRideColors.surface).toBe('#1A1A1A');
+      expect(WeRideColors.error).toBe('#FF3B3B');
     });
 
     it('exports rider marker colors (Person A)', () => {
@@ -99,14 +99,15 @@ describe('WeRide Theme', () => {
 
   describe('WeRideFonts', () => {
     it('exports font configuration', () => {
-      expect(WeRideFonts.primary).toBe('Roboto');
-      expect(WeRideFonts.headline).toBe('Roboto');
+      expect(WeRideFonts.primary).toBe('Inter');
+      expect(WeRideFonts.heading).toBe('BebasNeue');
       expect(WeRideFonts.mono).toBeDefined();
     });
 
-    it('uses consistent font family', () => {
-      // MVP uses Roboto for both primary and headline
-      expect(WeRideFonts.primary).toBe(WeRideFonts.headline);
+    it('separates display and body font families per master spec', () => {
+      // Master spec §1.2: Bebas Neue for display, Inter for body, Space Mono for badges
+      expect(WeRideFonts.heading).toBe(WeRideFonts.display);
+      expect(WeRideFonts.body).toBeDefined();
     });
   });
 

@@ -2,10 +2,14 @@
 module.exports = {
   preset: 'react-native',
   setupFiles: ['<rootDir>/jest.setup.js'],
+  // Polyfills (Animated combinators, Easing) must run AFTER the RN preset's
+  // own setup, which re-mocks react-native modules.
+  setupFilesAfterEnv: ['<rootDir>/jest.polyfills.js'],
   testMatch: ['<rootDir>/__tests__/**/*.test.ts', '<rootDir>/__tests__/**/*.test.tsx'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: { jsx: 'react', esModuleInterop: true } }],
+    '^.+\\.(js|ts|tsx)$': 'babel-jest',
+    '^.+\\.(bmp|gif|jpg|jpeg|mp4|png|psd|svg|webp)$': 'react-native/jest/assetFileTransformer.js',
   },
   moduleNameMapper: {
     '^@app/(.*)$': '<rootDir>/src/$1',
@@ -15,6 +19,11 @@ module.exports = {
     '^@routing/(.*)$': '<rootDir>/../modules/routing-eta/src/$1',
     '^@flvoice/(.*)$': '<rootDir>/../modules/fl-voice/src/$1',
     '^@env$': '<rootDir>/env.d.ts',
+    // Share the app's react/zustand across module node_modules to avoid
+    // duplicate React instances (hooks "useRef of null" errors in tests).
+    '^react$': '<rootDir>/node_modules/react',
+    '^zustand$': '<rootDir>/node_modules/zustand',
+    '^zustand/(.*)$': '<rootDir>/node_modules/zustand/$1',
   },
   testEnvironment: 'node',
 };

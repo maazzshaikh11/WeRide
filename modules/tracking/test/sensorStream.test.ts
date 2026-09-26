@@ -39,6 +39,8 @@ jest.mock('react-native-sensors', () => ({
       return { unsubscribe: jest.fn() };
     }),
   },
+  setUpdateIntervalForType: jest.fn(),
+  setLogLevelForType: jest.fn(),
 }), { virtual: true });
 
 describe('SensorStream', () => {

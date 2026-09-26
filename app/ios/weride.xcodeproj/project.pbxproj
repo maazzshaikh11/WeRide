@@ -15,6 +15,13 @@
 		6132EF182BDFF13200BBE14D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6132EF172BDFF13200BBE14D /* PrivacyInfo.xcprivacy */; };
 		7699B88040F8A987B510C191 /* libPods-weride-werideTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 19F6CBCC0A4E27FBF8BF4A61 /* libPods-weride-werideTests.a */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		EA1E956D1C2FC57C038D2F22 /* BebasNeue-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A34741917A213E191EE20000 /* BebasNeue-Regular.ttf */; };
+		2BAB8AE53F64B8EE0D01E1EC /* Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1CF0C714FF8B4E081DDE2F99 /* Inter-Regular.ttf */; };
+		40A8BA573460B7899A8C5D0C /* Inter-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 0A17FED79BDA58100388C6D1 /* Inter-Medium.ttf */; };
+		05452D0EB4D326AF4835F5FF /* Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4FA61B13C47A3C2CC4BA09BA /* Inter-SemiBold.ttf */; };
+		46A2E6A7025F2753FF77E3AA /* Inter-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C3BCB132BD1BB2367F1CD972 /* Inter-Bold.ttf */; };
+		74B3F5B21E712734654F7C60 /* SpaceMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 234A11B3D5C20DCC702B205E /* SpaceMono-Regular.ttf */; };
+		F0BAFDEE89D3C5B42FCC8D58 /* SpaceMono-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7D0F99305172A4205EAC8362 /* SpaceMono-Bold.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +53,13 @@
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = weride/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		89C6BE57DB24E9ADA2F236DE /* Pods-weride-werideTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-weride-werideTests.release.xcconfig"; path = "Target Support Files/Pods-weride-werideTests/Pods-weride-werideTests.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		A34741917A213E191EE20000 /* BebasNeue-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = weride/Fonts/BebasNeue-Regular.ttf; sourceTree = "<group>"; };
+		1CF0C714FF8B4E081DDE2F99 /* Inter-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = weride/Fonts/Inter-Regular.ttf; sourceTree = "<group>"; };
+		0A17FED79BDA58100388C6D1 /* Inter-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = weride/Fonts/Inter-Medium.ttf; sourceTree = "<group>"; };
+		4FA61B13C47A3C2CC4BA09BA /* Inter-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = weride/Fonts/Inter-SemiBold.ttf; sourceTree = "<group>"; };
+		C3BCB132BD1BB2367F1CD972 /* Inter-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = weride/Fonts/Inter-Bold.ttf; sourceTree = "<group>"; };
+		234A11B3D5C20DCC702B205E /* SpaceMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = weride/Fonts/SpaceMono-Regular.ttf; sourceTree = "<group>"; };
+		7D0F99305172A4205EAC8362 /* SpaceMono-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = weride/Fonts/SpaceMono-Bold.ttf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -244,6 +258,13 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EA1E956D1C2FC57C038D2F22 /* BebasNeue-Regular.ttf in Resources */,
+				2BAB8AE53F64B8EE0D01E1EC /* Inter-Regular.ttf in Resources */,
+				40A8BA573460B7899A8C5D0C /* Inter-Medium.ttf in Resources */,
+				05452D0EB4D326AF4835F5FF /* Inter-SemiBold.ttf in Resources */,
+				46A2E6A7025F2753FF77E3AA /* Inter-Bold.ttf in Resources */,
+				74B3F5B21E712734654F7C60 /* SpaceMono-Regular.ttf in Resources */,
+				F0BAFDEE89D3C5B42FCC8D58 /* SpaceMono-Bold.ttf in Resources */,
 				6132EF182BDFF13200BBE14D /* PrivacyInfo.xcprivacy in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,

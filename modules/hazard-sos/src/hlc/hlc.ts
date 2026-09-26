@@ -7,6 +7,21 @@ export interface HlcState {
 
 export type NowFn = () => number;
 
+/**
+ * Canonical HLC string format: "physical:counter" (colon separator).
+ * parse() still accepts the legacy dash form ("physical-counter") so old
+ * persisted/queued timestamps keep working.
+ */
+export const HLC_SEPARATOR = ':';
+
+/**
+ * Device-wide HLC clock persistence. Single source of truth for the MMKV
+ * location — every module (tracking's hlcStore, hazard/sos services) shares
+ * this one clock instead of maintaining divergent per-module clocks.
+ */
+export const HLC_STORAGE_ID = 'hlc';
+export const HLC_STORAGE_KEY = 'hlc_state';
+
 // We cannot instantiate MMKV at module load time due to ts-jest mocking bugs.
 // The require() is deferred to call-time so Jest's jest.mock() runs first.
 let _storage: MMKV | null = null;
@@ -15,7 +30,7 @@ function getStorage(): MMKV | null {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { MMKV: MMKVClass } = require('react-native-mmkv') as { MMKV: new (cfg: { id: string }) => MMKV };
-      _storage = new MMKVClass({ id: 'hlc' });
+      _storage = new MMKVClass({ id: HLC_STORAGE_ID });
     } catch {
       // A caller can still use an in-memory clock while native storage starts.
       // SOS persistence itself remains fail-closed in the OR-Set layer.
@@ -38,7 +53,7 @@ export class HLC {
 
   static fresh(now?: NowFn): HLC {
     const n = now ?? (() => Date.now());
-    const saved = getStorage()?.getString('hlc_state');
+    const saved = getStorage()?.getString(HLC_STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as HlcState;
@@ -51,7 +66,7 @@ export class HLC {
     }
 
     const newState = { physical: n(), counter: 0 };
-    getStorage()?.set('hlc_state', JSON.stringify(newState));
+    getStorage()?.set(HLC_STORAGE_KEY, JSON.stringify(newState));
     return new HLC(newState, n);
   }
 
@@ -92,9 +107,13 @@ export class HLC {
   }
 
   toString(): string {
-    return `${this._physical}-${this._counter}`;
+    return `${this._physical}${HLC_SEPARATOR}${this._counter}`;
   }
 
+  /**
+   * Parse a canonical "physical:counter" timestamp. The legacy dash form
+   * "physical-counter" is also accepted for backward compatibility.
+   */
   static parse(s: string): HlcState {
     const match = /^(\d+)[-:](\d+)$/.exec(s);
     if (!match) {
@@ -137,7 +156,7 @@ export class HLC {
   }
 
   private persist() {
-    getStorage()?.set('hlc_state', JSON.stringify({
+    getStorage()?.set(HLC_STORAGE_KEY, JSON.stringify({
       physical: this._physical,
       counter: this._counter
     }));
@@ -147,9 +166,9 @@ export class HLC {
     // MMKV v2 uses delete(), v4 uses remove() — support both.
     const storage = getStorage() as unknown as { delete?: (k: string) => void; remove?: (k: string) => boolean } | null;
     if (storage?.delete) {
-      storage.delete('hlc_state');
+      storage.delete(HLC_STORAGE_KEY);
     } else if (storage?.remove) {
-      storage.remove('hlc_state');
+      storage.remove(HLC_STORAGE_KEY);
     }
   }
 }

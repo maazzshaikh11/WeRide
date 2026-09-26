@@ -30,7 +30,7 @@ jest.mock('../src/ekfStore', () => ({
 jest.mock('../src/hlcStore', () => ({
   persistHlc: jest.fn(),
   loadHlc: jest.fn(),
-  HLC_MMKV_KEY: 'tracking:hlc_state',
+  HLC_MMKV_KEY: 'hlc_state',
   _resetMmkvForTest: jest.fn(),
 }));
 
@@ -154,13 +154,24 @@ describe('TrackingService', () => {
     });
 
     it('calls ekf.predict on tick with downsampled IMU data', () => {
-      const imuSample: ImuSample = { accelForward: 2.5, headingRate: Math.PI / 2 };
+      // headingRate arrives in compass-heading degrees per second already
+      // (SensorStream converts from the world-frame gyro yaw rate).
+      const imuSample: ImuSample = { accelForward: 2.5, headingRate: 90 };
       sensors.popImuSample.mockReturnValue(imuSample);
 
       jest.advanceTimersByTime(1000);
 
-      // headingRate in degrees = (PI/2 * 180 / PI) = 90
       expect(ekf.predict).toHaveBeenCalledWith(1.0, 2.5, 90);
+    });
+
+    it('falls back to constant-velocity prediction when forward accel is unknown', () => {
+      const imuSample: ImuSample = { accelForward: null, headingRate: -12 };
+      sensors.popImuSample.mockReturnValue(imuSample);
+
+      jest.advanceTimersByTime(1000);
+
+      // null accelForward → 0 (GPS-only), heading rate still applied.
+      expect(ekf.predict).toHaveBeenCalledWith(1.0, 0, -12);
     });
 
     it('gps callback routes to ekf.update', () => {

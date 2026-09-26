@@ -1,0 +1,39 @@
+# Dev deploy config for the routing backend (Node server + Python ETA sidecar).
+# Usage: docker compose -f modules/routing-eta/docker-compose.yml up --build
+# The Node server talks to the sidecar over the compose network at
+# http://eta-sidecar:5000 (ETA_SIDECAR_URL).
+#
+# Prod path: deploy the sidecar image to Cloud Run / any container host,
+# point the Node server at it via ETA_SIDECAR_URL, and set MAPBOX_ACCESS_TOKEN
+# in the Node service's env. The heuristic fallback keeps /route working
+# when the sidecar is unreachable.
+
+services:
+  eta-sidecar:
+    build: ./server/training
+    ports:
+      - "5000:5000"
+    environment:
+      MODEL_PATH: /app/models/eta_model.txt
+    volumes:
+      # Mount the trained model from the host (train with server/training/train_eta.py).
+      - ./server/training/models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  routing-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      ETA_SIDECAR_URL: http://eta-sidecar:5000
+      # Set in your shell / .env — never commit a real token.
+      MAPBOX_ACCESS_TOKEN: ${MAPBOX_ACCESS_TOKEN:-}
+    depends_on:
+      eta-sidecar:
+        condition: service_healthy

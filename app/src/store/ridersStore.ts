@@ -5,8 +5,10 @@
  * Subscribes to Socket.io 'location:update' events and maintains
  * a map of riderId → RiderEntry (latest payload + derived marker state).
  *
- * Phase 4: filters by group_id client-side (no Socket.io room protocol).
- * Room joining is deferred to Phase 6.
+ * subscribe(groupId) joins the server-side group room ('join-group') so the
+ * server only forwards this group's traffic; a client-side group_id filter is
+ * kept as defence-in-depth. Re-joins on socket reconnect. unsubscribe()
+ * leaves the room and removes all listeners.
  */
 
 import { create } from 'zustand';
@@ -24,9 +26,12 @@ interface RidersState {
   riders: Map<string, RiderEntry>;
   connected: boolean;
   subscribed: boolean;
+  groupId: string | null;
   selectedRiderId: string | null;
 
   upsertRider: (rawPayload: unknown) => void;
+  /** Seed the store with last-known locations (e.g. Firestore late-joiner read). */
+  seedRiders: (rawPayloads: unknown[]) => void;
   removeRider: (riderId: string) => void;
   clear: () => void;
   refreshStaleStates: () => void;
@@ -43,6 +48,7 @@ export const useRidersStore = create<RidersState>((set, get) => ({
   riders: new Map(),
   connected: false,
   subscribed: false,
+  groupId: null,
   selectedRiderId: null,
 
   upsertRider: (rawPayload: unknown) => {
@@ -67,6 +73,12 @@ export const useRidersStore = create<RidersState>((set, get) => ({
       newRiders.set(riderId, entry);
       return { riders: newRiders };
     });
+  },
+
+  seedRiders: (rawPayloads: unknown[]) => {
+    for (const raw of rawPayloads) {
+      get().upsertRider(raw);
+    }
   },
 
   removeRider: (riderId: string) => {
@@ -114,11 +126,18 @@ export const useRidersStore = create<RidersState>((set, get) => ({
 
   subscribe: (groupId: string) => {
     const state = get();
-    if (state.subscribed) {
+    if (state.subscribed && state.groupId === groupId) {
       return;
+    }
+    // Switching groups: drop the old subscription first.
+    if (state.subscribed) {
+      get().unsubscribe();
     }
 
     const socket = getLocationSocket();
+
+    // Join the server-side group room so only this group's traffic arrives.
+    socket.emit('join-group', { groupId });
 
     socketHandler = (payload: unknown) => {
       if (!isValidLocation(payload)) {
@@ -127,7 +146,7 @@ export const useRidersStore = create<RidersState>((set, get) => ({
       }
       const location = verifiedLocationFromJson(payload);
 
-      // Client-side group filter (Phase 4: no room protocol)
+      // Client-side group filter (defence-in-depth alongside the server room).
       if (location.group_id !== groupId) {
         return;
       }
@@ -137,6 +156,8 @@ export const useRidersStore = create<RidersState>((set, get) => ({
 
     connectHandler = () => {
       set({ connected: true });
+      // Re-join after a reconnect — the server forgets rooms on disconnect.
+      getLocationSocket().emit('join-group', { groupId });
     };
 
     disconnectHandler = () => {
@@ -148,16 +169,26 @@ export const useRidersStore = create<RidersState>((set, get) => ({
     socket.on('disconnect', disconnectHandler);
 
     // Set initial connection state
-    set({ connected: socket.connected, subscribed: true });
+    set({ connected: socket.connected, subscribed: true, groupId });
   },
 
   unsubscribe: () => {
+    const { groupId } = get();
+    if (groupId) {
+      try {
+        getLocationSocket().emit('leave-group', { groupId });
+      } catch {
+        // Socket may be torn down already; room membership dies with it.
+      }
+    }
+
     if (!socketHandler) {
+      set({ subscribed: false, connected: false, groupId: null });
       return;
     }
 
     const socket = getLocationSocket();
-    if (socketHandler) socket.off('location:update', socketHandler);
+    socket.off('location:update', socketHandler);
     if (connectHandler) socket.off('connect', connectHandler);
     if (disconnectHandler) socket.off('disconnect', disconnectHandler);
 
@@ -165,6 +196,6 @@ export const useRidersStore = create<RidersState>((set, get) => ({
     connectHandler = null;
     disconnectHandler = null;
 
-    set({ subscribed: false, connected: false });
+    set({ subscribed: false, connected: false, groupId: null });
   },
 }));

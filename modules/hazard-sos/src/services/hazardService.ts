@@ -59,9 +59,13 @@ export interface HazardCluster {
 
 /**
  * Submit a hazard report.
+ *
  * Online: write to Firestore immediately.
- * Offline: enqueue to local queue (Phase 4).
- * Returns the created report for optimistic UI.
+ * Offline (or online write fails): enqueue to the local queue — zero data loss.
+ *
+ * Returns the created report plus whether it was queued instead of written.
+ * Callers use `queued` to show the right confirmation ("reported" vs
+ * "saved — will sync when you're back online").
  */
 export async function submitHazardReport(
   hazardType: HazardCluster['hazard_type'],
@@ -70,7 +74,7 @@ export async function submitHazardReport(
   riderId: string,
   groupId: string,
   locationTimestampHlc: string
-): Promise<HazardReport> {
+): Promise<{ report: HazardReport; queued: boolean }> {
   const hlc = HLC.fresh();
   const reportId = uuidv4();
   const reportedAtHlc = hlc.now();
@@ -89,23 +93,35 @@ export async function submitHazardReport(
   const online = await isOnline();
 
   if (online) {
-    const db = getFirestore();
-    await db
-      .collection(HAZARD_REPORTS_COLLECTION(groupId))
-      .doc(reportId)
-      .set(report);
-  } else {
-    const operation = {
-      id: uuidv4(),
-      type: 'hazard_report' as const,
-      data: report,
-      created_at_hlc: reportedAtHlc,
-      retry_count: 0,
-    };
-    queueEnqueue(HAZARD_QUEUE, operation);
+    try {
+      const db = getFirestore();
+      await db
+        .collection(HAZARD_REPORTS_COLLECTION(groupId))
+        .doc(reportId)
+        .set(report);
+      return { report, queued: false };
+    } catch (err) {
+      // The connectivity check passed but the write failed (rules denial,
+      // network drop mid-write, Firestore outage). Never lose the report:
+      // fall through to the offline queue.
+      console.warn('[hazardService] Online write failed; queueing report:', err);
+    }
   }
 
-  return report;
+  enqueueHazardReport(report, reportedAtHlc);
+  return { report, queued: true };
+}
+
+/** Enqueue a hazard report for later sync (offline path + online-write fallback). */
+function enqueueHazardReport(report: HazardReport, reportedAtHlc: string): void {
+  const operation = {
+    id: uuidv4(),
+    type: 'hazard_report' as const,
+    data: report,
+    created_at_hlc: reportedAtHlc,
+    retry_count: 0,
+  };
+  queueEnqueue(HAZARD_QUEUE, operation);
 }
 
 /**
@@ -165,10 +181,11 @@ export async function triggerClustering(groupId: string): Promise<void> {
     const hazardType = cluster.reports[0].hazard_type as HazardCluster['hazard_type'];
     const centroid = calculateCentroid(cluster.reports);
     const bbox = calculateBoundingBox(cluster.reports);
-    const latestReportTime = Math.max(...cluster.reports.map(r => {
-      const parts = r.reported_at_hlc.split('-');
-      return parseInt(parts[0], 10);
-    }));
+    const latestReportTime = Math.max(...cluster.reports.map(r =>
+      // Canonical HLC form is "physical:counter"; HLC.parse also accepts the
+      // legacy dash form, so this is robust to old queued reports.
+      HLC.parse(r.reported_at_hlc).physical
+    ));
     const hazardScore = calculateHazardScore(cluster.reports.length, latestReportTime);
 
     // Try to match with existing cluster by centroid proximity

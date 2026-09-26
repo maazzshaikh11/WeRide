@@ -65,7 +65,7 @@ describe('hlcStore', () => {
       const after = Date.now();
 
       const ts = hlc.now();
-      expect(ts).toMatch(/^\d+-\d+$/);
+      expect(ts).toMatch(/^\d+:\d+$/);
       expect(hlc.physical).toBeGreaterThanOrEqual(before);
       expect(hlc.physical).toBeLessThanOrEqual(after + 10);
     });
@@ -82,14 +82,14 @@ describe('hlcStore', () => {
       });
 
       const hlc = loadHlc();
-      // Should not throw; result is a valid fresh HLC
-      expect(hlc.now()).toMatch(/^\d+-\d+$/);
+      // Should not throw; result is a valid fresh HLC (canonical colon format)
+      expect(hlc.now()).toMatch(/^\d+:\d+$/);
     });
   });
 
   // ── Test 3 ──────────────────────────────────────────────────────────────────
   describe('persistHlc', () => {
-    it('writes serialized HlcState to MMKV under tracking:hlc_state', () => {
+    it('writes serialized HlcState to MMKV under the shared HLC key', () => {
       // loadHlc triggers singleton init → MMKV is constructed.
       const hlc = loadHlc();
       hlc.now(); // advance clock once
@@ -124,6 +124,21 @@ describe('hlcStore', () => {
 
       // The set call should be on the same instance reference.
       expect(mmkvAfterLoad.set).toHaveBeenCalled();
+    });
+
+    it('shares one clock with the HLC class (same MMKV id and key)', () => {
+      // Single-clock convergence: tracking's hlcStore and hazard-sos's HLC
+      // class must persist to the same MMKV location. (The in-memory MMKV
+      // mock gives each construction an independent store, so we assert the
+      // configuration that makes them converge on a real device.)
+      const { HLC_STORAGE_ID, HLC_STORAGE_KEY } = jest.requireMock('@hazard/hlc/hlc');
+
+      loadHlc(); // triggers singleton init → new MMKV({ id })
+
+      const ctorCalls = (MMKV as jest.Mock).mock.calls;
+      expect(ctorCalls.length).toBeGreaterThan(0);
+      expect(ctorCalls[ctorCalls.length - 1][0]).toEqual({ id: HLC_STORAGE_ID });
+      expect(HLC_MMKV_KEY).toBe(HLC_STORAGE_KEY);
     });
   });
 });

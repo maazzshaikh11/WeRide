@@ -13,7 +13,9 @@
  *   edges: { id: [{ to, weight }] }
  * }
  *
- * Weight is pre-calculated Haversine distance in km.
+ * Weight is pre-calculated Haversine distance in METERS.
+ * (Was kilometers before Phase 3; km weights with the meter-based A*
+ * heuristic made the heuristic overestimate 1000x, voiding optimality.)
  * Can be adjusted for hazards via applyHazardPenalties.
  */
 
@@ -43,7 +45,7 @@ export function addNode(graph, nodeId, lat, lng) {
 
 /**
  * Add a bidirectional edge between two nodes.
- * Weight is Haversine distance in km.
+ * Weight is Haversine distance in METERS (must match the A* heuristic unit).
  * @param {Object} graph
  * @param {string} fromId
  * @param {string} toId
@@ -56,15 +58,14 @@ export function addEdge(graph, fromId, toId) {
   }
 
   const distanceM = haversineMeters(fromNode.lat, fromNode.lng, toNode.lat, toNode.lng);
-  const distanceKm = distanceM / 1000;
 
   // Add edge from -> to
   if (!graph.edges[fromId]) graph.edges[fromId] = [];
-  graph.edges[fromId].push({ to: toId, weight: distanceKm });
+  graph.edges[fromId].push({ to: toId, weight: distanceM });
 
   // Add edge to -> from (bidirectional)
   if (!graph.edges[toId]) graph.edges[toId] = [];
-  graph.edges[toId].push({ to: fromId, weight: distanceKm });
+  graph.edges[toId].push({ to: fromId, weight: distanceM });
 }
 
 /**
@@ -79,7 +80,7 @@ export function addEdge(graph, fromId, toId) {
  *   6 - 7 - 8
  *
  * Lat increases downward, lng increases rightward.
- * Each step is ~0.01 degrees (~1.1 km).
+ * Each step is ~0.01 degrees (~1110 m).
  */
 export function createTestGrid() {
   const graph = createGraph();
@@ -118,6 +119,24 @@ export function createTestGrid() {
 }
 
 /**
+ * Deep-clone a graph.
+ * Use before applyHazardPenalties* when the base graph is shared/reused —
+ * the penalty functions mutate edge weights in place.
+ * @param {Object} graph
+ * @returns {Object} independent copy
+ */
+export function cloneGraph(graph) {
+  const copy = { nodes: {}, edges: {} };
+  for (const id in graph.nodes) {
+    copy.nodes[id] = { ...graph.nodes[id] };
+  }
+  for (const id in graph.edges) {
+    copy.edges[id] = graph.edges[id].map((e) => ({ ...e }));
+  }
+  return copy;
+}
+
+/**
  * Extract path coordinates from node IDs.
  * @param {string[]} nodePath - array of node IDs from A*
  * @param {Object} graph
@@ -132,10 +151,10 @@ export function pathToCoordinates(nodePath, graph) {
 }
 
 /**
- * Calculate total distance of a path in km.
+ * Calculate total distance of a path in METERS.
  * @param {string[]} nodePath
  * @param {Object} graph
- * @returns {number} distance in km
+ * @returns {number} distance in meters
  */
 export function pathDistance(nodePath, graph) {
   let total = 0;

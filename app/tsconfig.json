@@ -9,7 +9,13 @@
       "@hazard/*": ["../modules/hazard-sos/src/*"],
       "@routing/*": ["../modules/routing-eta/src/*"],
       "@flvoice/*": ["../modules/fl-voice/src/*"],
-      "@env": [".env.d.ts"]
+      "@env": [".env.d.ts"],
+      "socket.io-client": ["./node_modules/socket.io-client"],
+      "@react-native-firebase/firestore": ["./node_modules/@react-native-firebase/firestore"],
+      "react-native-mmkv": ["./node_modules/react-native-mmkv"],
+      "react-native-sensors": ["./node_modules/react-native-sensors"],
+      "react-native-geolocation-service": ["./node_modules/react-native-geolocation-service"],
+      "react-native-background-geolocation": ["./node_modules/react-native-background-geolocation"]
     },
     "strict": true,
     "esModuleInterop": true,

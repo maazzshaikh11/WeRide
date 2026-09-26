@@ -194,4 +194,58 @@ describe('RoutingClient (Phase 6)', () => {
       done();
     }, 150);
   });
+
+  it('should include active_hazards in the request body when provided', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        route_id: 'r1',
+        path_points: [[40.7128, -74.006], [40.7140, -74.0089]],
+        distance_km: 1.5,
+        eta_minutes: 25,
+        safety_score: 0.85,
+        recalculated_at_hlc: '1000:0',
+      }),
+    });
+
+    const hazards = [
+      { centroid_lat: 40.713, centroid_lng: -74.007, hazard_type: 'accident', hazard_score: 0.9 },
+    ];
+
+    await client.requestRoute({
+      group_id: 'g1',
+      origin: { lat: 40.7128, lng: -74.006 },
+      destination: { lat: 40.7140, lng: -74.0089 },
+      avoid_hazard_types: ['accident'],
+      active_hazards: hazards,
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(call[1].body);
+    expect(body.active_hazards).toEqual(hazards);
+  });
+
+  it('should omit active_hazards from the body when none provided', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        route_id: 'r1',
+        path_points: [[40.7128, -74.006], [40.7140, -74.0089]],
+        distance_km: 1.5,
+        eta_minutes: 25,
+        safety_score: 0.85,
+        recalculated_at_hlc: '1000:0',
+      }),
+    });
+
+    await client.requestRoute({
+      group_id: 'g1',
+      origin: { lat: 40.7128, lng: -74.006 },
+      destination: { lat: 40.7140, lng: -74.0089 },
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(call[1].body);
+    expect('active_hazards' in body).toBe(false);
+  });
 });

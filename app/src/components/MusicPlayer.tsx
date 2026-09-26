@@ -1,8 +1,9 @@
 /**
- * MusicPlayer — stub mini-player (spec §3.3.10). P2 feature, placeholder data.
- * Duck state: border #FF5C0022, subtitle "🔉 Volume lowered — {reason}".
+ * MusicPlayer — mini-player (spec §3.3.10). Placeholder: no real Spotify
+ * integration; UI/state architecture only. Duck state: border #FF5C0022,
+ * subtitle "🔉 Volume lowered — {reason}".
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { WeRideColors, WeRideFonts } from '../theme/theme';
 
@@ -12,7 +13,13 @@ interface Props {
   duckReason?: string | null;
 }
 
-export default function MusicPlayer({ track = 'Night Ride', artist = 'Playlist · Focus', duckReason }: Props) {
+export default function MusicPlayer({
+  track = 'Kesariya — Arijit Singh',
+  artist = 'Spotify · connected',
+  duckReason,
+}: Props) {
+  const [playing, setPlaying] = useState(true);
+
   return (
     <View style={[styles.player, duckReason ? styles.duck : null]}>
       <View style={styles.art}>
@@ -25,11 +32,20 @@ export default function MusicPlayer({ track = 'Night Ride', artist = 'Playlist �
         </Text>
       </View>
       <View style={styles.controls}>
-        {['⏮', '⏸', '▶', '⏭'].map((c) => (
-          <Pressable key={c} hitSlop={4} accessibilityLabel={`Music control ${c}`}>
-            <Text style={styles.control}>{c}</Text>
-          </Pressable>
-        ))}
+        <Pressable hitSlop={6} accessibilityLabel="Previous track" accessibilityRole="button">
+          <Text style={styles.control}>⏮</Text>
+        </Pressable>
+        <Pressable
+          hitSlop={6}
+          accessibilityLabel={playing ? 'Pause' : 'Play'}
+          accessibilityRole="button"
+          onPress={() => setPlaying((p) => !p)}
+        >
+          <Text style={styles.control}>{playing ? '⏸' : '▶'}</Text>
+        </Pressable>
+        <Pressable hitSlop={6} accessibilityLabel="Next track" accessibilityRole="button">
+          <Text style={styles.control}>⏭</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -60,6 +76,6 @@ const styles = StyleSheet.create({
   meta: { flex: 1 },
   track: { fontFamily: WeRideFonts.body, fontSize: 11.5, fontWeight: '600', color: WeRideColors.white },
   artist: { fontFamily: WeRideFonts.body, fontSize: 9, color: WeRideColors.textSub, marginTop: 1 },
-  controls: { flexDirection: 'row', gap: 6 },
-  control: { fontSize: 15, color: WeRideColors.text },
+  controls: { flexDirection: 'row', gap: 10, alignItems: 'center', paddingRight: 4 },
+  control: { fontSize: 16, color: WeRideColors.text },
 });

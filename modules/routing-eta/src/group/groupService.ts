@@ -55,6 +55,21 @@ export class GroupService {
     return data?.ride_plan ?? null;
   }
 
+  /** Fetch a group's metadata (name, members). Returns null when missing. */
+  async getGroup(groupId: string): Promise<Group | null> {
+    const snap = await this._firestore.collection('groups').doc(groupId).get();
+    if (!snap.exists) return null;
+    const data = snap.data() as any;
+    return {
+      id: groupId,
+      name: data?.name ?? 'Ride',
+      created_by: data?.created_by ?? '',
+      member_ids: data?.member_ids ?? [],
+      created_at: data?.created_at ?? null,
+      active_ride_id: data?.active_ride_id ?? null,
+    };
+  }
+
   async joinGroup(groupCode: string): Promise<void> {
     const uid = this._auth.currentUser!.uid;
 

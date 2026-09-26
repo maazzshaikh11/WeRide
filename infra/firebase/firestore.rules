@@ -29,13 +29,18 @@ service cloud.firestore {
         allow write: if request.auth.uid == riderId;
       }
 
-      // Hazard reports (raw): group members read; authed riders create own
+      // Hazard reports (raw): group members read/write; create binds the
+      // report to the writer and to this group's path (no cross-group writes).
       match /reports/{reportId} {
         allow read: if request.auth != null
           && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
         allow create: if request.auth != null
-          && request.resource.data.rider_id == request.auth.uid;
-        allow update, delete: if false;
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids
+          && request.resource.data.rider_id == request.auth.uid
+          && request.resource.data.group_id == groupId;
+        allow update: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow delete: if false;
       }
     }
 

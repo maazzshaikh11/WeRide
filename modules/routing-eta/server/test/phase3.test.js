@@ -44,36 +44,67 @@ test('A* finds optimal path on small graph', () => {
 // Haversine Heuristic Admissibility Test
 // ============================================================================
 
-test('A* heuristic is admissible (never overestimates)', () => {
-  // Create a simple 3-node path: A -> B -> C
-  // where B is not on the direct line from A to C.
-  const graph = {
-    nodes: {
-      A: { lat: 0, lng: 0 },
-      B: { lat: 0.001, lng: 0.001 }, // diagonal
-      C: { lat: 0.002, lng: 0 },
-    },
-    edges: {
-      A: [{ to: 'B', weight: 1.414 }], // ~sqrt(2) for diagonal
-      B: [{ to: 'A', weight: 1.414 }, { to: 'C', weight: 1.414 }],
-      C: [{ to: 'B', weight: 1.414 }],
-    },
-  };
+test('A* heuristic is admissible with real units (never overestimates)', () => {
+  // Phase 3: real units — edge weights in METERS (via createTestGrid/addEdge),
+  // heuristic in meters. Admissibility means h(n) <= true cheapest cost from
+  // n to goal for every node, which is what guarantees A* optimality.
+  // The old unitless version of this test (weights 1 / 1.414 vs a meter
+  // heuristic) could not catch the km-vs-meters mismatch.
+  //
+  // Oracle: independent Dijkstra (A* with h=0), NOT A*'s own cost —
+  // comparing A* against itself would be circular.
+  function dijkstra(graph, start, goal) {
+    const dist = { [start]: 0 };
+    const visited = new Set();
+    for (;;) {
+      let u = null;
+      for (const id in dist) {
+        if (!visited.has(id) && (u === null || dist[id] < dist[u])) u = id;
+      }
+      if (u === null) return Infinity;
+      if (u === goal) return dist[u];
+      visited.add(u);
+      for (const e of (graph.edges[u] || [])) {
+        const nd = dist[u] + e.weight;
+        if (nd < (dist[e.to] ?? Infinity)) dist[e.to] = nd;
+      }
+    }
+  }
 
-  // The actual shortest distance (by road) from B to C
-  const roadDistance = 1.414;
+  const graph = createTestGrid();
+  const goal = '8'; // bottom-right corner
 
-  // The Haversine heuristic from B to C
-  const bLat = graph.nodes.B.lat;
-  const bLng = graph.nodes.B.lng;
-  const cLat = graph.nodes.C.lat;
-  const cLng = graph.nodes.C.lng;
-  const heuristicDistance = haversineMeters(bLat, bLng, cLat, cLng) / 1000;
+  for (const nodeId in graph.nodes) {
+    const trueCostM = dijkstra(graph, nodeId, goal);
+    assert.ok(Number.isFinite(trueCostM), `Dijkstra should reach ${goal} from ${nodeId}`);
+    const h = haversineMeters(
+      graph.nodes[nodeId].lat, graph.nodes[nodeId].lng,
+      graph.nodes[goal].lat, graph.nodes[goal].lng
+    );
+    assert.ok(h <= trueCostM + 1e-6,
+      `Heuristic ${h.toFixed(1)} m from ${nodeId} overestimates true cost ${trueCostM.toFixed(1)} m`);
 
-  // Admissibility: heuristic <= actual distance
-  // (Haversine is always <= road distance because it's straight-line)
-  assert.ok(heuristicDistance <= roadDistance * 1.1, // allow 10% tolerance for approx
-    `Heuristic ${heuristicDistance} should not exceed road distance ${roadDistance}`);
+    // And A* must find that same optimal cost (optimality, not just a path).
+    const aStar = astar(graph, nodeId, goal);
+    assert.ok(aStar, `A* should find a path from ${nodeId} to ${goal}`);
+    assert.ok(Math.abs(aStar.cost - trueCostM) < 1e-6,
+      `A* cost ${aStar.cost.toFixed(1)} m != optimal ${trueCostM.toFixed(1)} m from ${nodeId}`);
+  }
+});
+
+test('A* returns optimal (shortest) path with meter weights', () => {
+  // On the 3x3 grid every edge is ~1110 m; the corner-to-corner shortest
+  // path uses 4 edges. A greedy (inadmissible-heuristic) search could still
+  // find *a* path here, but the cost must equal the true optimum.
+  const graph = createTestGrid();
+  const result = astar(graph, '0', '8');
+  assert.ok(result);
+  assert.equal(result.path.length, 5, 'corner-to-corner needs 4 edges / 5 nodes');
+  const expected = pathDistance(result.path, graph);
+  assert.ok(Math.abs(result.cost - expected) < 1e-6, 'reported cost must equal path distance');
+  // Straight-line distance 0->8 is ~3140 m; Manhattan path must be >= that.
+  const straight = haversineMeters(0, 0, 0.02, 0.02);
+  assert.ok(result.cost >= straight - 1e-6, 'path cannot be shorter than straight line');
 });
 
 // ============================================================================
@@ -374,5 +405,7 @@ test('path distance calculation', () => {
   const nodePath = ['0', '1', '2'];
   const distance = pathDistance(nodePath, graph);
   assert.ok(distance > 0, 'Path should have positive distance');
-  assert.ok(distance < 5, 'Path on 3x3 grid should be < 5 km');
+  // Units are METERS (Phase 3): two ~1110 m grid steps ≈ 2220 m.
+  assert.ok(distance > 2000 && distance < 5000,
+    `Path on 3x3 grid should be ~2220 m, got ${distance} m`);
 });

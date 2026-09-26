@@ -157,8 +157,7 @@ describe('LocationPublisher', () => {
       // (jest might require awaiting a tick if it was an unhandled rejection, but catch handles it)
     });
 
-    it('Firestore failure resets throttle guard enabling immediate retry on next tick', async () => {
-      mockSet.mockRejectedValueOnce(new Error('fail 1'));
+    it('Firestore failure resets throttle guard enabling immediate retry on next tick', async () => {      mockSet.mockRejectedValueOnce(new Error('fail 1'));
       const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
       // Tick 1
@@ -174,6 +173,36 @@ describe('LocationPublisher', () => {
       publisher.publish(samplePayload);
       expect(mockSet).toHaveBeenCalledTimes(2); // Attempted again
 
+      consoleWarnSpy.mockRestore();
+    });
+  });
+
+  // ── Phase 1: group last-known fetch (late-joiner seeding) ──────────────────
+
+  describe('fetchGroupLastKnown', () => {
+    it('returns raw docs for the group locations subcollection', async () => {
+      const docs = [
+        { id: 'r1', data: () => ({ rider_id: 'r1', lat: 1, lng: 2, timestamp_hlc: '100:0' }) },
+        { id: 'r2', data: () => ({ rider_id: 'r2', lat: 3, lng: 4, timestamp_hlc: '101:0' }) },
+      ];
+      (firestore as any)._mockGetAll.mockResolvedValueOnce({ empty: false, docs });
+
+      const out = await publisher.fetchGroupLastKnown('group456');
+
+      expect(out).toHaveLength(2);
+      expect(out[0]).toMatchObject({ rider_id: 'r1', lat: 1, lng: 2 });
+      expect(out[1]).toMatchObject({ rider_id: 'r2', lat: 3, lng: 4 });
+    });
+
+    it('returns [] when the subcollection is empty', async () => {
+      (firestore as any)._mockGetAll.mockResolvedValueOnce({ empty: true, docs: [] });
+      await expect(publisher.fetchGroupLastKnown('group456')).resolves.toEqual([]);
+    });
+
+    it('returns [] on Firestore failure', async () => {
+      (firestore as any)._mockGetAll.mockRejectedValueOnce(new Error('permission-denied'));
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      await expect(publisher.fetchGroupLastKnown('group456')).resolves.toEqual([]);
       consoleWarnSpy.mockRestore();
     });
   });

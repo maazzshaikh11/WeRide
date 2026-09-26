@@ -122,7 +122,7 @@ describe('Phase 1: Mock Producer Contract Compliance', () => {
 
     test('created_at_hlc has valid HLC string format', () => {
       const cluster = generateMockHazardCluster('test-group-id');
-      expect(cluster.created_at_hlc).toMatch(/^\d+-\d+$/);
+      expect(cluster.created_at_hlc).toMatch(/^\d+:\d+$/);
     });
 
     test('preserves supplied group_id', () => {
@@ -166,7 +166,7 @@ describe('Phase 1: Mock Producer Contract Compliance', () => {
 
     test('created_at_hlc has valid HLC string format', () => {
       const sosEvent = generateMockSosEvent('test-rider', 'test-group', 37.7749, -122.4194);
-      expect(sosEvent.created_at_hlc).toMatch(/^\d+-\d+$/);
+      expect(sosEvent.created_at_hlc).toMatch(/^\d+:\d+$/);
     });
   });
 });
@@ -429,12 +429,14 @@ describe('Phase 2: Real HLC Implementation', () => {
       const hlc = HLC.fresh(() => 1000);
       hlc.now();
 
+      // Canonical output uses the colon separator; the legacy dash form is
+      // still accepted on input (backward compatibility).
       const merged1 = hlc.receive('2000-5');
-      expect(merged1).toBe('2000-6');
+      expect(merged1).toBe('2000:6');
       expect(hlc.toState().counter).toBe(6);
 
       const merged2 = hlc.receive('500-10');
-      expect(merged2).toBe('2000-7');
+      expect(merged2).toBe('2000:7');
     });
 
     test('wall-clock time winning a receive resets the logical counter', () => {
@@ -442,7 +444,7 @@ describe('Phase 2: Real HLC Implementation', () => {
       const hlc = HLC.fresh(() => time);
       hlc.now();
       time = 3000;
-      expect(hlc.receive('2000-5')).toBe('3000-0');
+      expect(hlc.receive('2000-5')).toBe('3000:0');
     });
   });
 
@@ -471,7 +473,7 @@ describe('Phase 2: Real HLC Implementation', () => {
       const parsed = HLC.parse(str);
       expect(parsed.physical).toBe(hlc.toState().physical);
       expect(parsed.counter).toBe(hlc.toState().counter);
-      expect(hlc.toString()).toBe(`${parsed.physical}-${parsed.counter}`);
+      expect(hlc.toString()).toBe(`${parsed.physical}:${parsed.counter}`);
     });
   });
 
@@ -2283,7 +2285,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
     test('submitHazardReport_online: creates correct report and writes expected Firestore path', async () => {
       NetInfo._setNetworkState({ isConnected: true });
 
-      const report = await submitHazardReport(
+      const { report, queued } = await submitHazardReport(
         'pothole',
         37.7749,
         -122.4194,
@@ -2292,6 +2294,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
         '1000-0'
       );
 
+      expect(queued).toBe(false);
       expect(report).toMatchObject({
         hazard_type: 'pothole',
         lat: 37.7749,
@@ -2301,7 +2304,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
         timestamp_hlc: '1000-0',
       });
       expect(report.report_id).toBeDefined();
-      expect(report.reported_at_hlc).toMatch(/^\d+-\d+$/);
+      expect(report.reported_at_hlc).toMatch(/^\d+:\d+$/);
 
       const firestoreData = firestore._getData();
       expect(firestoreData['groups/group-1/reports']).toBeDefined();
@@ -2311,7 +2314,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
     test('submitHazardReport_offline: does NOT depend on Firestore, queues using existing local queue', async () => {
       NetInfo._setNetworkState({ isConnected: false });
 
-      const report = await submitHazardReport(
+      const { report, queued } = await submitHazardReport(
         'accident',
         38.0,
         -123.0,
@@ -2320,6 +2323,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
         '1000-1'
       );
 
+      expect(queued).toBe(true);
       expect(report.hazard_type).toBe('accident');
       expect(report.group_id).toBe('group-1');
 
@@ -2333,10 +2337,40 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
       expect(firestoreData['groups/group-1/reports']).toBeUndefined();
     });
 
+    test('submitHazardReport_onlineWriteFails: report is queued, never lost', async () => {
+      // Connectivity check passes but the Firestore write itself fails
+      // (rules denial, mid-write network drop). Zero data loss: the report
+      // must land in the offline queue instead of propagating as a loss.
+      NetInfo._setNetworkState({ isConnected: true });
+      firestore._setFailWrites(true);
+      try {
+        const { report, queued } = await submitHazardReport(
+          'debris',
+          37.1,
+          -122.1,
+          'rider-9',
+          'group-1',
+          '3000-0'
+        );
+
+        expect(queued).toBe(true);
+        expect(report.report_id).toBeDefined();
+
+        const queue = queuePeek(HAZARD_QUEUE);
+        expect(queue.length).toBe(1);
+        expect((queue[0].data as any).report_id).toBe(report.report_id);
+
+        const firestoreData = firestore._getData();
+        expect(firestoreData['groups/group-1/reports']).toBeUndefined();
+      } finally {
+        firestore._setFailWrites(false);
+      }
+    });
+
     test('hazard_report_contract: exact required fields/types', async () => {
       NetInfo._setNetworkState({ isConnected: true });
 
-      const report = await submitHazardReport(
+      const { report, queued } = await submitHazardReport(
         'debris',
         37.0,
         -122.0,
@@ -2344,6 +2378,8 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
         'group-2',
         '2000-0'
       );
+
+      expect(queued).toBe(false);
 
       // Contract: report_id, rider_id, group_id, hazard_type, lat, lng, timestamp_hlc, reported_at_hlc
       expect(typeof report.report_id).toBe('string');
@@ -2354,7 +2390,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
       expect(typeof report.lng).toBe('number');
       expect(typeof report.timestamp_hlc).toBe('string');
       expect(typeof report.reported_at_hlc).toBe('string');
-      expect(report.reported_at_hlc).toMatch(/^\d+-\d+$/);
+      expect(report.reported_at_hlc).toMatch(/^\d+:\d+$/);
     });
   });
 
@@ -2405,7 +2441,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
         ]),
         report_count: 2,
         hazard_score: expect.any(Number),
-        created_at_hlc: expect.stringMatching(/^\d+-\d+$/),
+        created_at_hlc: expect.stringMatching(/^\d+:\d+$/),
         status: 'active',
       });
       expect(cluster.hazard_score).toBeGreaterThanOrEqual(0);
@@ -2670,7 +2706,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
       // Verify Firestore was updated
       const doc = await db.collection('sos_events').doc('s1').get();
       expect(doc.data()?.resolved).toBe(true);
-      expect(doc.data()?.resolved_at_hlc).toMatch(/^\d+-\d+$/);
+      expect(doc.data()?.resolved_at_hlc).toMatch(/^\d+:\d+$/);
     });
 
     test('resolveSos_offline: creates OR-Set tombstone, queues resolve operation', async () => {

@@ -14,6 +14,12 @@ interface Props {
   isLast?: boolean;
 }
 
+const TAG_LABELS = {
+  done: '✓ Reached',
+  current: 'Up next',
+  upcoming: 'Upcoming',
+} as const;
+
 const TAG_STYLES = {
   done:     { bg: '#22C55E18', border: '#22C55E44', text: WeRideColors.green },
   current:  { bg: '#FF5C0022', border: '#FF5C0044', text: WeRideColors.primary },
@@ -47,7 +53,7 @@ export default function StopNode({ stop, info, onPress, isLast }: Props) {
         <Text style={styles.name}>{stop.name}</Text>
         <Text style={styles.info}>{info}</Text>
         <View style={[styles.tag, { backgroundColor: tag.bg, borderColor: tag.border }]}>
-          <Text style={[styles.tagText, { color: tag.text }]}>{stop.status}</Text>
+          <Text style={[styles.tagText, { color: tag.text }]}>{TAG_LABELS[stop.status]}</Text>
         </View>
       </Pressable>
     </View>

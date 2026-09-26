@@ -56,7 +56,9 @@ jest.mock('@tracking/sensorStream', () => ({
 }));
 
 jest.mock('@tracking/locationPublisher', () => ({
-  LocationPublisher: jest.fn().mockImplementation(() => ({})),
+  LocationPublisher: jest.fn().mockImplementation(() => ({
+    fetchGroupLastKnown: jest.fn().mockResolvedValue([]),
+  })),
 }));
 
 jest.mock('@tracking/trackingService', () => {
@@ -187,6 +189,7 @@ jest.mock('@routing/client/deepLink', () => ({
 jest.mock('@routing/group/groupService', () => ({
   GroupService: jest.fn().mockImplementation(() => ({
     getRidePlan: jest.fn().mockResolvedValue(null),
+    getGroup: jest.fn().mockResolvedValue(null),
     createGroup: jest.fn(),
     joinGroup: jest.fn(),
     myGroups: jest.fn(() => jest.fn()),

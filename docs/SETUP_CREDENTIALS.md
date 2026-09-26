@@ -1,0 +1,37 @@
+# WeRide — Setup Credentials (manual steps)
+
+These values are never invented, never committed, and never shared outside the
+team. Every step below must be completed by a human before the app runs
+end-to-end on a device.
+
+## App (`app/.env`)
+
+| Variable | Where it comes from | Notes |
+|---|---|---|
+| `MAPBOX_ACCESS_TOKEN` | Mapbox account → Tokens | Needs Directions + Maps SDK scopes. Public token is fine in the client; never use a secret token. |
+| `ROUTING_URL` | Your deployed routing server | e.g. `https://<host>/route`. Dev default `http://localhost:3000` works only on emulators via `10.0.2.2`. |
+| `SOCKET_URL` | Same server (Socket.io) | Same host rules as above. |
+| `ETA_SIDECAR_URL` | ETA model sidecar | If unset, the app falls back to server-side ETA. |
+
+## Firebase
+
+1. Create (or reuse) the Firebase project in the Firebase console.
+2. Add an Android app (package name from `app/android/app/build.gradle`) and an
+   iOS app (bundle id from Xcode); download `google-services.json` /
+   `GoogleService-Info.plist` into the platform folders.
+3. Run `firebase login` and `firebase use --add` inside `infra/firebase/` —
+   this creates `.firebaserc`, which is **deliberately uncommitted**.
+4. Deploy rules: `firebase deploy --only firestore:rules`.
+5. Enable Email/Password (or your chosen provider) in Authentication.
+
+## Fonts (already bundled — nothing to do)
+
+The 7 font files ship in the repo (`app/assets/fonts/`, Android assets,
+iOS Fonts + `UIAppFonts`). A fresh `react-native-asset` run is only needed if
+fonts are added/renamed later.
+
+## Permissions (requested at runtime on device)
+
+Location (foreground + background for tracking), microphone (Voice tab).
+Denying either degrades gracefully — tracking and voice show explicit empty
+states rather than crashing.

@@ -15,6 +15,8 @@ export type TabName = 'Home' | 'Stops' | 'Voice' | 'Family' | 'Alerts' | 'Histor
 interface AppState {
   userId: string | null;
   groupId: string | null;
+  /** Wall-clock ms when the current group/ride session started (for "started N min ago"). */
+  rideStartedAt: number | null;
   familySharingEnabled: boolean;
   socketConnected: boolean;
   currentTab: TabName;
@@ -28,11 +30,13 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   userId: null,
   groupId: null,
+  rideStartedAt: null,
   familySharingEnabled: false,
   socketConnected: false,
   currentTab: 'Home',
   setUserId: (id) => set({ userId: id }),
-  setGroupId: (id) => set({ groupId: id }),
+  // Joining a group starts the ride session clock; leaving clears it.
+  setGroupId: (id) => set({ groupId: id, rideStartedAt: id ? Date.now() : null }),
   setFamilySharingEnabled: (on) => set({ familySharingEnabled: on }),
   setSocketConnected: (connected) => set({ socketConnected: connected }),
   setCurrentTab: (tab) => set({ currentTab: tab }),

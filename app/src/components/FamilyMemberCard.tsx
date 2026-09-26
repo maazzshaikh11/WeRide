@@ -10,23 +10,26 @@ interface Props {
   name: string;
   meta: string;
   status: 'safe' | 'watching';
+  color?: string;
 }
+
+const STATUS_LABELS = { safe: 'Notified', watching: 'Watching' } as const;
 
 function initials(name: string): string {
   return name.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || '??';
 }
 
-export default function FamilyMemberCard({ name, meta, status }: Props) {
+export default function FamilyMemberCard({ name, meta, status, color }: Props) {
   return (
     <View style={styles.card}>
-      <View style={styles.avatar}>
+      <View style={[styles.avatar, color ? { backgroundColor: color } : null]}>
         <Text style={styles.avatarText}>{initials(name)}</Text>
       </View>
       <View style={styles.textWrap}>
         <Text style={styles.name}>{name}</Text>
         <Text style={styles.meta}>{meta}</Text>
       </View>
-      <StatusBadge label={status} variant={status} />
+      <StatusBadge label={STATUS_LABELS[status]} variant={status} />
     </View>
   );
 }

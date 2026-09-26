@@ -9,7 +9,6 @@ import { WeRideColors, hazardColor } from '@app/theme/theme';
 import { useAppStore } from '@app/store/appStore';
 import type { HazardType } from '../dbscan/dbscan';
 import { submitHazardReport } from '../services/hazardService';
-import { isOnline } from '../crdt/syncWorker';
 
 const TYPES: { type: HazardType; label: string; icon: string }[] = [
   { type: 'pothole', label: 'Pothole', icon: '🕳️' },
@@ -41,8 +40,10 @@ export default function HazardReportSheet({
 
   const appGroupId = useAppStore((s: any) => s.groupId);
   const appUserId = useAppStore((s: any) => s.userId);
-  const groupId = propsGroupId ?? appGroupId ?? 'demo-group';
-  const riderId = propsRiderId ?? appUserId ?? 'demo-rider';
+  // No demo fallbacks: without a real group/rider the report cannot be
+  // attributed, so submission is blocked with an explicit error instead.
+  const groupId: string | null = propsGroupId ?? appGroupId ?? null;
+  const riderId: string | null = propsRiderId ?? appUserId ?? null;
 
   // Reset state when sheet opens/closes
   useEffect(() => {
@@ -61,6 +62,11 @@ export default function HazardReportSheet({
   const handleSubmit = useCallback(async () => {
     if (!selectedType) {
       setError('Please select a hazard type');
+      return;
+    }
+
+    if (!groupId || !riderId) {
+      setError('No active ride — join a group before reporting a hazard.');
       return;
     }
 
@@ -110,30 +116,27 @@ export default function HazardReportSheet({
 
   const proceedSubmit = async (location: any) => {
     try {
-      // Check connectivity BEFORE submitting to distinguish online vs offline
-      const wasOnline = await isOnline();
-
-      await submitHazardReport(
+      const { queued } = await submitHazardReport(
         selectedType as any, // TS inference
         location.lat,
         location.lng,
-        riderId,
-        groupId,
+        riderId as string,
+        groupId as string,
         location.timestampHlc
       );
 
       if (!submitting) return; // prevent double-set if already unmounted
 
-      // Distinguish online vs offline based on connectivity at submit time
-      if (wasOnline) {
-        // Successfully sent to Firestore
+      if (queued) {
+        // Offline, or the online write failed and the report was queued
+        // (zero data loss) — say so honestly instead of claiming it sent.
+        setStatusMessage('Report saved — will sync when you\'re back online');
+        setTimeout(() => onClose(), 1500);
+      } else {
+        // Written to Firestore
         setStatusMessage('Hazard reported');
         // Brief delay so user sees confirmation before sheet closes
         setTimeout(() => onClose(), 800);
-      } else {
-        // Queued offline
-        setStatusMessage('Report saved — will sync when you\'re back online');
-        setTimeout(() => onClose(), 1500);
       }
     } catch (err) {
       console.error('[HazardReportSheet] Submit failed:', err);

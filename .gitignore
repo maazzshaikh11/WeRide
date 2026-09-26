@@ -57,3 +57,5 @@ ui-debug.log
 
 # React Native
 .expo/
+# Firebase project selector - machine-local, never commit
+.firebaserc

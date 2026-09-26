@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { firebaseAuth } from '../services/firebaseService';
+import { firebaseAuth, saveFcmToken } from '../services/firebaseService';
 import { useAppStore } from '../store/appStore';
 import { WeRideColors, WeRideFonts } from '../theme/theme';
 
@@ -22,6 +22,10 @@ export default function LoginScreen({ navigation }: any) {
     try {
       const cred = await firebaseAuth.signInWithEmailAndPassword(email, password);
       setUserId(cred.user.uid);
+      // Register this device for SOS push (best-effort; must not block login).
+      saveFcmToken(cred.user.uid).catch((e) =>
+        console.warn('[LoginScreen] FCM token save failed:', e)
+      );
       navigation.replace('Groups');
     } catch (e: any) {
       setError(e.message ?? 'Authentication failed');

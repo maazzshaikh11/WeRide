@@ -474,6 +474,7 @@ describe('ridersStore', () => {
       (getLocationSocket as jest.Mock).mockReturnValue({
         on: jest.fn(),
         off: jest.fn(),
+        emit: jest.fn(),
         connected: true,
       });
 
@@ -489,6 +490,7 @@ describe('ridersStore', () => {
       (getLocationSocket as jest.Mock).mockReturnValue({
         on: jest.fn(),
         off: jest.fn(),
+        emit: jest.fn(),
         connected: true,
       });
 

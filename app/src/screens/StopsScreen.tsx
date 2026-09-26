@@ -13,12 +13,15 @@ import StopNode from '../components/StopNode';
 import { useStopsStore } from '../store/stopsStore';
 import { useRidePlanStore } from '../store/ridePlanStore';
 import { useToastStore } from '../store/toastStore';
+import { useRouteStore } from '@routing/client/routeStore';
+import { haversineMeters } from '../utils/geoUtils';
 
 export default function StopsScreen() {
   const stops = useStopsStore((s) => s.stops);
   const markCurrentDone = useStopsStore((s) => s.markCurrentDone);
   const syncFromPlan = useStopsStore((s) => s.syncFromPlan);
   const planVersion = useRidePlanStore((s) => s.stops.length + (s.destination ? 1 : 0));
+  const currentLocation = useRouteStore((s) => s.currentLocation);
   const push = useToastStore((s) => s.push);
 
   // Re-sync the timeline whenever the ride plan changes
@@ -41,28 +44,31 @@ export default function StopsScreen() {
         <ScreenHeader
           eyebrow="02 — Route"
           title="Planned Stops"
-          right={
-            <Text style={styles.counter}>
-              {doneCount}/{stops.length} done
-            </Text>
-          }
         />
         <Progressbar completed={doneCount} total={stops.length} />
-        {stops.map((stop, i) => (
-          <StopNode
-            key={stop.id}
-            stop={stop}
-            isLast={i === stops.length - 1}
-            info={
-              stop.status === 'done'
-                ? 'reached'
-                : stop.status === 'current'
-                  ? 'next up'
-                  : 'upcoming'
-            }
-            onPress={stop.status === 'current' ? () => onStopPress(stop.name, true) : undefined}
-          />
-        ))}
+        {stops.map((stop, i) => {
+          // Demo info pattern: "12 km · next stop" / "19 km away" (real distances).
+          const distKm =
+            currentLocation != null && stop.lat != null && stop.lng != null
+              ? haversineMeters(currentLocation.lat, currentLocation.lng, stop.lat, stop.lng) / 1000
+              : null;
+          const distText = distKm != null ? `${distKm < 10 ? distKm.toFixed(1) : Math.round(distKm)} km` : null;
+          const info =
+            stop.status === 'done'
+              ? 'reached'
+              : stop.status === 'current'
+                ? distText ? `${distText} · next stop` : 'next stop'
+                : distText ? `${distText} away` : 'upcoming';
+          return (
+            <StopNode
+              key={stop.id}
+              stop={stop}
+              isLast={i === stops.length - 1}
+              info={info}
+              onPress={stop.status === 'current' ? () => onStopPress(stop.name, true) : undefined}
+            />
+          );
+        })}
         {!currentStop && stops.length > 0 && (
           <Text style={styles.allDone}>All stops reached 🏁</Text>
         )}

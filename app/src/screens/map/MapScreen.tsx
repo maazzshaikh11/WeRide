@@ -56,7 +56,9 @@ import { getLocationSocket } from '../../services/socketService';
 MapboxGL.setAccessToken(MAPBOX_TOKEN ?? '');
 
 export default function MapScreen() {
-  const groupId = useAppStore((s) => s.groupId) ?? 'demo-group';
+  // No demo fallback: without a real group there is nothing to track.
+  // The component renders a "no group selected" placeholder instead.
+  const groupId = useAppStore((s) => s.groupId);
   const userId = useAppStore((s) => s.userId);
   const riders = useRidersStore((s) => s.riders);
   const connected = useRidersStore((s) => s.connected);
@@ -73,6 +75,8 @@ export default function MapScreen() {
   const [showFuelBanner, setShowFuelBanner] = useState(true);
   const [networkBanner, setNetworkBanner] = useState<'lost' | 'recovered' | null>(null);
   const [sosActive, setSosActive] = useState(false);
+  // Ride name for the header (demo shows "Lonavala Loop", not the group ID).
+  const [rideName, setRideName] = useState<string | null>(null);
 
   const prevConnectedRef = useRef<boolean | null>(null);
 
@@ -102,15 +106,43 @@ export default function MapScreen() {
     const service = new TrackingService({ ekf, sensors, publisher, hlc });
     serviceRef.current = service;
 
-    service.start().catch((err: unknown) => {
+    // Prefer background tracking; fall back to foreground when the native
+    // background module is unavailable (permissions, platform limits).
+    service.start(true).then((started) => {
+      if (started) return;
+      console.warn('[MapScreen] Background tracking unavailable; falling back to foreground.');
+      push('Background location unavailable — using foreground tracking', 'warn');
+      return service.start(false).then((fgStarted) => {
+        if (!fgStarted) {
+          console.error('[MapScreen] TrackingService.start failed (foreground too).');
+          push('Could not start location tracking', 'error');
+        }
+      });
+    }).catch((err: unknown) => {
       console.error('[MapScreen] TrackingService.start failed:', err);
     });
 
     // Subscribe riders store to location updates (other riders' markers).
     useRidersStore.getState().subscribe(groupId);
 
+    // Seed other riders' last-known positions so the map is not empty on join.
+    publisher
+      .fetchGroupLastKnown(groupId)
+      .then((docs) => useRidersStore.getState().seedRiders(docs))
+      .catch((e: unknown) => {
+        console.warn('[MapScreen] Rider seed failed:', e);
+      });
+
     // Load the ride plan saved at group creation (Create Ride modal).
     const groupService = new GroupService();
+    groupService
+      .getGroup(groupId)
+      .then((group) => {
+        if (group?.name) setRideName(group.name);
+      })
+      .catch((e: unknown) => {
+        console.warn('[MapScreen] Group name load failed:', e);
+      });
     groupService
       .getRidePlan(groupId)
       .then((plan) => {
@@ -177,6 +209,7 @@ export default function MapScreen() {
   }, []);
 
   const handleResolveSos = useCallback(async (sosId: string) => {
+    if (!groupId) return;
     try {
       await resolveSos(sosId, groupId);
       setSosActive(false);
@@ -190,6 +223,19 @@ export default function MapScreen() {
   const onSosEventsChange = useCallback((events: ActiveSos[]) => {
     setSosEvents(events);
   }, []);
+
+  // Explicit empty state: no demo-group fallback. All hooks above run
+  // unconditionally, so this early return is hook-safe.
+  if (!groupId) {
+    return (
+      <View style={styles.noGroup}>
+        <Text style={styles.noGroupTitle}>No ride selected</Text>
+        <Text style={styles.noGroupSub}>
+          Join or create a group ride to see the live map.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -218,7 +264,7 @@ export default function MapScreen() {
         <View>
           <Text style={styles.eyebrow}>RIDE OVERVIEW</Text>
           <Text style={styles.title} numberOfLines={1}>
-            {groupId.slice(0, 8)}
+            {rideName ?? groupId.slice(0, 8)}
           </Text>
         </View>
         <LivePill variant={connected ? 'live' : 'grey'} />
@@ -228,14 +274,18 @@ export default function MapScreen() {
       <FlStatusOverlay />
 
       {/* 3.3.4 Fuel banner (conditional, stub threshold per spec) */}
-      {showFuelBanner && route && route.distance_km > 50 && (
-        <View style={styles.bannerWrap}>
-          <FuelBanner
-            message="Nearest fuel stop is far — plan a refill"
-            onDismiss={() => setShowFuelBanner(false)}
-          />
-        </View>
-      )}
+      {showFuelBanner && route && route.distance_km > 50 && (() => {
+        const nextStop = useStopsStore.getState().stops.find((s) => s.status !== 'done');
+        const stopName = nextStop ? nextStop.name : 'next stop';
+        return (
+          <View style={styles.bannerWrap}>
+            <FuelBanner
+              message={`Next pump is ${Math.round(route.distance_km)} km away — fuel up at the ${stopName} coming up.`}
+              onDismiss={() => setShowFuelBanner(false)}
+            />
+          </View>
+        );
+      })()}
 
       {/* 3.3.5 Network banner */}
       {networkBanner && (
@@ -343,6 +393,7 @@ export default function MapScreen() {
         onCancel={() => setSosModalOpen(false)}
         onSent={handleSosSent}
       />
+
     </View>
   );
 }
@@ -376,6 +427,25 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   bannerWrap: { position: 'absolute', top: 96, left: 0, right: 0, zIndex: 20 },
+  noGroup: {
+    flex: 1,
+    backgroundColor: WeRideColors.dark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  noGroupTitle: {
+    fontFamily: WeRideFonts.heading,
+    fontSize: 20,
+    color: WeRideColors.text,
+    marginBottom: 8,
+  },
+  noGroupSub: {
+    fontFamily: WeRideFonts.body,
+    fontSize: 14,
+    color: WeRideColors.textSub,
+    textAlign: 'center',
+  },
   fabColumn: {
     position: 'absolute',
     right: 12,

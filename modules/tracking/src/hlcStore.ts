@@ -1,30 +1,31 @@
 /**
  * HLC persistence backed by MMKV.
  *
- * Owns the MMKV instance for the tracking module (id: 'tracking').
- * Does NOT touch B's 'sos_queue' or D's 'fl_data' instances.
+ * The HLC is a device-wide singleton clock owned by the hazard-sos module
+ * (see @hazard/hlc/hlc). This store shares that exact MMKV location —
+ * HLC_STORAGE_ID / HLC_STORAGE_KEY — so tracking, hazard and SOS all read
+ * and advance the SAME clock. There is exactly one persisted HLC; the old
+ * per-module 'tracking' MMKV id / 'tracking:hlc_state' key are gone.
  *
  * Public API:
  *   loadHlc()       — restore HLC from MMKV, or create fresh if absent/corrupt.
  *   persistHlc(hlc) — write current HLC state to MMKV.
  *
- * Caller integration (Phase 6):
+ * Caller integration:
  *   const hlc = loadHlc();
  *   const service = new TrackingService({ ..., hlc });
  *   // persistHlc is called internally by TrackingService on every tick.
- *
- * NOTE: No real TrackingService caller exists yet (only the test suite).
- * App-level wiring is deferred to Phase 6 integration.
  */
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import { MMKV } from 'react-native-mmkv';
-import { HLC, HlcState } from '@hazard/hlc/hlc';
+import { HLC, HlcState, HLC_STORAGE_ID, HLC_STORAGE_KEY } from '@hazard/hlc/hlc';
 
-export const HLC_MMKV_KEY = 'tracking:hlc_state';
+/** Kept for backward compatibility; equals HLC_STORAGE_KEY. */
+export const HLC_MMKV_KEY = HLC_STORAGE_KEY;
 
-/** Lazily-initialised singleton MMKV instance for the tracking module. */
+/** Lazily-initialised singleton MMKV instance for the shared HLC clock. */
 let _mmkv: MMKV | null = null;
 
 /** @internal Exposed only for test isolation — reset the singleton between tests. */
@@ -34,7 +35,7 @@ export function _resetMmkvForTest(): void {
 
 function getMmkv(): MMKV {
   if (!_mmkv) {
-    _mmkv = new MMKV({ id: 'tracking' });
+    _mmkv = new MMKV({ id: HLC_STORAGE_ID });
   }
   return _mmkv;
 }

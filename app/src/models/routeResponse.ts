@@ -1,10 +1,22 @@
 /** route_request / route_response model (§6.4). Published by Person C's REST API. */
 
+export interface RouteRequestHazard {
+  centroid_lat: number;
+  centroid_lng: number;
+  hazard_type: string;
+  hazard_score?: number;
+}
+
 export interface RouteRequest {
   group_id: string;
   origin: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   avoid_hazard_types: string[];
+  /**
+   * Optional extension (not in the frozen §6.4 contract): live hazard clusters
+   * so the server can route around them. Omitted from the payload when empty.
+   */
+  active_hazards?: RouteRequestHazard[];
 }
 
 export interface RouteResponse {
@@ -28,10 +40,14 @@ export function routeResponseFromJson(j: Record<string, any>): RouteResponse {
 }
 
 export function routeRequestToJson(r: RouteRequest): Record<string, any> {
-  return {
+  const json: Record<string, any> = {
     group_id: r.group_id,
     origin: r.origin,
     destination: r.destination,
     avoid_hazard_types: r.avoid_hazard_types,
   };
+  if (r.active_hazards && r.active_hazards.length > 0) {
+    json.active_hazards = r.active_hazards;
+  }
+  return json;
 }

@@ -99,9 +99,15 @@ describe('WeRide Theme', () => {
 
   describe('WeRideFonts', () => {
     it('exports font configuration', () => {
-      expect(WeRideFonts.primary).toBe('Inter');
-      expect(WeRideFonts.heading).toBe('BebasNeue');
-      expect(WeRideFonts.mono).toBeDefined();
+      // Phase 4 P0 fix: values are the bundled fonts' PostScript names, which
+      // resolve on BOTH platforms (iOS UIAppFonts matches PostScript name;
+      // Android matches the file name in assets/fonts). The old values
+      // ('Inter', 'BebasNeue') resolved on neither iOS nor Android.
+      expect(WeRideFonts.primary).toBe('Inter-Regular');
+      expect(WeRideFonts.heading).toBe('BebasNeue-Regular');
+      expect(WeRideFonts.mono).toBe('SpaceMono-Regular');
+      expect(WeRideFonts.bodyBold).toBe('Inter-Bold');
+      expect(WeRideFonts.monoBold).toBe('SpaceMono-Bold');
     });
 
     it('separates display and body font families per master spec', () => {

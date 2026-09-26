@@ -35,18 +35,22 @@ export class RoutingClient {
   private _lastRequestOrigin?: { lat: number; lng: number };
 
   constructor(params: RoutingClientParams = {}) {
-    this._baseUrl = params.baseUrl ?? 'http://localhost:3000';
+    // Same default convention as the rest of the app (socketService, RouteOverlay):
+    // 10.0.2.2 is the Android emulator alias for the dev machine. Pass baseUrl
+    // explicitly (e.g. ROUTING_URL) for physical devices.
+    this._baseUrl = params.baseUrl ?? 'http://10.0.2.2:3000';
     this._onUpdate = params.onUpdate;
     this.debounce = params.debounceMs ?? 500;
   }
 
   /** Request a route (immediate, no debounce). */
-  async requestRoute(req: Omit<RouteRequest, 'avoid_hazard_types'> & { avoid_hazard_types?: string[] }): Promise<RouteResponse> {
+  async requestRoute(req: Omit<RouteRequest, 'avoid_hazard_types' | 'active_hazards'> & { avoid_hazard_types?: string[]; active_hazards?: RouteRequest['active_hazards'] }): Promise<RouteResponse> {
     const fullReq: RouteRequest = {
       group_id: req.group_id,
       origin: req.origin,
       destination: req.destination,
       avoid_hazard_types: req.avoid_hazard_types ?? [],
+      active_hazards: req.active_hazards,
     };
     const res = await fetch(`${this._baseUrl}/route`, {
       method: 'POST',
@@ -61,7 +65,7 @@ export class RoutingClient {
   }
 
   /** Debounced request — batch hazard changes within `debounce` ms into one request. */
-  scheduleRecalculation(req: Omit<RouteRequest, 'avoid_hazard_types'> & { avoid_hazard_types?: string[] }): void {
+  scheduleRecalculation(req: Omit<RouteRequest, 'avoid_hazard_types' | 'active_hazards'> & { avoid_hazard_types?: string[]; active_hazards?: RouteRequest['active_hazards'] }): void {
     this._pendingRequest = req;
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
     this._debounceTimer = setTimeout(() => {
@@ -80,7 +84,8 @@ export class RoutingClient {
     destination: { lat: number; lng: number },
     groupId: string,
     avoidHazardTypes: string[],
-    thresholdMeters = 100
+    thresholdMeters = 100,
+    activeHazards?: RouteRequest['active_hazards']
   ): void {
     if (!this._lastRequestOrigin) {
       // First location, trigger immediately
@@ -89,6 +94,7 @@ export class RoutingClient {
         origin: newLocation,
         destination,
         avoid_hazard_types: avoidHazardTypes,
+        active_hazards: activeHazards,
       });
       return;
     }
@@ -106,6 +112,7 @@ export class RoutingClient {
         origin: newLocation,
         destination,
         avoid_hazard_types: avoidHazardTypes,
+        active_hazards: activeHazards,
       });
     }
   }

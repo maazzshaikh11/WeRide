@@ -27,7 +27,6 @@ export default function VoiceScreen() {
   const userId = useAppStore((s) => s.userId);
   const riders = useRidersStore((s) => s.riders);
   const push = useToastStore((s) => s.push);
-  const { width } = useWindowDimensions();
 
   const [status, setStatus] = useState<VoiceStatus>('connecting');
   const [muted, setMuted] = useState(false);
@@ -118,7 +117,8 @@ export default function VoiceScreen() {
     push('You left the voice channel', 'error');
   };
 
-  const columns = width <= 375 ? 2 : 3;
+  // Demo grid is always 3 columns (repeat(3, 1fr)) — no narrow breakpoint.
+  const columns = 3;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

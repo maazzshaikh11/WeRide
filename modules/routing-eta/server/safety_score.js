@@ -20,6 +20,8 @@
  * - The score is deterministic and reproducible
  */
 
+import { haversineMeters } from './geo.js';
+
 /**
  * Default severity weights for exposure calculation.
  * (Can be different from routing weights for different UX semantics.)
@@ -101,6 +103,70 @@ export function calculateSafetyScore(
 }
 
 /**
+ * Calculate safety score for a raw coordinate path (e.g. Mapbox geometry).
+ * Same formula as calculateSafetyScore; operates on [{lat, lng}] directly
+ * instead of node IDs + graph.
+ *
+ * @param {Array<{lat:number,lng:number}>} points
+ * @param {Array} hazards - [{ centroid_lat, centroid_lng, hazard_type, hazard_score }, ...]
+ * @param {number} radiusM
+ * @param {Object} severityWeights
+ * @param {number} maxExposure
+ * @returns {number} safety_score in [0, 1]
+ */
+export function calculateSafetyScoreForPoints(
+  points,
+  hazards = [],
+  radiusM = DEFAULT_HAZARD_RADIUS_M,
+  severityWeights = DEFAULT_SEVERITY_WEIGHTS_SAFETY,
+  maxExposure = DEFAULT_MAX_EXPOSURE
+) {
+  if (hazards.length === 0) return 1.0;
+
+  let totalExposure = 0;
+  for (const point of points) {
+    for (const hazard of hazards) {
+      const distanceM = haversineMeters(
+        point.lat,
+        point.lng,
+        hazard.centroid_lat,
+        hazard.centroid_lng
+      );
+      if (distanceM <= radiusM) {
+        const severity = severityWeights[hazard.hazard_type] || severityWeights.other;
+        const proximityFactor = 1 - distanceM / radiusM;
+        const hazardScore = hazard.hazard_score || 1.0;
+        totalExposure += severity * hazardScore * proximityFactor;
+      }
+    }
+  }
+
+  const score = Math.max(0, 1 - totalExposure / maxExposure);
+  return Math.min(1, score);
+}
+
+/**
+ * Count hazards within radiusM of any point on the path.
+ * Used for ETA features and for picking the cleanest Mapbox alternative.
+ *
+ * @param {Array<{lat:number,lng:number}>} points
+ * @param {Array} hazards
+ * @param {number} radiusM
+ * @returns {number} hazards near the path
+ */
+export function countHazardsNearPoints(points, hazards = [], radiusM = DEFAULT_HAZARD_RADIUS_M) {
+  let count = 0;
+  for (const hazard of hazards) {
+    const near = points.some(
+      (p) =>
+        haversineMeters(p.lat, p.lng, hazard.centroid_lat, hazard.centroid_lng) <= radiusM
+    );
+    if (near) count += 1;
+  }
+  return count;
+}
+
+/**
  * Categorize a safety score into a user-facing tier.
  *
  * @param {number} safetyScore - [0, 1]
@@ -116,20 +182,5 @@ export function safetyTier(
   return 'danger';
 }
 
-/**
- * Haversine distance in meters.
- */
-function haversineMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000; // Earth radius in meters
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
+/** Re-exported from geo.js (single source of truth). */
 export { haversineMeters };

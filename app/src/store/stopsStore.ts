@@ -11,6 +11,8 @@ export interface Stop {
   name: string;
   icon: string;    // emoji per spec §1.6
   status: 'done' | 'current' | 'upcoming';
+  lat?: number;    // from ride plan — for distance info lines
+  lng?: number;
 }
 
 interface StopsState {
@@ -25,17 +27,22 @@ const DESTINATION_STOP: Stop[] = [
 ];
 
 function planToStops(planStops: PlannedStop[], hasDestination: boolean): Stop[] {
-  if (planStops.length === 0) return DESTINATION_STOP.map((s) => ({ ...s }));
+  if (planStops.length === 0) {
+    const dest = useRidePlanStore.getState().destination;
+    return [{ id: 'stop-1', name: dest ? dest.label.split(',')[0] : 'Destination', icon: '🏁', status: 'current', lat: dest?.lat, lng: dest?.lng }];
+  }
   const stops: Stop[] = planStops.map((s) => ({
     id: s.id,
     name: s.label.split(',')[0],
     icon: s.icon,
     status: 'upcoming' as const,
+    lat: s.lat,
+    lng: s.lng,
   }));
   if (hasDestination) {
     const dest = useRidePlanStore.getState().destination;
     if (dest) {
-      stops.push({ id: 'final-destination', name: dest.label.split(',')[0], icon: '🏁', status: 'upcoming' });
+      stops.push({ id: 'final-destination', name: dest.label.split(',')[0], icon: '🏁', status: 'upcoming', lat: dest.lat, lng: dest.lng });
     }
   }
   if (stops.length > 0) stops[0] = { ...stops[0], status: 'current' };

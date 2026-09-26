@@ -78,12 +78,14 @@ function fallbackEta(features) {
  * @returns {Promise<number>} ETA in minutes
  */
 export async function predictEta(features) {
+  // Configurable for prod (sidecar on another host/port); dev default unchanged.
+  const sidecarUrl = process.env.ETA_SIDECAR_URL || 'http://127.0.0.1:5000';
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 2000);
 
   try {
-    // Attempt to call Python sidecar on localhost:5000/predict
-    const response = await fetch('http://127.0.0.1:5000/predict', {
+    // Attempt to call Python sidecar /predict
+    const response = await fetch(`${sidecarUrl}/predict`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

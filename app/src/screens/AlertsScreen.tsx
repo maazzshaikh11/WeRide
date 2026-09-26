@@ -17,6 +17,7 @@ import { useRouteStore } from '@routing/client/routeStore';
 import { useToastStore } from '../store/toastStore';
 import { subscribeToHazardClusters, submitHazardReport, triggerClustering } from '@hazard/services/hazardService';
 import { HazardCluster } from '@app/models/hazardCluster';
+import { haversineMeters } from '../utils/geoUtils';
 
 // Spec §3.7 report chips
 const CHIPS = [
@@ -87,12 +88,12 @@ export default function AlertsScreen() {
       return;
     }
     try {
-      await submitHazardReport(chip.type, lat, lng, userId, groupId, loc?.timestamp_hlc ?? '');
+      const { queued } = await submitHazardReport(chip.type, lat, lng, userId, groupId, loc?.timestamp_hlc ?? '');
       await triggerClustering(groupId);
-      push(`Hazard reported`);
+      push(queued ? 'Hazard queued — will sync when online' : 'Hazard reported', queued ? 'warn' : undefined);
     } catch (e) {
       console.warn('[AlertsScreen] submitHazardReport failed:', e);
-      push('Hazard queued — will sync when online', 'warn');
+      push('Could not submit hazard — please try again', 'error');
     }
   };
 
@@ -102,7 +103,9 @@ export default function AlertsScreen() {
         <ScreenHeader
           eyebrow="Live · shared by group"
           title="Road Alerts"
-          right={activeCount > 0 ? <LivePill variant="live" label={`${activeCount} ACTIVE`} /> : undefined}
+          right={
+            <LivePill variant={activeCount > 0 ? 'live' : 'grey'} label={`${activeCount} ACTIVE`} />
+          }
         />
 
         <View style={styles.chipRow}>
@@ -112,15 +115,24 @@ export default function AlertsScreen() {
         </View>
 
         <View style={styles.cardList}>
-          {clusters.map((c) => (
-            <AlertCard
-              key={c.cluster_id}
-              emoji={HAZARD_EMOJI[c.hazard_type] ?? '⚠️'}
-              title={`${c.hazard_type.charAt(0).toUpperCase() + c.hazard_type.slice(1)}${c.status === 'resolved' ? ' (Resolved)' : ''}`}
-              meta={`by group · ${c.report_count} report${c.report_count !== 1 ? 's' : ''} · score ${Math.round(c.hazard_score * 100)}%`}
-              isNew={newIds.has(c.cluster_id)}
-            />
-          ))}
+          {clusters.map((c) => {
+            // Demo meta pattern: "8.6 km ahead · 6 min ago".
+            const ago = timeAgo(c.created_at_hlc);
+            const dist =
+              currentLocation != null
+                ? `${(haversineMeters(currentLocation.lat, currentLocation.lng, c.centroid_lat, c.centroid_lng) / 1000).toFixed(1)} km ahead`
+                : null;
+            const meta = [dist, ago].filter(Boolean).join(' · ') || `${c.report_count} report${c.report_count !== 1 ? 's' : ''}`;
+            return (
+              <AlertCard
+                key={c.cluster_id}
+                emoji={HAZARD_EMOJI[c.hazard_type] ?? '⚠️'}
+                title={`${c.hazard_type.charAt(0).toUpperCase() + c.hazard_type.slice(1)}${c.status === 'resolved' ? ' (Resolved)' : ''}`}
+                meta={meta}
+                isNew={newIds.has(c.cluster_id)}
+              />
+            );
+          })}
           {clusters.length === 0 && <Text style={styles.empty}>No alerts yet</Text>}
         </View>
       </ScrollView>

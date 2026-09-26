@@ -1,18 +1,24 @@
 // Safety-Weighted A* routing.
 // Pure logic — testable without Express.
 //
-// Graph: adjacency list { node_id: { lat, lng, edges: [{ to, weight }] } }
+// Graph: adjacency list { node_id: { lat, lng }, edges: { id: [{ to, weight }] } }
+// Units: METERS everywhere. Edge weights must be meters; the heuristic is
+// haversineMeters. Mixing km weights with the meter heuristic overestimates
+// 1000x and voids A* optimality (fixed in Phase 3).
 // Heuristic: Haversine straight-line distance (admissible → optimal path)
 
-export function haversineMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
+import { haversineMeters, densifySegment } from './geo.js';
+// Re-exported for existing importers (tests import it from here).
+export { haversineMeters };
+
+import { v4 as uuidv4 } from 'uuid';
+import { extractEtaFeatures, predictEta } from './eta_model.js';
+import { fetchMapboxRoutes, getMapboxToken } from './mapbox_directions.js';
+import {
+  calculateSafetyScoreForPoints,
+  countHazardsNearPoints,
+  DEFAULT_HAZARD_RADIUS_M,
+} from './safety_score.js';
 
 // Min-heap for A* open set (simple array-based — ponytail: use a real heap if graph is large)
 class MinHeap {
@@ -66,51 +72,16 @@ export function astar(graph, start, goal) {
 }
 
 /**
- * Apply hazard penalties to edge weights.
- * @param {Object} graph
- * @param {Array} hazards - [{ centroid_lat, centroid_lng, hazard_type, hazard_score }]
- * @param {number} radiusM - hazards within this radius affect an edge
- * @param {Object} severityWeights - { accident: 5, oil_spill: 4, ... }
+ * Hazard penalty + safety score: single source of truth lives in
+ * hazard_penalty.js / safety_score.js. Re-exported here so existing
+ * importers (tests) keep working.
+ *
+ * NOTE: the penalty functions mutate edge weights in place (documented).
+ * Clone the graph first (cloneGraph from road_graph.js) when the base
+ * graph is shared.
  */
-export function applyHazardPenalties(graph, hazards, radiusM = 100, severityWeights = {}) {
-  const defaultSeverity = { accident: 5, oil_spill: 4, debris: 3, pothole: 2, other: 1 };
-  const sw = { ...defaultSeverity, ...severityWeights };
-
-  for (const id in graph.edges) {
-    const node = graph.nodes[id];
-    graph.edges[id] = graph.edges[id].map(edge => {
-      const toNode = graph.nodes[edge.to];
-      const midLat = (node.lat + toNode.lat) / 2;
-      const midLng = (node.lng + toNode.lng) / 2;
-      let penalty = 0;
-      for (const h of hazards) {
-        const d = haversineMeters(midLat, midLng, h.centroid_lat, h.centroid_lng);
-        if (d <= radiusM) {
-          penalty += (sw[h.hazard_type] || 1) * h.hazard_score * (1 - d / radiusM);
-        }
-      }
-      return { ...edge, weight: edge.weight * (1 + penalty) };
-    });
-  }
-  return graph;
-}
-
-/**
- * Safety score for a route.
- * 0-1, higher is safer. 1 = no hazards near route.
- */
-export function routeSafetyScore(path, graph, hazards, radiusM = 100) {
-  if (hazards.length === 0) return 1.0;
-  let totalPenalty = 0;
-  for (const nodeId of path) {
-    const node = graph.nodes[nodeId];
-    for (const h of hazards) {
-      const d = haversineMeters(node.lat, node.lng, h.centroid_lat, h.centroid_lng);
-      if (d <= radiusM) totalPenalty += h.hazard_score * (1 - d / radiusM);
-    }
-  }
-  return Math.max(0, 1 - totalPenalty / Math.max(1, hazards.length));
-}
+export { applyHazardPenaltiesToGraph as applyHazardPenalties } from './hazard_penalty.js';
+export { calculateSafetyScore as routeSafetyScore } from './safety_score.js';
 
 /**
  * Validate route_response against the contract schema (T-03, Phase 1).
@@ -172,8 +143,6 @@ function validateRouteResponse(payload) {
 }
 
 // Express handler
-import { v4 as uuidv4 } from 'uuid';
-import { extractEtaFeatures, predictEta } from './eta_model.js';
 
 /**
  * Generate HLC-format timestamp (physical:counter).
@@ -217,49 +186,111 @@ export async function handleRoute(req, res) {
       return res.status(400).json({ error: 'avoid_hazard_types must be an array' });
     }
 
-    // Phase 6 T-17: Accept real hazards from client (or fetch from Firestore)
-    const hazardsToConsider = Array.isArray(active_hazards) ? active_hazards : [];
+    // Optional extension (not in the frozen contract — extra fields tolerated):
+    // the client forwards its live hazard clusters so the server can route around them.
+    const rawHazards = Array.isArray(active_hazards) ? active_hazards : [];
+    const validHazards = rawHazards.filter(
+      (h) =>
+        h != null &&
+        typeof h.centroid_lat === 'number' &&
+        typeof h.centroid_lng === 'number' &&
+        typeof h.hazard_type === 'string'
+    );
 
-    // TODO: load road graph for the bbox (Option A: use Directions API; Option B: OSM graph)
-    // TODO: fetch active hazards from Firestore if not passed by client
-    // TODO: applyHazardPenalties, run astar, compute safety_score, call ETA model
+    // The avoid list is authoritative: empty = avoid nothing; otherwise only
+    // the listed hazard types influence routing/scoring.
+    const hazardsToAvoid = validHazards.filter((h) =>
+      avoid_hazard_types.includes(h.hazard_type)
+    );
 
-    // Mock response for now (T-04.1: schema-exact)
-    const distanceM = haversineMeters(origin.lat, origin.lng, destination.lat, destination.lng);
-    const distanceKm = distanceM / 1000;
+    const now = new Date();
+    let pathPoints; // [[lat, lng], ...] — contract order
+    let scoringPoints; // [{lat, lng}, ...] — dense geometry used for safety/ETA scoring
+    let distanceKm;
+    let turnCount = 0;
+    let hazardCount = 0;
 
-    // Phase 4: Extract ETA features and predict using LightGBM model
+    // --- Option A: Mapbox Directions base route + hazard post-processing ---
+    let mapboxCandidates = null;
+    try {
+      mapboxCandidates = await fetchMapboxRoutes(origin, destination);
+    } catch (e) {
+      console.warn(`[handleRoute] Mapbox request failed, using degraded mode: ${e.message}`);
+    }
+
+    if (mapboxCandidates && mapboxCandidates.length > 0) {
+      // Post-process: pick the candidate with the fewest hazard conflicts
+      // (ties broken by shortest distance). This is "reroute around hazards".
+      const scored = mapboxCandidates.map((c) => ({
+        candidate: c,
+        conflicts: countHazardsNearPoints(c.points, hazardsToAvoid, DEFAULT_HAZARD_RADIUS_M),
+      }));
+      scored.sort(
+        (a, b) => a.conflicts - b.conflicts || a.candidate.distanceM - b.candidate.distanceM
+      );
+      const best = scored[0];
+      hazardCount = best.conflicts;
+      turnCount = best.candidate.turnCount;
+      distanceKm = best.candidate.distanceM / 1000;
+      pathPoints = best.candidate.points.map((p) => [p.lat, p.lng]);
+      scoringPoints = best.candidate.points;
+    } else {
+      // --- Degraded mode: no Mapbox token (or Mapbox down). ---
+      // Straight-line geometry, but hazard scoring and ETA features are real.
+      if (!getMapboxToken()) {
+        console.warn(
+          '[handleRoute] MAPBOX_ACCESS_TOKEN unset — degraded straight-line routing. ' +
+            'Set the token (see docs/SETUP_CREDENTIALS.md) for road-based routes.'
+        );
+      }
+      const distanceM = haversineMeters(origin.lat, origin.lng, destination.lat, destination.lng);
+      distanceKm = distanceM / 1000;
+      pathPoints = [
+        [origin.lat, origin.lng],
+        [destination.lat, destination.lng],
+      ];
+      // Densify so hazard exposure is scored along the whole segment,
+      // not just at the two endpoints (contract path stays endpoint-to-endpoint).
+      scoringPoints = densifySegment(origin, destination, 50);
+      // Hazard exposure along the straight line, so safety still reflects reality.
+      hazardCount = countHazardsNearPoints(scoringPoints, hazardsToAvoid, DEFAULT_HAZARD_RADIUS_M);
+    }
+
+    // Safety score from real exposure along the chosen geometry.
+    const safety_score = calculateSafetyScoreForPoints(
+      scoringPoints,
+      hazardsToAvoid,
+      DEFAULT_HAZARD_RADIUS_M
+    );
+
+    // ETA: real features where computable; sidecar when reachable, heuristic fallback otherwise.
+    // avg_speed_limit has no source (Mapbox doesn't provide it) — 40 km/h documented fallback.
     const etaFeatures = extractEtaFeatures(
-      { distance_km: distanceKm },
-      new Date()
+      {
+        distance_km: distanceKm,
+        turn_count: turnCount,
+        hazard_count: hazardCount,
+        avg_speed_limit: 40,
+      },
+      now
     );
     const eta_minutes = await predictEta(etaFeatures);
 
-    // Phase 6 T-17: Compute safety score with real hazards
-    let safety_score = 0.85;
-    if (hazardsToConsider.length > 0) {
-      // Simple penalty model: reduce score by hazard density
-      // Real model would apply route-specific hazard proximity calculations
-      const hazardPenalty = Math.min(0.3, hazardsToConsider.length * 0.05);
-      safety_score = Math.max(0.5, 0.85 - hazardPenalty);
-    }
-
-    // Phase 6 T-17: Use real HLC format for recalculated_at_hlc
     const recalculated_at_hlc = generateHlcTimestamp();
 
-    const mockResponse = {
+    const response = {
       route_id: uuidv4(),
-      path_points: [[origin.lat, origin.lng], [destination.lat, destination.lng]],
+      path_points: pathPoints,
       distance_km: distanceKm,
       eta_minutes: eta_minutes,
       safety_score: safety_score,
       recalculated_at_hlc: recalculated_at_hlc,
     };
 
-    // Validate the mock response against the contract (T-04.1)
-    validateRouteResponse(mockResponse);
+    // Validate the response against the contract (§6.4)
+    validateRouteResponse(response);
 
-    res.json(mockResponse);
+    res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

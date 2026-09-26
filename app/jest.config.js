@@ -22,6 +22,7 @@ module.exports = {
     // Share the app's react/zustand across module node_modules to avoid
     // duplicate React instances (hooks "useRef of null" errors in tests).
     '^react$': '<rootDir>/node_modules/react',
+    '^react-native$': '<rootDir>/node_modules/react-native',
     '^zustand$': '<rootDir>/node_modules/zustand',
     '^zustand/(.*)$': '<rootDir>/node_modules/zustand/$1',
   },

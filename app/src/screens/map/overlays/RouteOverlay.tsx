@@ -11,7 +11,7 @@
  * - Prevents origin churn: Only recalcs when moved > 100m
  */
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 
 import { WeRideColors } from '@app/theme/theme';
@@ -45,6 +45,8 @@ export default function RouteOverlay({ groupId }: Props) {
 
   // Ride plan (Create Ride modal) — destination chosen by the user
   const destination = useRidePlanStore((s) => s.destination);
+  const planStart = useRidePlanStore((s) => s.start);
+  const planStops = useRidePlanStore((s) => s.stops);
 
   const setRoute = useRouteStore((state) => state.setRoute);
   const setCurrentLocation = useRouteStore((state) => state.setCurrentLocation);
@@ -52,6 +54,18 @@ export default function RouteOverlay({ groupId }: Props) {
   const setActiveClusters = useRouteStore((state) => state.setActiveClusters);
   const setAvoidHazardTypes = useRouteStore((state) => state.setAvoidHazardTypes);
   const setIsLoading = useRouteStore((state) => state.setIsLoading);
+
+  // Live hazard clusters → the shape POST /route expects (C-P0-5).
+  const activeHazards = React.useMemo(
+    () =>
+      activeClusters.map((c) => ({
+        centroid_lat: c.centroid_lat,
+        centroid_lng: c.centroid_lng,
+        hazard_type: c.hazard_type,
+        hazard_score: c.hazard_score,
+      })),
+    [activeClusters]
+  );
 
   // RoutingClient instance
   const clientRef = React.useRef<RoutingClient | null>(null);
@@ -98,7 +112,8 @@ export default function RouteOverlay({ groupId }: Props) {
             destination,
             groupId,
             avoidHazardTypes,
-            RECALC_DISTANCE_THRESHOLD_M
+            RECALC_DISTANCE_THRESHOLD_M,
+            activeHazards
           );
         } else {
           // First valid location, trigger initial route
@@ -107,6 +122,7 @@ export default function RouteOverlay({ groupId }: Props) {
             origin: { lat: location.lat, lng: location.lng },
             destination,
             avoid_hazard_types: avoidHazardTypes,
+            active_hazards: activeHazards,
           });
         }
       } catch (e) {
@@ -119,7 +135,7 @@ export default function RouteOverlay({ groupId }: Props) {
     return () => {
       socket.off('location:update', handleLocationUpdate);
     };
-  }, [groupId, client, avoidHazardTypes, lastValidLocation, destination, setCurrentLocation, setLastValidLocation]);
+  }, [groupId, client, avoidHazardTypes, activeHazards, lastValidLocation, destination, setCurrentLocation, setLastValidLocation]);
 
   // Phase 6 T-17: Listen to real hazard_cluster stream (Person B)
   useEffect(() => {
@@ -133,6 +149,14 @@ export default function RouteOverlay({ groupId }: Props) {
           origin: { lat: lastValidLocation.lat, lng: lastValidLocation.lng },
           destination,
           avoid_hazard_types: avoidHazardTypes,
+          // Map here (not the memoized activeHazards) — keeps this effect
+          // from resubscribing on every cluster snapshot.
+          active_hazards: clusters.map((c) => ({
+            centroid_lat: c.centroid_lat,
+            centroid_lng: c.centroid_lng,
+            hazard_type: c.hazard_type,
+            hazard_score: c.hazard_score,
+          })),
         });
       }
     });
@@ -162,6 +186,7 @@ export default function RouteOverlay({ groupId }: Props) {
         origin: { lat: lastValidLocation.lat, lng: lastValidLocation.lng },
         destination,
         avoid_hazard_types: newTypes,
+        active_hazards: activeHazards,
       });
     } catch (e) {
       console.error('Toggle avoid hazards failed:', e);
@@ -181,23 +206,58 @@ export default function RouteOverlay({ groupId }: Props) {
     return routeToGeoJsonLine(route);
   }, [route?.recalculated_at_hlc, route]);
 
-  if (!route) {
-    return null;
-  }
+  // Stop pins from the ride plan (demo shows numbered/emoji pins on the map).
+  const stopPins = useMemo(() => {
+    const pins: { id: string; lat: number; lng: number; icon: string; label: string }[] = [];
+    if (planStart) pins.push({ id: 'plan-start', lat: planStart.lat, lng: planStart.lng, icon: '🟢', label: planStart.label });
+    planStops.forEach((s, i) =>
+      pins.push({ id: s.id, lat: s.lat, lng: s.lng, icon: s.icon || `${i + 1}️⃣`, label: s.label })
+    );
+    if (destination) pins.push({ id: 'plan-destination', lat: destination.lat, lng: destination.lng, icon: '🏁', label: destination.label });
+    return pins;
+  }, [planStart, planStops, destination]);
 
-  // Route line only — the bottom sheet (RoutePanel) is rendered by MapScreen.
+  // Route line + stop pins — the bottom sheet (RoutePanel) is rendered by MapScreen.
   return (
-    <MapboxGL.ShapeSource id="routeSource" shape={routeGeoJson as any}>
-      <MapboxGL.LineLayer
-        id="routeLine"
-        style={{
-          lineColor: WeRideColors.primary,
-          lineWidth: 4,
-          lineOpacity: 0.8,
-        }}
-      />
-    </MapboxGL.ShapeSource>
+    <>
+      {routeGeoJson && (
+        <MapboxGL.ShapeSource id="routeSource" shape={routeGeoJson as any}>
+          <MapboxGL.LineLayer
+            id="routeLine"
+            style={{
+              lineColor: WeRideColors.primary,
+              lineWidth: 4,
+              lineOpacity: 0.8,
+            }}
+          />
+        </MapboxGL.ShapeSource>
+      )}
+      {stopPins.map((pin) => (
+        <MapboxGL.PointAnnotation
+          key={pin.id}
+          id={pin.id}
+          coordinate={[pin.lng, pin.lat]}
+          title={pin.label}
+        >
+          <View style={styles.pin}>
+            <Text style={styles.pinIcon}>{pin.icon}</Text>
+          </View>
+        </MapboxGL.PointAnnotation>
+      ))}
+    </>
   );
 }
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  pin: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: WeRideColors.dark2,
+    borderWidth: 2,
+    borderColor: WeRideColors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pinIcon: { fontSize: 14 },
+});

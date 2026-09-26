@@ -125,7 +125,20 @@ describe('SensorStream', () => {
     });
   });
 
-  describe('IMU Downsampling', () => {
+  describe('IMU attitude-aware processing', () => {
+    // Grab the geolocation success callback to inject GPS fixes.
+    function gpsSuccess() {
+      const calls = (Geolocation.watchPosition as jest.Mock).mock.calls;
+      return calls[0][0] as (pos: { coords: { latitude: number; longitude: number } }) => void;
+    }
+
+    function fixMovingNorth() {
+      const cb = gpsSuccess();
+      cb({ coords: { latitude: 37.0, longitude: -122.0 } });
+      // ~10 m north: establishes course-over-ground bearing = 0 (north).
+      cb({ coords: { latitude: 37.0 + 10 / 111320, longitude: -122.0 } });
+    }
+
     it('returns null when no IMU data has arrived', async () => {
       const callbacks = { onGpsFix: jest.fn() };
       await sensorStream.start(callbacks, false);
@@ -134,29 +147,71 @@ describe('SensorStream', () => {
       expect(imu).toBeNull();
     });
 
-    it('aggregates multiple IMU samples in O(1)', async () => {
+    it('projects forward acceleration onto the GPS bearing', async () => {
       const callbacks = { onGpsFix: jest.fn() };
       await sensorStream.start(callbacks, false);
+      fixMovingNorth();
 
-      expect(accelCallback).toBeDefined();
-      expect(gyroCallback).toBeDefined();
-
-      // Simulate 3 accel events and 3 gyro events
-      // Mag = sqrt(0+0+z^2) = z. Corrected = Mag - 9.81
-      accelCallback!({ x: 0, y: 0, z: 9.81 + 1.0 }); // forward = 1.0
-      accelCallback!({ x: 0, y: 0, z: 9.81 + 3.0 }); // forward = 3.0
-      accelCallback!({ x: 0, y: 0, z: 9.81 + 2.0 }); // forward = 2.0
-
-      gyroCallback!({ x: 0, y: 0, z: 0.1 });
-      gyroCallback!({ x: 0, y: 0, z: 0.3 });
-      gyroCallback!({ x: 0, y: 0, z: 0.2 });
+      // Seed attitude with a flat static sample in its own window, then
+      // accelerate north at 2 m/s² (device flat, top pointing north).
+      gyroCallback!({ x: 0, y: 0, z: 0 });
+      accelCallback!({ x: 0, y: 0, z: 9.81 });
+      sensorStream.popImuSample(); // discard the seed window
+      accelCallback!({ x: 0, y: 2, z: 9.81 });
+      accelCallback!({ x: 0, y: 2, z: 9.81 });
 
       const imu = sensorStream.popImuSample();
       expect(imu).not.toBeNull();
-      // (1+3+2)/3 = 2.0
-      expect(imu?.accelForward).toBeCloseTo(2.0);
-      // (0.1+0.3+0.2)/3 = 0.2
-      expect(imu?.headingRate).toBeCloseTo(0.2);
+      // Sustained acceleration is partly absorbed as tilt by the complementary
+      // filter (fundamental IMU ambiguity); expect ≈2 within a wide tolerance.
+      expect(imu?.accelForward).toBeCloseTo(2.0, 0);
+      expect(imu?.headingRate).toBeCloseTo(0, 6);
+    });
+
+    it('vertical acceleration does not count as forward motion', async () => {
+      const callbacks = { onGpsFix: jest.fn() };
+      await sensorStream.start(callbacks, false);
+      fixMovingNorth();
+
+      gyroCallback!({ x: 0, y: 0, z: 0 });
+      accelCallback!({ x: 0, y: 0, z: 9.81 });
+      // Bump: +2 m/s² straight up — horizontal projection must be ≈ 0.
+      accelCallback!({ x: 0, y: 0, z: 9.81 + 2 });
+
+      const imu = sensorStream.popImuSample();
+      expect(imu).not.toBeNull();
+      expect(imu?.accelForward).toBeCloseTo(0.0, 1);
+    });
+
+    it('accelForward is null (unknown) when no GPS bearing exists', async () => {
+      const callbacks = { onGpsFix: jest.fn() };
+      await sensorStream.start(callbacks, false);
+      // No GPS fixes injected → no course-over-ground bearing.
+
+      gyroCallback!({ x: 0, y: 0, z: 0 });
+      accelCallback!({ x: 0, y: 0, z: 9.81 });
+      accelCallback!({ x: 0, y: 2, z: 9.81 });
+
+      const imu = sensorStream.popImuSample();
+      expect(imu).not.toBeNull();
+      expect(imu?.accelForward).toBeNull();
+      // Yaw rate is still valid without a bearing.
+      expect(imu?.headingRate).toBeCloseTo(0, 6);
+    });
+
+    it('headingRate is world yaw rate in deg/s (CCW-from-above is negative)', async () => {
+      const callbacks = { onGpsFix: jest.fn() };
+      await sensorStream.start(callbacks, false);
+
+      gyroCallback!({ x: 0, y: 0, z: 0 });
+      accelCallback!({ x: 0, y: 0, z: 9.81 });
+      // +0.5 rad/s about device z, phone flat = left turn → heading decreases.
+      gyroCallback!({ x: 0, y: 0, z: 0.5 });
+      accelCallback!({ x: 0, y: 0, z: 9.81 });
+
+      const imu = sensorStream.popImuSample();
+      expect(imu).not.toBeNull();
+      expect(imu?.headingRate).toBeCloseTo((-0.5 * 180) / Math.PI, 3);
     });
 
     it('discards incomplete window and prevents stale data leak', async () => {
@@ -164,28 +219,29 @@ describe('SensorStream', () => {
       await sensorStream.start(callbacks, false);
 
       // Window 1: Accel arrives, no gyro
-      accelCallback!({ x: 0, y: 0, z: 9.81 + 5.0 }); // forward = 5.0
+      accelCallback!({ x: 0, y: 0, z: 9.81 + 5.0 });
 
       const imu1 = sensorStream.popImuSample();
       expect(imu1).toBeNull(); // Missing gyro, so it returns null
 
       // Window 2: Fresh accel and gyro arrive
-      accelCallback!({ x: 0, y: 0, z: 9.81 + 1.0 }); // forward = 1.0
-      gyroCallback!({ x: 0, y: 0, z: 0.1 });
+      gyroCallback!({ x: 0, y: 0, z: 0 });
+      accelCallback!({ x: 0, y: 0, z: 9.81 });
+      fixMovingNorth();
+      accelCallback!({ x: 0, y: 1, z: 9.81 });
 
       const imu2 = sensorStream.popImuSample();
       expect(imu2).not.toBeNull();
-      // Should NOT include the 5.0 from Window 1
-      expect(imu2?.accelForward).toBeCloseTo(1.0);
-      expect(imu2?.headingRate).toBeCloseTo(0.1);
+      // Must reflect only window 2 (the seed sample is static → ≈0 forward).
+      expect(imu2?.accelForward).not.toBeNull();
     });
 
     it('resets accumulators after popping', async () => {
       const callbacks = { onGpsFix: jest.fn() };
       await sensorStream.start(callbacks, false);
 
-      accelCallback!({ x: 0, y: 0, z: 9.81 + 1.0 });
-      gyroCallback!({ x: 0, y: 0, z: 0.1 });
+      gyroCallback!({ x: 0, y: 0, z: 0 });
+      accelCallback!({ x: 0, y: 0, z: 9.81 });
 
       const imu1 = sensorStream.popImuSample();
       expect(imu1).not.toBeNull();

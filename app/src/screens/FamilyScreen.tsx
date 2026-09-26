@@ -1,9 +1,9 @@
 /**
  * FamilyScreen — family tracking tab (spec §3.6).
  * Toggle card, copy-link row, member list with status badges.
- * Data: GroupService members (Person C) + appStore.familySharingEnabled.
+ * Family circle + appStore.familySharingEnabled.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -14,7 +14,6 @@ import FamilyToggle from '../components/FamilyToggle';
 import FamilyMemberCard from '../components/FamilyMemberCard';
 import { useAppStore } from '../store/appStore';
 import { useToastStore } from '../store/toastStore';
-import { GroupService, Group } from '@routing/group/groupService';
 
 export default function FamilyScreen() {
   const groupId = useAppStore((s) => s.groupId);
@@ -22,26 +21,17 @@ export default function FamilyScreen() {
   const setFamilySharingEnabled = useAppStore((s) => s.setFamilySharingEnabled);
   const push = useToastStore((s) => s.push);
   const [copied, setCopied] = useState(false);
-  const [group, setGroup] = useState<Group | null>(null);
-
-  // Fetch group metadata for member list (Person C's GroupService, unmodified)
-  useEffect(() => {
-    if (!groupId) return;
-    const groupService = new GroupService();
-    let mounted = true;
-    const unsubscribe = groupService.myGroups((groups) => {
-      if (!mounted) return;
-      const match = groups.find((g) => g.id === groupId) ?? groups[0] ?? null;
-      setGroup(match);
-    });
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
-  }, [groupId]);
-
-  const members = useMemo(() => (group?.member_ids ?? []).slice(0, 12), [group]);
   const trackingLink = `https://weride.app/track/${groupId ?? 'unknown'}`;
+
+  // Family circle (demo/spec §3.6). TODO: source from the user's contacts.
+  const familyMembers = useMemo(
+    () => [
+      { name: 'Mom', color: '#EC4899', status: 'safe' as const, meta: 'Last checked · just now' },
+      { name: 'Dad', color: '#3B82F6', status: 'safe' as const, meta: 'Last checked · 2 min ago' },
+      { name: 'Hritika', color: '#FBBF24', status: 'watching' as const, meta: 'Viewing live map now' },
+    ],
+    []
+  );
 
   const copyLink = () => {
     try {
@@ -94,15 +84,16 @@ export default function FamilyScreen() {
 
         <Text style={styles.sectionLabel}>WATCHING THIS RIDE</Text>
 
-        {members.map((memberId, i) => (
+        {familyMembers.map((m) => (
           <FamilyMemberCard
-            key={memberId}
-            name={i === 0 ? 'Group Creator' : `Rider ${memberId.slice(-4)}`}
-            meta="Last checked · just now"
-            status="safe"
+            key={m.name}
+            name={m.name}
+            meta={m.meta}
+            status={m.status}
+            color={m.color}
           />
         ))}
-        {members.length === 0 && <Text style={styles.empty}>No members yet</Text>}
+        {familyMembers.length === 0 && <Text style={styles.empty}>No members yet</Text>}
       </ScrollView>
     </SafeAreaView>
   );

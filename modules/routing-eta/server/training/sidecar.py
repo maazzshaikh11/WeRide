@@ -31,6 +31,7 @@ Requires:
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -49,10 +50,10 @@ MODEL = None
 
 
 def load_model():
-    """Load LightGBM model from eta_model.txt."""
+    """Load LightGBM model (MODEL_PATH env, default: eta_model.txt next to this file)."""
     global MODEL
 
-    model_path = Path(__file__).parent / 'eta_model.txt'
+    model_path = Path(os.environ.get('MODEL_PATH', Path(__file__).parent / 'eta_model.txt'))
 
     if not model_path.exists():
         raise FileNotFoundError(f'Model file not found: {model_path}')
@@ -131,12 +132,13 @@ def main():
         print('Train the model first: python train_eta.py')
         sys.exit(1)
 
-    print('Starting Flask server on http://127.0.0.1:5000...')
+    print('Starting ETA sidecar...')
     print('Press Ctrl+C to stop')
     print()
 
-    # Run on localhost, port 5000
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    # PORT env for prod (e.g. Cloud Run); dev default 5000 on localhost.
+    port = int(os.environ.get('PORT', '5000'))
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 
 if __name__ == '__main__':

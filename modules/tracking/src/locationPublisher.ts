@@ -4,11 +4,7 @@
  * Ported from location_publisher.dart.
  */
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import { Socket } from 'socket.io-client';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore unresolved when compiled from app context (deps live in module node_modules)
 import firestore from '@react-native-firebase/firestore';
 
 export interface LocationPublisherParams {
@@ -92,7 +88,33 @@ export class LocationPublisher {
     }
   }
 
+  /**
+   * Task 3.2: Late-joiner read — all riders in a group.
+   * Returns the raw Firestore documents (snake_case, as written by publish())
+   * so they can be fed straight into ridersStore.seedRiders().
+   */
+  async fetchGroupLastKnown(groupId: string): Promise<unknown[]> {
+    try {
+      const snap = await this._firestore
+        .collection('groups')
+        .doc(groupId)
+        .collection('locations')
+        .get();
+      if (!snap || snap.empty) return [];
+      return snap.docs.map((d: { data: () => unknown }) => d.data());
+    } catch (err) {
+      console.warn('[LocationPublisher] fetchGroupLastKnown failed:', err);
+      return [];
+    }
+  }
+
   publish(p: VerifiedLocationPayload): void {
+    // Never emit an invalid fix: a NaN/Infinity lat/lng (e.g. from a failed
+    // EKF update) must not reach the group. The store also rejects these.
+    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) {
+      console.warn('[LocationPublisher] Dropped invalid payload (non-finite lat/lng).');
+      return;
+    }
     const payload = {
       rider_id: this.riderId,
       group_id: this.groupId,

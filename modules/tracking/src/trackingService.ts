@@ -108,10 +108,10 @@ export class TrackingService {
     const imuSample = this._sensors.popImuSample();
 
     if (imuSample) {
-      // Convert heading rate from rad/s to deg/s (gyroscope provides rad/s)
-      const headingRateDegPerSec = (imuSample.headingRate * 180) / Math.PI;
-      // Predict: pass acceleration (not speed) for IMU dead-reckoning
-      this._ekf.predict(dt, imuSample.accelForward, headingRateDegPerSec);
+      // accelForward is null when the GPS bearing is unknown: fall back to a
+      // GPS-only constant-velocity prediction rather than inventing data.
+      // headingRate is the world-frame gyro yaw rate (valid in any orientation).
+      this._ekf.predict(dt, imuSample.accelForward ?? 0, imuSample.headingRate);
     }
 
     // Advance HLC then immediately persist so restart-recovery always has latest state.

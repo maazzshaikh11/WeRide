@@ -44,6 +44,9 @@ export const DEFAULT_SEVERITY_WEIGHTS = {
  */
 export const DEFAULT_HAZARD_RADIUS_M = 100;
 
+import { haversineMeters } from './geo.js';
+export { haversineMeters };
+
 /**
  * Calculate penalty for a single edge given active hazards.
  * 
@@ -94,8 +97,9 @@ export function calculateHazardPenalty(
 
 /**
  * Apply hazard penalties to all edges in a graph.
- * Modifies the graph in-place: edge.weight *= (1 + penalty)
- * 
+ * MUTATES the graph in place: edge.weight *= (1 + penalty).
+ * Clone first (cloneGraph from road_graph.js) when the base graph is shared.
+ *
  * @param {Object} graph - { nodes: {...}, edges: {...} }
  * @param {Array} hazards - active hazards
  * @param {number} radiusM - hazard effect radius
@@ -133,21 +137,3 @@ export function applyHazardPenaltiesToGraph(
   }
 }
 
-/**
- * Haversine distance in meters between two coordinates.
- * (Imported from astar.js to avoid circular deps; re-defined here for clarity.)
- */
-function haversineMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000; // Earth radius in meters
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-export { haversineMeters };

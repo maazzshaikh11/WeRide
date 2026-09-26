@@ -69,19 +69,23 @@ export const WeRideColors = {
 
 /**
  * Typography tokens (spec §1.2).
- * Custom fonts (Bebas Neue, Inter, Space Mono) fall back to system fonts
- * when not bundled: Bebas → bold sans-serif, Space Mono → monospace,
- * Inter → default sans-serif. Font family constants reference the
- * post-link names; RN falls back automatically when unregistered.
+ * Custom fonts are bundled (app/assets/fonts, Android assets, iOS UIAppFonts).
+ * Family strings are the PostScript names, which resolve on BOTH platforms:
+ * iOS matches UIAppFonts by PostScript name; Android matches the file name
+ * in assets/fonts (files are named <PostScriptName>.ttf).
  */
 export const WeRideFonts = {
-  display: 'BebasNeue',       // page-level titles
-  heading: 'BebasNeue',       // screen titles, modal headings
-  body: 'Inter',              // default body text
-  mono: 'SpaceMono',         // technical/status/badge elements
+  display: 'BebasNeue-Regular',   // page-level titles
+  heading: 'BebasNeue-Regular',   // screen titles, modal headings
+  body: 'Inter-Regular',          // default body text
+  bodyMedium: 'Inter-Medium',     // spec body 500
+  bodySemibold: 'Inter-SemiBold', // spec body 600 (ride names, card titles)
+  bodyBold: 'Inter-Bold',         // spec body 700 (emphasized)
+  mono: 'SpaceMono-Regular',      // technical/status/badge elements
+  monoBold: 'SpaceMono-Bold',     // spec badge 700 (pills, initials)
   // Legacy aliases kept for existing imports
-  primary: 'Inter',
-  headline: 'BebasNeue',
+  primary: 'Inter-Regular',
+  headline: 'BebasNeue-Regular',
 } as const;
 
 /** Spacing scale (spec §1.3). */

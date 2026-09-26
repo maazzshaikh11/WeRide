@@ -10,6 +10,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { WeRideColors, WeRideFonts, safetyScoreColor } from '@app/theme/theme';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useRidersStore } from '@app/store/ridersStore';
+import { useAppStore } from '@app/store/appStore';
+import { useRidePlanStore } from '@app/store/ridePlanStore';
+import { useStopsStore } from '@app/store/stopsStore';
 import BottomSheet from './BottomSheet';
 import StatBox from './StatBox';
 import AvatarStack from './AvatarStack';
@@ -23,8 +26,8 @@ interface Props {
   duckReason?: string | null;
 }
 
-const COLLAPSED_HEIGHT = 150;
-const MAX_HEIGHT = 320;
+const COLLAPSED_HEIGHT = 208;
+const MAX_HEIGHT = 380;
 
 export default function RoutePanel({
   avoidHazards = false,
@@ -35,11 +38,31 @@ export default function RoutePanel({
   const route = useRouteStore((s) => s.route);
   const isLoading = useRouteStore((s) => s.isLoading);
   const riders = useRidersStore((s) => s.riders);
+  const rideStartedAt = useAppStore((s) => s.rideStartedAt);
+  const planStart = useRidePlanStore((s) => s.start);
+  const planDestination = useRidePlanStore((s) => s.destination);
+  const stops = useStopsStore((s) => s.stops);
 
   const riderNames = Array.from(riders.keys());
   const eta = route ? Math.round(route.eta_minutes) : null;
   const distance = route ? route.distance_km.toFixed(1) : null;
   const safety = route?.safety_score ?? null;
+
+  // Demo meta: "Pune → Lonavala · started 38 min ago" (spec §3.3.8).
+  const shortLabel = (label?: string | null) => label?.split(',')[0] ?? null;
+  const originLabel = shortLabel(planStart?.label);
+  const destLabel = shortLabel(planDestination?.label);
+  const routeLabel =
+    originLabel && destLabel ? `${originLabel} → ${destLabel}` : destLabel ? `→ ${destLabel}` : null;
+  const startedAgo =
+    rideStartedAt != null ? `started ${Math.max(1, Math.round((Date.now() - rideStartedAt) / 60000))} min ago` : null;
+  const metaText = isLoading
+    ? 'Recalculating…'
+    : [routeLabel, startedAgo].filter(Boolean).join(' · ') || 'Route active';
+
+  // Next stop from the real stops store (demo: "☕ Chai Pt").
+  const currentStop = stops.find((s) => s.status === 'current') ?? stops.find((s) => s.status === 'upcoming');
+  const nextStopText = currentStop ? `${currentStop.icon} ${currentStop.name}` : '—';
 
   return (
     <BottomSheet collapsedHeight={COLLAPSED_HEIGHT} maxHeight={MAX_HEIGHT}>
@@ -57,7 +80,7 @@ export default function RoutePanel({
                 {riderNames.length} rider{riderNames.length !== 1 ? 's' : ''} · Convoy synced
               </Text>
               <Text style={styles.rideMeta}>
-                {isLoading ? 'Recalculating…' : 'Route active'}
+                {metaText}
               </Text>
             </View>
 
@@ -75,16 +98,17 @@ export default function RoutePanel({
                 <>
                   <StatBox value={distance ?? '—'} label="km left" />
                   <StatBox value={eta != null ? String(eta) : '—'} label="min eta" />
-                  <StatBox value="☕ —" label="next stop" display={false} />
+                  <StatBox value={nextStopText} label="next stop" display={false} />
                 </>
               )}
             </View>
 
+            {/* Row 4: music mini-player (demo shows it in the collapsed sheet) */}
+            <MusicPlayer duckReason={duckReason} />
+
             {/* Expanded content */}
             {expanded && (
               <ScrollView style={styles.expanded} pointerEvents="box-none">
-                <MusicPlayer duckReason={duckReason} />
-
                 {/* Safety score bar (spec §4.6) */}
                 <View style={styles.safetyRow}>
                   <Text style={styles.safetyLabel}>Safety score</Text>

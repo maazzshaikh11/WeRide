@@ -159,7 +159,7 @@ describe('StopsScreen', () => {
     const joined = texts.join(' ');
     expect(joined).toContain('Planned Stops');
     expect(joined).toContain('Destination');
-    expect(joined).toContain('current');
+    expect(joined).toContain('Up next'); // demo tag label, not the raw 'current' status
   });
 
   test('tapping the current stop marks it done and pushes a toast', () => {

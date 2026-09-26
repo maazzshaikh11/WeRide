@@ -118,3 +118,67 @@ test('POST /route path_points follow straight-line mock', async () => {
   assert.deepEqual(res.data.path_points[0], [40.7128, -74.006]);
   assert.deepEqual(res.data.path_points[1], [40.7140, -74.0089]);
 });
+
+test('POST /route honors avoid_hazard_types: avoided hazard lowers safety', async () => {
+  // Hazard sits exactly on the straight-line path (midpoint).
+  const hazardOnPath = {
+    centroid_lat: (40.7128 + 40.7140) / 2,
+    centroid_lng: (-74.006 + -74.0089) / 2,
+    hazard_type: 'accident',
+    hazard_score: 0.9,
+  };
+  const req = mockReq({
+    group_id: 'group-123',
+    origin: { lat: 40.7128, lng: -74.006 },
+    destination: { lat: 40.7140, lng: -74.0089 },
+    avoid_hazard_types: ['accident'],
+    active_hazards: [hazardOnPath],
+  });
+
+  const res = mockRes();
+  await handleRoute(req, res);
+
+  assert.equal(res.status_code, 200);
+  assert.doesNotThrow(() => validateRouteResponse(res.data));
+  assert.ok(res.data.safety_score < 1.0,
+    `hazard on path should lower safety, got ${res.data.safety_score}`);
+});
+
+test('POST /route ignores hazards not in avoid_hazard_types', async () => {
+  const hazardOnPath = {
+    centroid_lat: (40.7128 + 40.7140) / 2,
+    centroid_lng: (-74.006 + -74.0089) / 2,
+    hazard_type: 'accident',
+    hazard_score: 0.9,
+  };
+  const req = mockReq({
+    group_id: 'group-123',
+    origin: { lat: 40.7128, lng: -74.006 },
+    destination: { lat: 40.7140, lng: -74.0089 },
+    avoid_hazard_types: ['pothole'], // accident not avoided
+    active_hazards: [hazardOnPath],
+  });
+
+  const res = mockRes();
+  await handleRoute(req, res);
+
+  assert.equal(res.status_code, 200);
+  assert.equal(res.data.safety_score, 1.0,
+    `non-avoided hazard must not affect safety, got ${res.data.safety_score}`);
+});
+
+test('POST /route tolerates malformed active_hazards entries', async () => {
+  const req = mockReq({
+    group_id: 'group-123',
+    origin: { lat: 40.7128, lng: -74.006 },
+    destination: { lat: 40.7140, lng: -74.0089 },
+    avoid_hazard_types: ['accident'],
+    active_hazards: [null, { hazard_type: 'accident' }, 'junk'],
+  });
+
+  const res = mockRes();
+  await handleRoute(req, res);
+
+  assert.equal(res.status_code, 200);
+  assert.doesNotThrow(() => validateRouteResponse(res.data));
+});

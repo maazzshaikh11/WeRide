@@ -1,4 +1,4 @@
-﻿const React = require('react');
+const React = require('react');
 
 function AnimatedValue(value) {
   this._value = value || 0;
@@ -25,6 +25,14 @@ const Image = function Image(props) {
   return React.createElement('Image', props, props.children);
 };
 
+const Pressable = function Pressable(props) {
+  return React.createElement('Pressable', props, props.children);
+};
+
+const ScrollView = function ScrollView(props) {
+  return React.createElement('ScrollView', props, props.children);
+};
+
 const Animated = {
   Value: AnimatedValue,
   timing: jest.fn(function(_anim, _config) {
@@ -47,6 +55,10 @@ const Animated = {
     };
   }),
   diffClamp: jest.fn(),
+  // The app's shared UI primitives wrap Pressable in an animated component at import time.
+  createAnimatedComponent: function(Component) { return Component; },
+  spring: jest.fn(function() { return { start: function(cb) { if (cb) cb({ finished: true }); }, stop: function() {} }; }),
+  parallel: jest.fn(function() { return { start: function(cb) { if (cb) cb({ finished: true }); }, stop: function() {} }; }),
   View: function AnimatedView(props) {
     return React.createElement('Animated.View', props, props.children);
   },
@@ -58,6 +70,12 @@ module.exports = {
   Text,
   TouchableOpacity,
   Image,
+  Pressable,
+  ScrollView,
+  TextInput: function TextInput(props) { return React.createElement('TextInput', props, props.children); },
+  Vibration: { vibrate: jest.fn(), cancel: jest.fn() },
+  useColorScheme: function() { return 'dark'; },
+  useWindowDimensions: function() { return { width: 375, height: 667, scale: 2, fontScale: 1 }; },
   StyleSheet: {
     create: function(styles) { return styles; },
     flatten: function(style) { return style; },

@@ -68,24 +68,28 @@ export const WeRideColors = {
 } as const;
 
 /**
- * Typography tokens (spec §1.2).
+ * Typography tokens (spec §1.2) — Fraunces for display, Figtree for UI text.
  * Custom fonts are bundled (app/assets/fonts, Android assets, iOS UIAppFonts).
  * Family strings are the PostScript names, which resolve on BOTH platforms:
  * iOS matches UIAppFonts by PostScript name; Android matches the file name
  * in assets/fonts (files are named <PostScriptName>.ttf).
  */
 export const WeRideFonts = {
-  display: 'BebasNeue-Regular',   // page-level titles
-  heading: 'BebasNeue-Regular',   // screen titles, modal headings
-  body: 'Inter-Regular',          // default body text
-  bodyMedium: 'Inter-Medium',     // spec body 500
-  bodySemibold: 'Inter-SemiBold', // spec body 600 (ride names, card titles)
-  bodyBold: 'Inter-Bold',         // spec body 700 (emphasized)
-  mono: 'SpaceMono-Regular',      // technical/status/badge elements
-  monoBold: 'SpaceMono-Bold',     // spec badge 700 (pills, initials)
+  display: 'Fraunces-SemiBold',   // large titles and stat numbers (soft serif)
+  heading: 'Fraunces-SemiBold',   // screen titles, modal headings
+  body: 'Figtree-Regular',        // default body text
+  bodyMedium: 'Figtree-Medium',
+  bodySemibold: 'Figtree-SemiBold', // ride names, card titles, buttons
+  bodyBold: 'Figtree-Bold',         // emphasised values
+  // `mono*` names are kept so existing call sites don't churn; labels, eyebrows
+  // and badges now use Figtree like the rest of the UI.
+  mono: 'Figtree-Medium',
+  monoBold: 'Figtree-Bold',
+  /** A real monospace, only where character clarity matters (join codes). */
+  code: 'SpaceMono-Bold',
   // Legacy aliases kept for existing imports
-  primary: 'Inter-Regular',
-  headline: 'BebasNeue-Regular',
+  primary: 'Figtree-Regular',
+  headline: 'Fraunces-SemiBold',
 } as const;
 
 /** Spacing scale (spec §1.3). */

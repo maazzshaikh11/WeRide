@@ -99,21 +99,18 @@ describe('WeRide Theme', () => {
 
   describe('WeRideFonts', () => {
     it('exports font configuration', () => {
-      // Phase 4 P0 fix: values are the bundled fonts' PostScript names, which
-      // resolve on BOTH platforms (iOS UIAppFonts matches PostScript name;
-      // Android matches the file name in assets/fonts). The old values
-      // ('Inter', 'BebasNeue') resolved on neither iOS nor Android.
-      expect(WeRideFonts.primary).toBe('Inter-Regular');
-      expect(WeRideFonts.heading).toBe('BebasNeue-Regular');
-      expect(WeRideFonts.mono).toBe('SpaceMono-Regular');
-      expect(WeRideFonts.bodyBold).toBe('Inter-Bold');
-      expect(WeRideFonts.monoBold).toBe('SpaceMono-Bold');
+      // Values are the bundled fonts' PostScript names, which resolve on BOTH
+      // platforms (iOS UIAppFonts matches PostScript name; Android matches the file
+      // name in assets/fonts).
+      expect(WeRideFonts.primary).toBe('Figtree-Regular');
+      expect(WeRideFonts.heading).toBe('Fraunces-SemiBold');
+      expect(WeRideFonts.bodyBold).toBe('Figtree-Bold');
+      expect(WeRideFonts.code).toBe('SpaceMono-Bold');
     });
 
-    it('separates display and body font families per master spec', () => {
-      // Master spec §1.2: Bebas Neue for display, Inter for body, Space Mono for badges
+    it('separates display (Fraunces) and body (Figtree) families', () => {
       expect(WeRideFonts.heading).toBe(WeRideFonts.display);
-      expect(WeRideFonts.body).toBeDefined();
+      expect(WeRideFonts.display).not.toBe(WeRideFonts.body);
     });
   });
 

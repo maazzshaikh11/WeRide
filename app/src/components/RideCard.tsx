@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     paddingTop: WeRideSpacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: WeRideColors.border,
   },
   stat: { flex: 1, minWidth: 0 },
-  statValue: { fontFamily: WeRideFonts.monoBold, fontSize: 14, lineHeight: 18, color: WeRideColors.text },
+  statValue: { fontFamily: WeRideFonts.bodyBold, fontSize: 15, lineHeight: 20, color: WeRideColors.text, fontVariant: ['tabular-nums'] },
   statLabel: { ...type.label, marginTop: 2, letterSpacing: 0.8, textTransform: 'uppercase' },
   foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: WeRideSpacing.md, gap: WeRideSpacing.sm },
   avatars: { flexDirection: 'row', alignItems: 'center' },
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   more: { backgroundColor: WeRideColors.dark },
-  avatarText: { fontFamily: WeRideFonts.monoBold, fontSize: 11, lineHeight: 14, color: WeRideColors.onPrimary },
+  avatarText: { fontFamily: WeRideFonts.bodyBold, fontSize: 11, lineHeight: 14, color: WeRideColors.onPrimary },
   footRight: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.md },
   view: { ...type.eyebrow },
 });

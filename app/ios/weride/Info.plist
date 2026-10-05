@@ -26,12 +26,11 @@
 	<true/>
 	<key>UIAppFonts</key>
 	<array>
-		<string>BebasNeue-Regular.ttf</string>
-		<string>Inter-Regular.ttf</string>
-		<string>Inter-Medium.ttf</string>
-		<string>Inter-SemiBold.ttf</string>
-		<string>Inter-Bold.ttf</string>
-		<string>SpaceMono-Regular.ttf</string>
+		<string>Figtree-Regular.ttf</string>
+		<string>Figtree-Medium.ttf</string>
+		<string>Figtree-SemiBold.ttf</string>
+		<string>Figtree-Bold.ttf</string>
+		<string>Fraunces-SemiBold.ttf</string>
 		<string>SpaceMono-Bold.ttf</string>
 	</array>
 	<key>NSAppTransportSecurity</key>

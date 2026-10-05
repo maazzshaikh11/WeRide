@@ -597,7 +597,8 @@ const styles = StyleSheet.create({
   },
   backText: { ...type.bodyStrong },
   headerTitles: { flex: 1, justifyContent: 'center' },
-  title: { ...type.titleSm },
+  // Compact chrome over the map: the ride name must fit beside the back chip and the live pill.
+  title: { ...type.titleSm, fontSize: 18, lineHeight: 24 },
   bannerWrap: { position: 'absolute', left: 0, right: 0, zIndex: 20 },
   noGroup: {
     flex: 1,

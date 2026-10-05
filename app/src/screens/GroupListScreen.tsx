@@ -616,7 +616,7 @@ const styles = StyleSheet.create({
   meta: { marginTop: WeRideSpacing.xs },
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.xs },
   codeChip: {
-    fontFamily: WeRideFonts.monoBold,
+    fontFamily: WeRideFonts.code,
     fontSize: 13,
     lineHeight: 16,
     letterSpacing: 1.5,

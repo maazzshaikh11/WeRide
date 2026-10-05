@@ -19,7 +19,7 @@ import VoiceScreen from '../screens/VoiceScreen';
 import FamilyScreen from '../screens/FamilyScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import HistoryScreen from '../screens/HistoryScreen';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
+import { WeRideColors, WeRideRadius } from '../theme/theme';
 import { type } from '../theme/typography';
 import { PressableScale, Motion, useReducedMotion, haptic } from '../ui';
 
@@ -104,7 +104,8 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
   }, [focused, t]);
 
   return (
-    <View>
+    // Fills the tab slot so the (wider) bold active label is never clipped.
+    <View style={styles.labelWrap}>
       <Animated.Text
         style={[type.label, styles.label, { color: WeRideColors.textSub, opacity: t.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
         numberOfLines={1}
@@ -218,6 +219,7 @@ const styles = StyleSheet.create({
     borderRadius: WeRideRadius.sm,
     backgroundColor: WeRideColors.primary,
   },
-  labelActive: { position: 'absolute', left: -WeRideSpacing.sm, right: -WeRideSpacing.sm, textAlign: 'center' },
+  labelWrap: { alignSelf: 'stretch' },
+  labelActive: { position: 'absolute', left: 0, right: 0, textAlign: 'center' },
   label: { letterSpacing: 0, textAlign: 'center' },
 });

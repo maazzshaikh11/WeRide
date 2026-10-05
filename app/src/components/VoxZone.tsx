@@ -1,93 +1,48 @@
 /**
- * VoxZone — bottom microphone zone on VoiceScreen (spec §3.5).
- * States: idle ("CHANNEL OPEN · AUTO-VOICE"), speaking ("YOU ARE SPEAKING…"),
- * muted ("YOUR MIC MUTED"), connecting, disconnected.
+ * VoxZone — voice channel status block on VoiceScreen (spec §3.5).
+ * States: idle, speaking, muted, connecting, disconnected. Each has a label
+ * (never colour alone) and a plain one-line explanation, overridable via `detail`.
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideSpacing } from '../theme/theme';
+import { type } from '../theme/typography';
 
 export type VoxState = 'idle' | 'speaking' | 'muted' | 'connecting' | 'disconnected';
 
 interface Props {
   state: VoxState;
+  /** Replaces the default explanation line. */
+  detail?: string;
 }
 
-const LABELS: Record<VoxState, { label: string; color: string }> = {
-  idle:         { label: 'CHANNEL OPEN · AUTO-VOICE', color: WeRideColors.green },
-  speaking:     { label: 'YOU ARE SPEAKING…', color: WeRideColors.green },
-  muted:        { label: 'YOUR MIC MUTED', color: WeRideColors.textSub },
-  connecting:    { label: 'CONNECTING…', color: WeRideColors.gold },
-  disconnected: { label: 'VOICE UNAVAILABLE', color: WeRideColors.red },
+// VoxClient (modules/fl-voice) only joins the signalling room today: peer
+// connections / audio relay are TODO there, so connected states say so.
+const AUDIO_NOTE = 'Connected to the group channel. Rider-to-rider audio is not live yet.';
+
+const COPY: Record<VoxState, { label: string; color: string; detail: string }> = {
+  idle:         { label: 'Channel open', color: WeRideColors.green, detail: AUDIO_NOTE },
+  speaking:     { label: 'You are speaking', color: WeRideColors.green, detail: AUDIO_NOTE },
+  muted:        { label: 'Your mic is muted', color: WeRideColors.textSub, detail: AUDIO_NOTE },
+  connecting:   { label: 'Connecting', color: WeRideColors.gold, detail: 'Setting up your microphone and the group channel.' },
+  disconnected: { label: 'Not connected', color: WeRideColors.red, detail: 'You are not in the voice channel.' },
 };
 
-export default function VoxZone({ state }: Props) {
-  const l = LABELS[state];
-  const ringColor =
-    state === 'disconnected' ? WeRideColors.red :
-    state === 'connecting' ? WeRideColors.gold :
-    state === 'muted' ? '#333333' :
-    WeRideColors.green;
-
+export default function VoxZone({ state, detail }: Props) {
+  const c = COPY[state];
   return (
-    <View style={styles.zone}>
-      <View style={styles.ringWrap}>
-        <View style={[styles.ring, { borderColor: ringColor, opacity: state === 'idle' ? 0 : 1 }]} />
-        <View
-          style={[
-            styles.core,
-            { borderColor: ringColor },
-            state === 'speaking' && styles.coreSpeaking,
-            state === 'muted' && styles.coreMuted,
-          ]}
-          accessibilityLabel={`Microphone status: ${l.label}`}
-        >
-          <Text style={styles.mic}>🎙️</Text>
-        </View>
+    <View style={styles.zone} accessible accessibilityLabel={`Voice status: ${c.label}. ${detail ?? c.detail}`}>
+      <View style={styles.statusRow}>
+        <View style={[styles.dot, { backgroundColor: c.color }]} />
+        <Text style={type.heading}>{c.label}</Text>
       </View>
-      <Text style={[styles.label, { color: l.color }]}>{l.label}</Text>
-      <Text style={styles.sub}>
-        Mic activates automatically when you speak — no buttons, hands stay on the bars.
-      </Text>
+      <Text style={type.caption}>{detail ?? c.detail}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  zone: { alignItems: 'center', paddingBottom: 24 },
-  ringWrap: { width: 66, height: 66, position: 'relative', justifyContent: 'center', alignItems: 'center' },
-  ring: {
-    position: 'absolute',
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    borderWidth: 2,
-  },
-  core: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    backgroundColor: WeRideColors.dark3,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  coreSpeaking: { backgroundColor: WeRideColors.greenDim },
-  coreMuted: { opacity: 0.5 },
-  mic: { fontSize: 22 },
-  label: {
-    fontFamily: WeRideFonts.mono,
-    fontSize: 10,
-    letterSpacing: 0.5,
-    marginTop: 8,
-  },
-  sub: {
-    fontFamily: WeRideFonts.body,
-    fontSize: 9.5,
-    color: WeRideColors.textSub,
-    textAlign: 'center',
-    maxWidth: 220,
-    marginTop: 6,
-    lineHeight: 14,
-  },
+  zone: { gap: WeRideSpacing.xs },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.sm },
+  dot: { width: 10, height: 10, borderRadius: 5 },
 });

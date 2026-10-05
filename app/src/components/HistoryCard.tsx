@@ -1,9 +1,13 @@
 /**
- * HistoryCard — ride history summary card (spec §3.8).
+ * HistoryCard — ride summary card (spec §3.8).
+ * Shows only real figures passed in via `stats`; the share action sends the
+ * same figures as plain text through the system share sheet.
  */
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Pressable, Share } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
+import { type } from '../theme/typography';
+import StatBox from './StatBox';
 
 interface Stat {
   label: string;
@@ -12,53 +16,48 @@ interface Stat {
 
 interface Props {
   name: string;
-  meta: string;           // "In progress · today" or "12 Aug · 6 riders"
+  meta: string;           // "In progress" or "12 Aug · 6 riders"
   active?: boolean;
   stats: Stat[];
 }
 
-export default function HistoryCard({ name, meta, active, stats }: Props) {
-  const [copied, setCopied] = useState(false);
+export function rideShareMessage(name: string, stats: Stat[]): string {
+  const figures = stats.map((s) => `${s.value} ${s.label}`).join(', ');
+  return figures ? `WeRide ride: ${name} (${figures})` : `WeRide ride: ${name}`;
+}
 
+export default function HistoryCard({ name, meta, active, stats }: Props) {
   const share = () => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-    Share.share({ message: `WeRide ride: ${name}` }).catch(() => {
-      // Share unavailable (e.g. test env) — still show "Card ready ✓" per spec.
+    Share.share({ message: rideShareMessage(name, stats) }).catch(() => {
+      // User dismissed or the share sheet is unavailable — nothing to recover.
     });
   };
 
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.name}>{name}</Text>
-        <Text style={[styles.meta, active && styles.metaActive]}>
-          {active ? '🟢 ' : ''}{meta}
+        <Text style={[type.heading, styles.name]} numberOfLines={1}>
+          {name}
         </Text>
-      </View>
-
-      {/* SVG route line placeholder (spec: horizontal line placeholder) */}
-      <View style={styles.routeLineWrap}>
-        <View style={styles.routeLine} />
-        <View style={[styles.routeDot, styles.routeDotLeft]} />
-        <View style={[styles.routeDot, styles.routeDotRight, active && styles.routeDotActive]} />
+        <View style={styles.metaWrap}>
+          {active ? <View style={styles.activeDot} /> : null}
+          <Text style={[type.caption, active && styles.metaActive]}>{meta}</Text>
+        </View>
       </View>
 
       <View style={styles.statsRow}>
         {stats.map((s) => (
-          <Text key={s.label} style={styles.stat}>
-            <Text style={styles.statValue}>{s.value}</Text> {s.label}
-          </Text>
+          <StatBox key={s.label} value={s.value} label={s.label} style={styles.stat} />
         ))}
       </View>
 
       <Pressable
-        style={styles.shareBtn}
+        style={({ pressed }) => [styles.shareBtn, pressed && styles.pressed]}
         onPress={share}
         accessibilityLabel={`Share ride card for ${name}`}
         accessibilityRole="button"
       >
-        <Text style={styles.shareText}>{copied ? 'Card ready ✓' : 'Share ride card 📤'}</Text>
+        <Text style={[type.buttonSm, { color: WeRideColors.primary }]}>Share ride</Text>
       </Pressable>
     </View>
   );
@@ -69,37 +68,25 @@ const styles = StyleSheet.create({
     backgroundColor: WeRideColors.dark3,
     borderWidth: 1,
     borderColor: WeRideColors.border,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: WeRideRadius.xl,
+    padding: WeRideSpacing.lg,
+    gap: WeRideSpacing.md,
   },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  name: { fontFamily: WeRideFonts.body, fontSize: 13, fontWeight: '700', color: WeRideColors.white },
-  meta: { fontFamily: WeRideFonts.body, fontSize: 9.5, color: WeRideColors.textSub },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: WeRideSpacing.md },
+  name: { flex: 1 },
+  metaWrap: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.xs },
+  activeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: WeRideColors.green },
   metaActive: { color: WeRideColors.green },
-  routeLineWrap: { position: 'relative', height: 28, marginVertical: 8, justifyContent: 'center' },
-  routeLine: { height: 2, backgroundColor: WeRideColors.border },
-  routeDot: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: WeRideColors.textSub,
-    top: 13,
-  },
-  routeDotLeft: { left: 0 },
-  routeDotRight: { right: 0 },
-  routeDotActive: { backgroundColor: WeRideColors.primary },
-  statsRow: { flexDirection: 'row', gap: 14, marginBottom: 12 },
-  stat: { fontFamily: WeRideFonts.body, fontSize: 10.5, color: WeRideColors.textSub },
-  statValue: { fontWeight: '700', color: WeRideColors.white },
+  statsRow: { flexDirection: 'row', gap: WeRideSpacing.sm },
+  stat: { backgroundColor: WeRideColors.dark2 },
   shareBtn: {
-    backgroundColor: '#FF5C0022',
+    minHeight: 44,
+    borderRadius: WeRideRadius.lg,
     borderWidth: 1,
-    borderColor: '#FF5C0044',
-    borderRadius: 8,
-    paddingVertical: 8,
+    borderColor: WeRideColors.primary,
+    backgroundColor: WeRideColors.primaryDim,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  shareText: { fontFamily: WeRideFonts.body, fontSize: 11, fontWeight: '700', color: WeRideColors.primary },
+  pressed: { opacity: 0.85 },
 });

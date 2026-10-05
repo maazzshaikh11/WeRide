@@ -1,10 +1,12 @@
 /**
  * VoiceAvatar — participant avatar with speaking ring pulse (spec §3.5).
  * ringPulse animation: scale 1→1.28, opacity 0.9→0, 1000ms infinite loop.
+ * Initials are dark on the rider colour for contrast on every palette entry.
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideSpacing } from '../theme/theme';
+import { type } from '../theme/typography';
 
 interface Props {
   initials: string;
@@ -12,11 +14,11 @@ interface Props {
   name: string;
   isYou?: boolean;
   speaking?: boolean;
-  isLeader?: boolean;
 }
 
-export default function VoiceAvatar({ initials, color, name, isYou, speaking, isLeader }: Props) {
+export default function VoiceAvatar({ initials, color, name, isYou, speaking }: Props) {
   const ring = useRef(new Animated.Value(0)).current;
+  const label = isYou ? 'You' : name;
 
   useEffect(() => {
     if (speaking) {
@@ -34,7 +36,7 @@ export default function VoiceAvatar({ initials, color, name, isYou, speaking, is
   }, [speaking, ring]);
 
   return (
-    <View style={styles.wrap}>
+    <View style={styles.wrap} accessible accessibilityLabel={speaking ? `${label}, speaking` : label}>
       <View style={styles.ringWrap}>
         {speaking && (
           <Animated.View
@@ -50,53 +52,35 @@ export default function VoiceAvatar({ initials, color, name, isYou, speaking, is
         <View style={[styles.avatar, { backgroundColor: color }, speaking && styles.avatarSpeaking]}>
           <Text style={styles.initials}>{initials}</Text>
         </View>
-        {isLeader && (
-          <View style={styles.leaderBadge}>
-            <Text style={styles.leaderIcon}>👑</Text>
-          </View>
-        )}
       </View>
-      <Text style={[styles.name, isYou && styles.nameYou]}>{isYou ? 'You' : name}</Text>
+      <Text style={[isYou ? type.bodyStrong : type.caption, styles.name]} numberOfLines={1}>
+        {label}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center', width: 100 },
-  ringWrap: { width: 66, height: 66, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  wrap: { alignItems: 'center', width: '100%' },
+  ringWrap: { width: 68, height: 68, justifyContent: 'center', alignItems: 'center' },
   ring: {
     position: 'absolute',
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     borderWidth: 2,
     borderColor: WeRideColors.green,
   },
   avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 2,
-    borderColor: '#111111',
+    borderColor: WeRideColors.dark2,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarSpeaking: { backgroundColor: WeRideColors.greenDim },
-  initials: { fontFamily: WeRideFonts.mono, fontSize: 15, fontWeight: '700', color: WeRideColors.white },
-  leaderBadge: {
-    position: 'absolute',
-    bottom: -3,
-    right: -3,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#111111',
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  leaderIcon: { fontSize: 8 },
-  name: { fontFamily: WeRideFonts.body, fontSize: 9.5, color: WeRideColors.textSub, marginTop: 4, textAlign: 'center' },
-  nameYou: { fontWeight: '700', color: WeRideColors.text },
+  avatarSpeaking: { borderColor: WeRideColors.green },
+  initials: { ...type.labelStrong, fontSize: 15, lineHeight: 20, letterSpacing: 0, color: WeRideColors.dark },
+  name: { marginTop: WeRideSpacing.xs, textAlign: 'center' },
 });

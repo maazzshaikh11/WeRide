@@ -1,49 +1,67 @@
 /**
- * HazardChip — report type chip (spec §3.7, §5.1 ChipButton).
- * chipPress animation: scale 1 → 0.94, 150ms.
+ * HazardChip — one-tap hazard report button (spec §3.7).
+ * Emoji here is a content glyph (the hazard type), not UI chrome.
+ * `busy` swaps the glyph for a spinner; `disabled` blocks presses.
  */
-import React, { useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import React from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
+import { type } from '../theme/typography';
 
 interface Props {
   emoji: string;
   label: string;
   onPress: () => void;
+  disabled?: boolean;
+  busy?: boolean;
 }
 
-export default function HazardChip({ emoji, label, onPress }: Props) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const press = () => {
-    Animated.timing(scale, { toValue: 0.94, duration: 150, useNativeDriver: true }).start(() => {
-      Animated.timing(scale, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-      onPress();
-    });
-  };
-
+export default function HazardChip({ emoji, label, onPress, disabled, busy }: Props) {
   return (
-    <Pressable onPress={press} accessibilityLabel={`Report hazard: ${label}`} accessibilityRole="button">
-      <Animated.View style={[styles.chip, { transform: [{ scale }] }]}>
-        <Text style={styles.emoji}>{emoji}</Text>
-        <Text style={styles.label}>{label}</Text>
-      </Animated.View>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityLabel={`Report hazard: ${label}`}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled, busy: !!busy }}
+      style={({ pressed }) => [
+        styles.chip,
+        disabled && !busy && styles.chipDisabled,
+        pressed && styles.chipPressed,
+      ]}
+    >
+      <View style={styles.glyph}>
+        {busy ? (
+          <ActivityIndicator size="small" color={WeRideColors.primary} />
+        ) : (
+          <Text style={styles.emoji}>{emoji}</Text>
+        )}
+      </View>
+      <Text style={[type.captionStrong, styles.label]} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   chip: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minHeight: 64,
     alignItems: 'center',
-    gap: 3,
+    justifyContent: 'center',
+    gap: WeRideSpacing.xs,
     backgroundColor: WeRideColors.dark3,
     borderWidth: 1,
     borderColor: WeRideColors.border,
-    borderRadius: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 4,
+    borderRadius: WeRideRadius.xl,
+    paddingVertical: WeRideSpacing.sm,
+    paddingHorizontal: WeRideSpacing.sm,
   },
-  emoji: { fontSize: 14 },
-  label: { fontFamily: WeRideFonts.body, fontSize: 9.5, fontWeight: '600', color: WeRideColors.text },
+  chipDisabled: { opacity: 0.5 },
+  chipPressed: { backgroundColor: WeRideColors.dark2 },
+  glyph: { height: 24, justifyContent: 'center', alignItems: 'center' },
+  emoji: { fontSize: 20, lineHeight: 24 },
+  label: { color: WeRideColors.text },
 });

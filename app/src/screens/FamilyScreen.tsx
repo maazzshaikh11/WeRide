@@ -13,7 +13,8 @@
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet, Pressable, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
+import { type } from '../theme/typography';
 import ScreenHeader from '../components/ScreenHeader';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useToastStore } from '../store/toastStore';
@@ -43,12 +44,12 @@ export default function FamilyScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader eyebrow="Family" title="Let someone know" />
+        <ScreenHeader title="Family" />
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Send my location</Text>
-          <Text style={styles.cardBody}>
-            Shares a map pin of where you are right now with anyone you choose. It's a one-time
+          <Text style={type.heading}>Send my location</Text>
+          <Text style={[type.body, styles.cardBody]}>
+            Shares a map pin of where you are right now with anyone you choose. It is a one-time
             snapshot, not a live feed.
           </Text>
           <Pressable
@@ -57,15 +58,15 @@ export default function FamilyScreen() {
             accessibilityLabel="Send my location"
             accessibilityRole="button"
           >
-            <Text style={styles.primaryBtnText}>Send my location</Text>
+            <Text style={type.button}>Send my location</Text>
           </Pressable>
         </View>
 
         <View style={[styles.card, styles.cardMuted]}>
-          <Text style={styles.cardTitle}>Live tracking link</Text>
-          <Text style={styles.cardBody}>
-            Not available yet. Watchers will be able to follow your ride live once family tracking
-            ships — nobody can see your position today except riders in your group.
+          <Text style={type.heading}>Live tracking link</Text>
+          <Text style={[type.body, styles.cardBody]}>
+            Not available yet. Nobody outside your ride group can see your position today, and there
+            is no tracking link to hand out.
           </Text>
         </View>
       </ScrollView>
@@ -75,31 +76,24 @@ export default function FamilyScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: WeRideColors.dark },
-  content: { paddingHorizontal: 16, paddingBottom: 24, gap: 12 },
+  content: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.xxl, gap: WeRideSpacing.md },
   card: {
     backgroundColor: WeRideColors.dark3,
     borderWidth: 1,
     borderColor: WeRideColors.border,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: WeRideRadius.xl,
+    padding: WeRideSpacing.lg,
+    gap: WeRideSpacing.xs,
   },
   cardMuted: { backgroundColor: WeRideColors.dark2 },
-  cardTitle: { fontFamily: WeRideFonts.bodySemibold, fontSize: 15, color: WeRideColors.text },
-  cardBody: {
-    fontFamily: WeRideFonts.body,
-    fontSize: 13,
-    lineHeight: 19,
-    color: WeRideColors.textSub,
-    marginTop: 6,
-  },
+  cardBody: { color: WeRideColors.textSub },
   primaryBtn: {
-    height: 44,
-    borderRadius: 10,
+    minHeight: 48,
+    borderRadius: WeRideRadius.lg,
     backgroundColor: WeRideColors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 14,
+    marginTop: WeRideSpacing.md,
   },
   pressed: { opacity: 0.85 },
-  primaryBtnText: { fontFamily: WeRideFonts.bodySemibold, fontSize: 14, color: WeRideColors.onPrimary },
 });

@@ -1,15 +1,18 @@
 /**
  * HistoryScreen — ride history tab (spec §3.8).
- * Stats row + history cards. Past ride history is NOT available in any
- * backend per master spec — show active ride from current route data +
- * empty state.
+ *
+ * Known gap: no backend stores completed rides, so past rides cannot be listed.
+ * Needs `GET /users/{uid}/rides` (completed rides with distance, duration,
+ * rider count, date). Until then this screen shows only the ride in progress
+ * (from the live route) or an honest empty state. No totals are shown because
+ * none can be computed from real data.
  */
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
+import { type } from '../theme/typography';
 import ScreenHeader from '../components/ScreenHeader';
-import StatBox from '../components/StatBox';
 import HistoryCard from '../components/HistoryCard';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useRidersStore } from '../store/ridersStore';
@@ -20,33 +23,16 @@ export default function HistoryScreen() {
   const riders = useRidersStore((s) => s.riders);
   const groupId = useAppStore((s) => s.groupId);
 
-  const hasActiveRide = route != null;
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader eyebrow="04 — Logbook" title="Ride History" />
+        <ScreenHeader title="Ride History" />
 
-        {/* Stats row — data unavailable → "—" per spec §3.8 */}
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>—</Text>
-            <Text style={styles.statLabel}>TOTAL KM</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{hasActiveRide ? '1' : '0'}</Text>
-            <Text style={styles.statLabel}>RIDES</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>—</Text>
-            <Text style={styles.statLabel}>CITIES</Text>
-          </View>
-        </View>
-
-        {hasActiveRide ? (
+        {route != null ? (
+          <View style={styles.stack}>
           <HistoryCard
-            name={`Ride ${groupId?.slice(0, 8) ?? ''}`}
-            meta="In progress · today"
+            name={`Ride ${groupId?.slice(0, 8) ?? ''}`.trim()}
+            meta="In progress"
             active
             stats={[
               { label: 'km', value: route.distance_km.toFixed(1) },
@@ -54,11 +40,13 @@ export default function HistoryScreen() {
               { label: 'riders', value: String(riders.size) },
             ]}
           />
-        ) : null}
-
-        {/* No completed rides backend — empty state per spec */}
-        {!hasActiveRide && (
-          <Text style={styles.empty}>Your ride history will appear here after you complete your first ride.</Text>
+          <Text style={type.caption}>Completed rides are not saved yet, so only this ride is shown.</Text>
+          </View>
+        ) : (
+          <View style={styles.block}>
+            <Text style={type.heading}>No completed rides yet</Text>
+            <Text style={[type.body, styles.blockBody]}>Rides you finish will be listed here.</Text>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -67,26 +55,15 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: WeRideColors.dark },
-  content: { paddingHorizontal: 18, paddingBottom: 20 },
-  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  statBox: {
-    flex: 1,
+  content: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.xxl },
+  stack: { gap: WeRideSpacing.md },
+  block: {
     backgroundColor: WeRideColors.dark3,
     borderWidth: 1,
     borderColor: WeRideColors.border,
-    borderRadius: 12,
-    padding: 10,
-    alignItems: 'center',
+    borderRadius: WeRideRadius.xl,
+    padding: WeRideSpacing.lg,
+    gap: WeRideSpacing.xs,
   },
-  statValue: { fontFamily: WeRideFonts.heading, fontSize: 22, color: WeRideColors.primary },
-  statLabel: { fontFamily: WeRideFonts.body, fontSize: 8, color: WeRideColors.textSub, marginTop: 2, letterSpacing: 0.5 },
-  empty: {
-    fontFamily: WeRideFonts.body,
-    fontSize: 13,
-    color: WeRideColors.textSub,
-    textAlign: 'center',
-    marginTop: 48,
-    paddingHorizontal: 20,
-    lineHeight: 19,
-  },
+  blockBody: { color: WeRideColors.textSub },
 });

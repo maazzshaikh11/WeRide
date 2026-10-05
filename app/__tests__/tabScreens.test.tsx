@@ -40,6 +40,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('react-native/Libraries/Linking/Linking', () => ({
+  openSettings: jest.fn(() => Promise.resolve()),
   canOpenURL: jest.fn(() => Promise.resolve(true)),
   openURL: jest.fn(() => Promise.resolve()),
 }));
@@ -144,6 +145,7 @@ jest.mock('../src/store/ridersStore', () => {
 
 import { useAppStore } from '../src/store/appStore';
 import { useStopsStore } from '../src/store/stopsStore';
+import { useRidePlanStore } from '../src/store/ridePlanStore';
 import { useToastStore } from '../src/store/toastStore';
 import { useRouteStore } from '@routing/client/routeStore';
 import StopsScreen from '../src/screens/StopsScreen';
@@ -154,9 +156,22 @@ import HistoryScreen from '../src/screens/HistoryScreen';
 
 // -----------------------------------------------------------------------------
 
+function planDestination() {
+  useRidePlanStore.setState({
+    start: null,
+    stops: [],
+    destination: { label: 'Destination, Pune', lat: 18.52, lng: 73.85 },
+  });
+}
+
 describe('StopsScreen', () => {
+  afterEach(() => {
+    useRidePlanStore.getState().clearPlan();
+  });
+
   test('renders header, progress and stop timeline', () => {
     useStopsStore.getState().reset();
+    planDestination();
     const tree = render(<StopsScreen />).root;
     const texts = tree.findAll((n) => (n.type as unknown) === 'Text').map((n) => JSON.stringify(n.props.children));
     const joined = texts.join(' ');
@@ -168,6 +183,7 @@ describe('StopsScreen', () => {
   test('tapping the current stop marks it done and pushes a toast', () => {
     useStopsStore.getState().reset();
     useToastStore.setState({ toasts: [] });
+    planDestination();
     const tree = render(<StopsScreen />).root;
     // Find the pressable for the current stop (the only stop node with onPress)
     const pressables = tree.findAll((n) => typeof n.props.onPress === 'function' && n.props.accessibilityLabel?.includes('Stop'));
@@ -245,17 +261,20 @@ describe('AlertsScreen', () => {
     const joined = tree.findAll((n) => (n.type as unknown) === 'Text').map((n) => JSON.stringify(n.props.children)).join(' ');
     expect(joined).toContain('Road Alerts');
     expect(joined).toContain('Pothole');
-    expect(joined).toContain('Pothole'); // card title
+    expect(joined).toContain('Oil spill'); // all contract types are offered
+    expect(joined).toContain('2 reports'); // card meta from the cluster
   });
 });
 
 describe('HistoryScreen', () => {
-  test('renders stats row and empty state without route', () => {
+  test('renders honest empty state without route (no placeholder stats)', () => {
     useAppStore.setState({ userId: 'user-1', groupId: 'group-1' });
+    useRouteStore.setState({ route: null });
     const tree = render(<HistoryScreen />).root;
     const joined = tree.findAll((n) => (n.type as unknown) === 'Text').map((n) => JSON.stringify(n.props.children)).join(' ');
     expect(joined).toContain('Ride History');
-    expect(joined).toContain('TOTAL KM');
-    expect(joined).toContain('Your ride history will appear here');
+    expect(joined).toContain('No completed rides yet');
+    expect(joined).not.toContain('TOTAL KM');
+    expect(joined).not.toContain('—');
   });
 });

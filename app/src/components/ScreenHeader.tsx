@@ -1,12 +1,16 @@
 /**
- * ScreenHeader — eyebrow + title pattern used across screens (spec §3.3.1).
+ * ScreenHeader — title block shared by the tab screens.
+ * Optional eyebrow (only when it carries information, e.g. the ride name),
+ * then the screen title, with an optional status element on the right.
+ * Horizontal gutter is the screen's job (16), not the header's.
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { type } from '../theme/typography';
+import { WeRideSpacing } from '../theme/theme';
 
 interface Props {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   right?: React.ReactNode;
 }
@@ -15,10 +19,12 @@ export default function ScreenHeader({ eyebrow, title, right }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.textWrap}>
-        <Text style={styles.eyebrow}>{eyebrow.toUpperCase()}</Text>
-        <Text style={styles.title}>{title}</Text>
+        {eyebrow ? <Text style={type.eyebrow}>{eyebrow.toUpperCase()}</Text> : null}
+        <Text style={type.title} accessibilityRole="header">
+          {title}
+        </Text>
       </View>
-      {right ? <View>{right}</View> : null}
+      {right ? <View style={styles.right}>{right}</View> : null}
     </View>
   );
 }
@@ -26,24 +32,13 @@ export default function ScreenHeader({ eyebrow, title, right }: Props) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    gap: WeRideSpacing.md,
+    paddingTop: WeRideSpacing.lg,
+    paddingBottom: WeRideSpacing.lg,
+    minHeight: 44,
   },
   textWrap: { flex: 1 },
-  eyebrow: {
-    fontFamily: WeRideFonts.mono,
-    fontSize: 9,
-    letterSpacing: 1,
-    color: WeRideColors.primary,
-    textTransform: 'uppercase',
-  },
-  title: {
-    fontFamily: WeRideFonts.heading,
-    fontSize: 24,
-    color: WeRideColors.text,
-    marginTop: 2,
-  },
+  right: { flexShrink: 0 },
 });

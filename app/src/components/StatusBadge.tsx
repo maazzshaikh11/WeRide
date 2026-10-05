@@ -5,7 +5,8 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
+import { type } from '../theme/typography';
 
 export type BadgeVariant = 'safe' | 'watching' | 'error' | 'muted';
 
@@ -26,7 +27,7 @@ export default function StatusBadge({ label, variant, style }: Props) {
   const v = VARIANT_STYLES[variant];
   return (
     <View style={[styles.badge, { backgroundColor: v.bg, borderColor: v.border }, style]}>
-      <Text style={[styles.label, { color: v.text }]}>{label}</Text>
+      <Text style={[type.labelStrong, { color: v.text }]}>{label}</Text>
     </View>
   );
 }
@@ -34,10 +35,9 @@ export default function StatusBadge({ label, variant, style }: Props) {
 const styles = StyleSheet.create({
   badge: {
     borderWidth: 1,
-    borderRadius: 99,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    borderRadius: WeRideRadius.pill,
+    paddingHorizontal: WeRideSpacing.sm,
+    paddingVertical: WeRideSpacing.xs,
     alignSelf: 'flex-start',
   },
-  label: { fontFamily: WeRideFonts.mono, fontSize: 8.5, fontWeight: '700' },
 });

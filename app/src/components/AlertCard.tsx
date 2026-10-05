@@ -1,10 +1,12 @@
 /**
  * AlertCard — hazard alert card for AlertsScreen (spec §3.7).
- * New variant: border #FF5C0055 + alertPop animation (400ms).
+ * New variant: accent border, "New" tag and a 400ms fade-in.
+ * The emoji is the hazard-type glyph (content), not chrome.
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
+import { type } from '../theme/typography';
 
 interface Props {
   emoji: string;
@@ -24,6 +26,8 @@ export default function AlertCard({ emoji, title, meta, isNew }: Props) {
 
   return (
     <Animated.View
+      accessible
+      accessibilityLabel={`${isNew ? 'New. ' : ''}${title}. ${meta}`}
       style={[
         styles.card,
         isNew && styles.newCard,
@@ -33,11 +37,14 @@ export default function AlertCard({ emoji, title, meta, isNew }: Props) {
         },
       ]}
     >
-      <Text style={styles.icon}>{emoji}</Text>
-      <View style={styles.textWrap}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.meta}>{meta}</Text>
+      <View style={styles.iconTile}>
+        <Text style={styles.icon}>{emoji}</Text>
       </View>
+      <View style={styles.textWrap}>
+        <Text style={type.heading}>{title}</Text>
+        <Text style={type.caption}>{meta}</Text>
+      </View>
+      {isNew ? <Text style={type.eyebrow}>NEW</Text> : null}
     </Animated.View>
   );
 }
@@ -46,16 +53,22 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: WeRideSpacing.md,
     backgroundColor: WeRideColors.dark3,
     borderWidth: 1,
     borderColor: WeRideColors.border,
-    borderRadius: 12,
-    padding: 11,
+    borderRadius: WeRideRadius.xl,
+    padding: WeRideSpacing.lg,
   },
-  newCard: { borderColor: '#FF5C0055' },
-  icon: { fontSize: 18 },
+  newCard: { borderColor: WeRideColors.primary },
+  iconTile: {
+    width: 40,
+    height: 40,
+    borderRadius: WeRideRadius.lg,
+    backgroundColor: WeRideColors.dark2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: { fontSize: 20, lineHeight: 24 },
   textWrap: { flex: 1 },
-  title: { fontFamily: WeRideFonts.body, fontSize: 12.5, fontWeight: '600', color: WeRideColors.white },
-  meta: { fontFamily: WeRideFonts.body, fontSize: 10, color: WeRideColors.textSub, marginTop: 1 },
 });

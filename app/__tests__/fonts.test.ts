@@ -49,7 +49,7 @@ describe('bundled fonts', () => {
   });
 
   it('the old typefaces are gone from the bundle and the plist', () => {
-    for (const old of ['BebasNeue-Regular', 'Inter-Regular', 'Inter-Bold', 'SpaceMono-Regular']) {
+    for (const old of ['BebasNeue-Regular', 'Inter-Regular', 'Inter-Bold', 'SpaceMono-Regular', 'SpaceMono-Bold', 'Figtree-Regular', 'Fraunces-SemiBold']) {
       expect(fs.existsSync(path.join(root, 'assets/fonts', `${old}.ttf`))).toBe(false);
       expect(plist).not.toContain(`${old}.ttf`);
     }

@@ -1,10 +1,11 @@
 /**
- * Progressbar — stop progress bar (spec §3.4).
- * Fill width animates over 500ms. Exposes progress to screen readers.
+ * Progressbar — stop progress bar (spec §3.4). Demo step-bar look: 5 px,
+ * `line2` track, `ink` fill. Fill width animates over 500ms and is exposed to
+ * screen readers.
  */
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
-import { WeRideColors, WeRideRadius } from '../theme/theme';
+import { View, Animated } from 'react-native';
+import { useStyles } from '../theme/ThemeProvider';
 import { useReducedMotion } from '../ui';
 
 interface Props {
@@ -13,6 +14,10 @@ interface Props {
 }
 
 export default function Progressbar({ completed, total }: Props) {
+  const s = useStyles(({ colors }) => ({
+    track: { height: 5, borderRadius: 3, backgroundColor: colors.line2, overflow: 'hidden' },
+    fill: { height: 5, borderRadius: 3, backgroundColor: colors.ink },
+  }));
   const reduced = useReducedMotion();
   const width = useRef(new Animated.Value(total > 0 ? Math.min(1, completed / total) : 0)).current;
 
@@ -30,29 +35,12 @@ export default function Progressbar({ completed, total }: Props) {
 
   return (
     <View
-      style={styles.track}
+      style={s.track}
       accessibilityRole="progressbar"
       accessibilityLabel="Stops reached"
       accessibilityValue={{ min: 0, max: total, now: Math.min(completed, total) }}
     >
-      <Animated.View
-        style={[
-          styles.fill,
-          { width: width.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) },
-        ]}
-      />
+      <Animated.View style={[s.fill, { width: width.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  track: {
-    height: 6,
-    borderRadius: WeRideRadius.pill,
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    overflow: 'hidden',
-  },
-  fill: { height: 4, borderRadius: WeRideRadius.pill, backgroundColor: WeRideColors.primary },
-});

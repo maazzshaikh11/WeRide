@@ -86,7 +86,7 @@ describe('StopsScreen', () => {
     const tree = render(<StopsScreen />);
     const t = texts(tree);
     expect(t).toContain('This ride has no planned stops');
-    expect(t).not.toContain('Up next');
+    expect(t).not.toContain('UP NEXT');
     expect(t).not.toContain('Tap the next stop');
     expect(stopButtons(tree)).toHaveLength(0);
   });
@@ -100,8 +100,8 @@ describe('StopsScreen', () => {
     const t = texts(tree);
     expect(t).toContain('Chai Point');
     expect(t).toContain('Lonavala');
-    expect(t).toContain('Up next');
-    expect(t).toContain('Upcoming');
+    expect(t).toContain('UP NEXT');
+    expect(t).toContain('UPCOMING');
     expect(t).toContain('0 of 2 stops reached');
     expect(t).toContain('Tap the next stop when you arrive');
     expect(t).not.toMatch(/0\d — /);
@@ -125,7 +125,7 @@ describe('StopsScreen', () => {
     expect(useToastStore.getState().toasts[0].message).toContain('Marked "Lonavala" as reached');
     const t = texts(tree);
     expect(t).toContain('1 of 1 stop reached');
-    expect(t).toContain('All stops reached');
+    expect(t).toContain('ALL STOPS REACHED');
     expect(t).not.toContain('Tap the next stop');
   });
 });
@@ -170,17 +170,17 @@ describe('StopsScreen interactions', () => {
       next.props.onPress();
     });
     expect(useStopsStore.getState().stops.map((x) => x.status)).toEqual(['done', 'done']);
-    expect(texts(tree)).toContain('All stops reached');
+    expect(texts(tree)).toContain('ALL STOPS REACHED');
   });
 
   test('StopNode re-renders upcoming -> current -> done without throwing and keeps its state text', () => {
     const base = { id: 'a', name: 'Stop A', icon: '☕' } as const;
     const tree = render(<StopNode stop={{ ...base, status: 'upcoming' }} />);
-    expect(texts(tree)).toContain('Upcoming');
+    expect(texts(tree)).toContain('UPCOMING');
     act(() => tree.update(<StopNode stop={{ ...base, status: 'current' }} onPress={() => undefined} />));
-    expect(texts(tree)).toContain('Up next');
+    expect(texts(tree)).toContain('UP NEXT');
     act(() => tree.update(<StopNode stop={{ ...base, status: 'done' }} />));
-    expect(texts(tree)).toContain('Reached');
+    expect(texts(tree)).toContain('REACHED');
     expect(texts(tree)).toContain('✓');
   });
 });
@@ -205,7 +205,7 @@ describe('HistoryScreen', () => {
     const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as any);
     const tree = render(<HistoryScreen />);
     const t = texts(tree);
-    expect(t).toContain('In progress');
+    expect(t).toContain('IN PROGRESS'); // pill, uppercase as in the demo
     expect(t).toContain('12.5');
     expect(t).toContain('32');
     expect(t).toContain('2'); // riders from the riders store

@@ -16,16 +16,15 @@
  *    light up if an id matches a listed rider.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Linking } from 'react-native';
+import { View, ScrollView, Text, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WeRideColors, WeRideRadius, WeRideSpacing, riderColor } from '../theme/theme';
-import { type } from '../theme/typography';
+import { avatarColor } from '../theme/palettes';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import ScreenHeader from '../components/ScreenHeader';
-import LivePill from '../components/LivePill';
 import VoiceAvatar from '../components/VoiceAvatar';
 import VoiceToolbar from '../components/VoiceToolbar';
 import VoxZone, { VoxState } from '../components/VoxZone';
-import { Button, FadeIn } from '../ui';
+import { Button, Card, FadeIn, Pill, SectionLabel } from '../ui';
 import { useRidersStore } from '../store/ridersStore';
 import { useAppStore } from '../store/appStore';
 import { useToastStore } from '../store/toastStore';
@@ -36,6 +35,21 @@ import { requestMicrophonePermission } from '@flvoice/vox/micPermission';
 type VoiceStatus = 'connected' | 'connecting' | 'disconnected';
 
 export default function VoiceScreen() {
+  const { colors, type } = useTheme();
+  const styles = useStyles(({ colors: c }) => ({
+    safe: { flex: 1, backgroundColor: c.bg },
+    container: { flex: 1 },
+    gutter: { paddingHorizontal: 20, paddingTop: 12 },
+    scroll: { flex: 1 },
+    gridContent: { paddingHorizontal: 20, paddingBottom: 20 },
+    sectionLabel: { marginTop: 24 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
+    cell: { width: '33.3333%', padding: 5 },
+    bottom: { gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
+    micDeniedBox: { borderColor: c.bad, marginTop: 24 },
+    micDeniedText: { marginTop: 4 },
+    settingsBtn: { marginTop: 14 },
+  }));
   const groupId = useAppStore((s) => s.groupId);
   const userId = useAppStore((s) => s.userId);
   const riders = useRidersStore((s) => s.riders);
@@ -150,14 +164,15 @@ export default function VoiceScreen() {
       <View style={styles.container}>
         <View style={styles.gutter}>
           <ScreenHeader
+            eyebrow="This ride"
             title="Group Voice"
             right={
               effectiveStatus === 'connected' ? (
-                <LivePill variant="green" label="CONNECTED" />
+                <Pill tone="ok" label="CONNECTED" />
               ) : effectiveStatus === 'connecting' ? (
-                <LivePill variant="gold" label="CONNECTING" />
+                <Pill tone="accent" label="CONNECTING" />
               ) : (
-                <LivePill variant="grey" label="OFFLINE" />
+                <Pill label="OFFLINE" />
               )
             }
           />
@@ -166,32 +181,32 @@ export default function VoiceScreen() {
         <ScrollView style={styles.scroll} contentContainerStyle={styles.gridContent}>
           {micDenied && (
             <FadeIn>
-              <View style={styles.micDeniedBox} accessibilityRole="alert">
-                <Text style={[type.heading, { color: WeRideColors.red }]}>Microphone access denied</Text>
-                <Text style={[type.body, styles.micDeniedText]}>
-                  Group voice needs the microphone. Allow it in Settings, then come back to this tab.
-                </Text>
+              <Card style={styles.micDeniedBox}>
+                <View accessibilityRole="alert">
+                  <Text style={[type.h3, { color: colors.bad }]}>Microphone access denied</Text>
+                  <Text style={[type.body, styles.micDeniedText]}>
+                    Group voice needs the microphone. Allow it in Settings, then come back to this tab.
+                  </Text>
+                </View>
                 <Button
                   label="Open settings"
-                  variant="secondary"
+                  variant="soft"
                   size="sm"
                   onPress={openSettings}
                   accessibilityLabel="Open settings"
                   style={styles.settingsBtn}
                 />
-              </View>
+              </Card>
             </FadeIn>
           )}
 
-          <Text style={[type.label, styles.sectionLabel]}>
-            {`RIDERS IN THIS RIDE · ${allNames.length}`}
-          </Text>
+          <SectionLabel style={styles.sectionLabel}>{`Riders in this ride · ${allNames.length}`}</SectionLabel>
           {allNames.length === 0 ? (
             <FadeIn>
-              <View style={styles.emptyBox}>
-                <Text style={type.heading}>No riders yet</Text>
+              <Card>
+                <Text style={type.h3}>No riders yet</Text>
                 <Text style={[type.body, styles.micDeniedText]}>Riders appear here once they join the ride.</Text>
-              </View>
+              </Card>
             </FadeIn>
           ) : (
             <View style={styles.grid}>
@@ -200,7 +215,7 @@ export default function VoiceScreen() {
                   {/* No display names exist yet: initials and label come from the rider id. */}
                   <VoiceAvatar
                     initials={riderId.slice(0, 2).toUpperCase()}
-                    color={riderColor(i)}
+                    color={avatarColor(i)}
                     name={`Rider ${riderId.slice(-4)}`}
                     isYou={riderId === userId}
                     speaking={speakingId === riderId}
@@ -224,42 +239,3 @@ export default function VoiceScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: WeRideColors.dark },
-  container: { flex: 1 },
-  gutter: { paddingHorizontal: WeRideSpacing.lg },
-  scroll: { flex: 1 },
-  gridContent: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.lg },
-  sectionLabel: { marginBottom: WeRideSpacing.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '33.3333%', alignItems: 'center', paddingVertical: WeRideSpacing.sm },
-  bottom: {
-    gap: WeRideSpacing.lg,
-    margin: WeRideSpacing.lg,
-    padding: WeRideSpacing.lg,
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xl,
-  },
-  micDeniedBox: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.red,
-    borderRadius: WeRideRadius.xl,
-    padding: WeRideSpacing.lg,
-    gap: WeRideSpacing.xs,
-    marginBottom: WeRideSpacing.lg,
-  },
-  micDeniedText: { color: WeRideColors.textSub },
-  settingsBtn: { marginTop: WeRideSpacing.md },
-  emptyBox: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xl,
-    padding: WeRideSpacing.lg,
-    gap: WeRideSpacing.xs,
-  },
-});

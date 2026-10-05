@@ -8,21 +8,32 @@
  * planned stops the screen renders an empty state instead.
  */
 import React, { useEffect } from 'react';
-import { ScrollView, View, StyleSheet, Text } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import ScreenHeader from '../components/ScreenHeader';
 import Progressbar from '../components/Progressbar';
 import StopNode from '../components/StopNode';
 import { useStopsStore } from '../store/stopsStore';
 import { useRidePlanStore } from '../store/ridePlanStore';
 import { useToastStore } from '../store/toastStore';
-import { FadeIn, haptic } from '../ui';
+import { Card, FadeIn, Plate, haptic } from '../ui';
 import { useRouteStore } from '@routing/client/routeStore';
 import { haversineMeters } from '../utils/geoUtils';
 
 export default function StopsScreen() {
+  const { type } = useTheme();
+  const styles = useStyles(({ colors }) => ({
+    safe: { flex: 1, backgroundColor: colors.bg },
+    scroll: { flex: 1 },
+    content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
+    progress: { gap: 10, marginTop: 24 },
+    hint: { marginTop: 12 },
+    rail: { marginTop: 24 },
+    allDone: { marginTop: 8 },
+    emptyBody: { marginTop: 8 },
+    empty: { marginTop: 24 },
+  }));
   const stops = useStopsStore((s) => s.stops);
   const markCurrentDone = useStopsStore((s) => s.markCurrentDone);
   const syncFromPlan = useStopsStore((s) => s.syncFromPlan);
@@ -49,54 +60,55 @@ export default function StopsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <ScreenHeader title="Planned Stops" />
+        <ScreenHeader eyebrow="This ride" title="Planned Stops" />
 
         {shownStops.length === 0 ? (
-          <FadeIn>
-            <View style={styles.block}>
-              <Text style={type.heading}>This ride has no planned stops</Text>
-              <Text style={[type.body, styles.blockBody]}>
+          <FadeIn style={styles.empty}>
+            <Card>
+              <Text style={type.h3}>This ride has no planned stops</Text>
+              <Text style={[type.body, styles.emptyBody]}>
                 Set a destination and stops when you create a ride and they will be listed here.
               </Text>
-            </View>
+            </Card>
           </FadeIn>
         ) : (
           <>
             <FadeIn style={styles.progress}>
-              <Text style={type.caption}>
+              <Text style={type.smStrong}>
                 {doneCount} of {shownStops.length} {shownStops.length === 1 ? 'stop' : 'stops'} reached
               </Text>
               <Progressbar completed={doneCount} total={shownStops.length} />
             </FadeIn>
 
             {currentStop ? (
-              <Text style={[type.caption, styles.hint]}>
-                Tap the next stop when you arrive to mark it as reached.
-              </Text>
+              <Text style={[type.sm, styles.hint]}>Tap the next stop when you arrive to mark it as reached.</Text>
             ) : null}
 
-            {shownStops.map((stop, i) => {
-              // Real straight-line distance from the verified position, when we have one.
-              const distKm =
-                currentLocation != null && stop.lat != null && stop.lng != null
-                  ? haversineMeters(currentLocation.lat, currentLocation.lng, stop.lat, stop.lng) / 1000
-                  : null;
-              const distText = distKm != null ? `${distKm < 10 ? distKm.toFixed(1) : Math.round(distKm)} km away` : undefined;
-              return (
-                <FadeIn key={stop.id} index={i + 1}>
-                  <StopNode
-                    stop={stop}
-                    isLast={i === shownStops.length - 1}
-                    info={stop.status === 'done' ? undefined : distText}
-                    onPress={stop.status === 'current' ? () => onStopPress(stop.name) : undefined}
-                  />
-                </FadeIn>
-              );
-            })}
+            <View style={styles.rail}>
+              {shownStops.map((stop, i) => {
+                // Real straight-line distance from the verified position, when we have one.
+                const distKm =
+                  currentLocation != null && stop.lat != null && stop.lng != null
+                    ? haversineMeters(currentLocation.lat, currentLocation.lng, stop.lat, stop.lng) / 1000
+                    : null;
+                const distText = distKm != null ? `${distKm < 10 ? distKm.toFixed(1) : Math.round(distKm)} km away` : undefined;
+                return (
+                  <FadeIn key={stop.id} index={i + 1}>
+                    <StopNode
+                      stop={stop}
+                      isFirst={i === 0}
+                      isLast={i === shownStops.length - 1}
+                      info={stop.status === 'done' ? undefined : distText}
+                      onPress={stop.status === 'current' ? () => onStopPress(stop.name) : undefined}
+                    />
+                  </FadeIn>
+                );
+              })}
+            </View>
 
             {!currentStop ? (
-              <FadeIn>
-                <Text style={[type.bodyStrong, styles.allDone]}>All stops reached</Text>
+              <FadeIn style={styles.rail}>
+                <Plate tone="green" icon="check" title="All stops reached" style={styles.allDone} />
               </FadeIn>
             ) : null}
           </>
@@ -105,21 +117,3 @@ export default function StopsScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: WeRideColors.dark },
-  scroll: { flex: 1 },
-  content: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.xxl },
-  progress: { gap: WeRideSpacing.sm, marginBottom: WeRideSpacing.md },
-  hint: { marginBottom: WeRideSpacing.lg },
-  allDone: { color: WeRideColors.green, marginTop: WeRideSpacing.lg },
-  block: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xl,
-    padding: WeRideSpacing.lg,
-    gap: WeRideSpacing.xs,
-  },
-  blockBody: { color: WeRideColors.textSub },
-});

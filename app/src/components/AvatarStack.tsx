@@ -1,28 +1,31 @@
 /**
- * AvatarStack — overlapping mini-avatars (spec §3.3.8, §5.5).
- * 24×24 circles, -8px overlap, 2px sheet-coloured border, 11px mono initials.
+ * AvatarStack — overlapping mini-avatars (demo `.avs`: 28 px `.av.sm`, -9 px
+ * overlap, 2.5 px ring in the page background, initials on the rider colour).
  *
  * A rider that joins after the stack is on screen pops in (scale 0 -> 1 on a
  * spring, transform only so the layout never shifts). Avatars present at first
  * render are simply there.
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { WeRideColors, riderColor } from '../theme/theme';
-import { type } from '../theme/typography';
-import { Motion, useReducedMotion } from '../ui';
+import { View, Text, Animated } from 'react-native';
+import { avatarColor } from '../theme/palettes';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
+import { Avatar, Motion, useReducedMotion } from '../ui';
 
 interface Props {
   names: string[];      // rider identifiers — initials derived
   max?: number;        // max shown (default 4)
 }
 
+const SIZE = 28;
+const OVERLAP = -9;
+
 function initials(name: string): string {
   return name.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || '??';
 }
 
 /** Avatar bubble; animates in only when mounted with `pop`. */
-function PopAvatar({ pop, style, children }: { pop: boolean; style: object; children: React.ReactNode }) {
+function PopAvatar({ pop, style, children }: { pop: boolean; style: object | null; children: React.ReactNode }) {
   const reduced = useReducedMotion();
   const scale = useRef(new Animated.Value(pop ? 0 : 1)).current;
 
@@ -39,10 +42,18 @@ function PopAvatar({ pop, style, children }: { pop: boolean; style: object; chil
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <Animated.View style={[styles.avatar, style, { transform: [{ scale }] }]}>{children}</Animated.View>;
+  return <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>;
 }
 
 export default function AvatarStack({ names, max = 4 }: Props) {
+  const { colors, type } = useTheme();
+  const s = useStyles(({ colors: c }) => ({
+    row: { flexDirection: 'row', alignItems: 'center' },
+    overflow: {
+      width: SIZE, height: SIZE, borderRadius: SIZE / 2, marginLeft: OVERLAP, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: c.card2, borderWidth: 2.5, borderColor: c.bg,
+    },
+  }));
   const shown = names.slice(0, max);
   // null until the first render has been committed: nobody pops on first paint.
   const seen = useRef<Set<string> | null>(null);
@@ -54,36 +65,17 @@ export default function AvatarStack({ names, max = 4 }: Props) {
   if (shown.length === 0) return null;
   const known = seen.current;
   return (
-    <View style={styles.row}>
+    <View style={s.row}>
       {shown.map((name, i) => (
-        <PopAvatar
-          key={name}
-          pop={known !== null && !known.has(name)}
-          style={{ backgroundColor: riderColor(i), marginLeft: i === 0 ? 0 : -8 }}
-        >
-          <Text style={styles.initials}>{initials(name)}</Text>
+        <PopAvatar key={name} pop={known !== null && !known.has(name)} style={i === 0 ? null : { marginLeft: OVERLAP }}>
+          <Avatar initials={initials(name)} color={avatarColor(i)} size={SIZE} />
         </PopAvatar>
       ))}
       {names.length > max ? (
-        <View style={[styles.avatar, styles.overflow, { marginLeft: -8 }]}>
-          <Text style={[styles.initials, { color: WeRideColors.textSub }]}>+{names.length - max}</Text>
+        <View style={s.overflow}>
+          <Text style={[type.pill, { color: colors.ink2, letterSpacing: 0 }]}>+{names.length - max}</Text>
         </View>
       ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center' },
-  avatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: WeRideColors.dark2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  overflow: { backgroundColor: WeRideColors.dark3 },
-  initials: { ...type.labelStrong, letterSpacing: 0, color: WeRideColors.white },
-});

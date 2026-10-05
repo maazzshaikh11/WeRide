@@ -1,19 +1,19 @@
 /**
- * StopNode — timeline node for a planned stop (spec §3.4).
- * States: done (green), current (accent), upcoming (neutral).
- * The icon is the glyph the rider picked for the stop (content). Only the
+ * StopNode — a waypoint on the ride's `.mp` rail (demo): dashed rail down the
+ * left, a 13 px diamond marker per stop (ink ring), title + a small status line.
+ * States: done (ok), current (accent), upcoming (ink).
+ * The glyph is the one the rider picked for the stop (content). Only the
  * current stop is pressable (PressableScale); its row is at least 44pt tall.
  *
  * State changes animate on the native driver (opacity/transform only):
- * the circle pops and cross-fades to its done look, the connecting line fills
- * downward, and the stop that becomes current eases in. Mounting in a state
- * does not animate.
+ * the marker pops and cross-fades to its new colour, and the stop that becomes
+ * current eases in. Mounting in a state does not animate.
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { WeRideColors, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, Animated } from 'react-native';
+import Svg, { Line } from 'react-native-svg';
 import { Stop } from '../store/stopsStore';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { Motion, PressableScale, useReducedMotion } from '../ui';
 
 interface Props {
@@ -22,6 +22,8 @@ interface Props {
   info?: string;
   onPress?: () => void;
   isLast?: boolean;
+  /** The rail starts a little lower on the first stop (demo `top: 6`). */
+  isFirst?: boolean;
 }
 
 const TAG_LABELS = {
@@ -30,17 +32,10 @@ const TAG_LABELS = {
   upcoming: 'Upcoming',
 } as const;
 
-const TAG_COLORS = {
-  done: WeRideColors.green,
-  current: WeRideColors.primary,
-  upcoming: WeRideColors.textSub,
-} as const;
-
 function useStopAnimation(status: Stop['status']) {
   const reduced = useReducedMotion();
   const done = useRef(new Animated.Value(status === 'done' ? 1 : 0)).current;
   const current = useRef(new Animated.Value(status === 'current' ? 1 : 0)).current;
-  const line = useRef(new Animated.Value(status === 'done' ? 1 : 0)).current;
   const pop = useRef(new Animated.Value(1)).current;
   const prev = useRef(status);
 
@@ -52,13 +47,11 @@ function useStopAnimation(status: Stop['status']) {
     if (reduced) {
       done.setValue(doneTo);
       current.setValue(currentTo);
-      line.setValue(doneTo);
       return;
     }
     const anims: Animated.CompositeAnimation[] = [
       Animated.timing(done, { toValue: doneTo, duration: 220, useNativeDriver: true }),
       Animated.timing(current, { toValue: currentTo, duration: 260, useNativeDriver: true }),
-      Animated.timing(line, { toValue: doneTo, duration: 380, delay: doneTo ? 140 : 0, useNativeDriver: true }),
     ];
     if (status === 'done') {
       // Scale pop: overshoot, then settle.
@@ -76,104 +69,77 @@ function useStopAnimation(status: Stop['status']) {
     const all = Animated.parallel(anims);
     all.start();
     return () => all.stop();
-  }, [status, reduced, done, current, line, pop]);
+  }, [status, reduced, done, current, pop]);
 
-  return { done, current, line, pop };
+  return { done, current, pop };
 }
 
-export default function StopNode({ stop, info, onPress, isLast }: Props) {
+export default function StopNode({ stop, info, onPress, isLast, isFirst }: Props) {
+  const { colors, type } = useTheme();
+  const s = useStyles(({ colors: c }) => ({
+    row: { paddingLeft: 26 },
+    rail: { position: 'absolute', left: 5, width: 3 },
+    marker: { position: 'absolute', left: 0, top: 3, width: 13, height: 13 },
+    fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+    diamond: { borderRadius: 4, borderWidth: 2, borderColor: c.ink },
+    glyphRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    glyph: { fontSize: 15, lineHeight: 20 },
+    content: { minHeight: 44, justifyContent: 'center', paddingBottom: 16 },
+    meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, marginTop: 4 },
+  }));
   const tagLabel = TAG_LABELS[stop.status];
-  const { done, current, line, pop } = useStopAnimation(stop.status);
-  const [lineHeight, setLineHeight] = useState(0);
+  const tagColor = stop.status === 'done' ? colors.ok : stop.status === 'current' ? colors.ink : colors.ink3;
+  const { done, current, pop } = useStopAnimation(stop.status);
   const a11yLabel = `Stop ${stop.name}, ${stop.status}.${info ? ` ${info}` : ''}`;
 
   const text = (
     <>
-      <Text style={type.heading} numberOfLines={2}>
-        {stop.name}
-      </Text>
-      <View style={styles.metaRow}>
-        <Text style={[type.label, { color: TAG_COLORS[stop.status] }]}>{tagLabel}</Text>
-        {info ? <Text style={type.caption}>{info}</Text> : null}
+      <View style={s.glyphRow}>
+        <Text style={s.glyph}>{stop.icon}</Text>
+        <Text style={[type.h3, { flex: 1 }]} numberOfLines={2}>
+          {stop.name}
+        </Text>
+      </View>
+      <View style={s.meta}>
+        <Text style={[type.label, { color: tagColor }]}>
+          {stop.status === 'done' ? '✓ ' : ''}
+          {tagLabel.toUpperCase()}
+        </Text>
+        {info ? <Text style={type.sm}>{info}</Text> : null}
       </View>
     </>
   );
 
   return (
-    <View style={styles.row}>
-      <View style={styles.timeline}>
-        <Animated.View style={[styles.circleWrap, { transform: [{ scale: pop }] }]}>
-          <View style={[StyleSheet.absoluteFill, styles.circle]} />
-          <Animated.View style={[StyleSheet.absoluteFill, styles.circle, styles.circleCurrent, { opacity: current }]} />
-          <Animated.View style={[StyleSheet.absoluteFill, styles.circle, styles.circleDone, { opacity: done }]} />
-          <View style={styles.glyphWrap} pointerEvents="none">
-            <Animated.Text
-              style={[styles.circleIcon, { opacity: done.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
-            >
-              {stop.icon}
-            </Animated.Text>
-            <Animated.Text style={[styles.circleIcon, styles.checkIcon, { opacity: done }]}>✓</Animated.Text>
-          </View>
-        </Animated.View>
-        {!isLast && (
-          <View style={styles.line} onLayout={(e) => setLineHeight(e.nativeEvent.layout.height)}>
-            {/* Fill slides down from the top as the stop is reached. */}
-            <Animated.View
-              style={[
-                styles.lineFill,
-                {
-                  opacity: lineHeight > 0 ? 1 : 0,
-                  transform: [{ translateY: line.interpolate({ inputRange: [0, 1], outputRange: [-lineHeight, 0] }) }],
-                },
-              ]}
-            />
-          </View>
-        )}
+    <View style={s.row}>
+      <View pointerEvents="none" style={[s.rail, { top: isFirst ? 6 : 0, bottom: isLast ? 6 : 0 }]}>
+        <Svg width={3} height="100%">
+          <Line x1={1.5} y1={0} x2={1.5} y2="100%" stroke={colors.line2} strokeWidth={3} strokeDasharray="6 5" strokeLinecap="butt" />
+        </Svg>
       </View>
-      <View style={[styles.contentWrap, !isLast && styles.contentGap]}>
-        {onPress ? (
-          <PressableScale
-            style={styles.content}
-            onPress={onPress}
-            haptic={false}
-            scaleTo={Motion.scale.card}
-            accessibilityLabel={a11yLabel}
-            accessibilityHint="Double tap to mark this stop as reached"
-            accessibilityRole="button"
-          >
-            {text}
-          </PressableScale>
-        ) : (
-          <View style={styles.content} accessible accessibilityLabel={a11yLabel} accessibilityRole="text">
-            {text}
-          </View>
-        )}
-      </View>
+      <Animated.View pointerEvents="none" testID={`stop-marker-${stop.status}`} style={[s.marker, { transform: [{ rotate: '45deg' }, { scale: pop }] }]}>
+        {/* ink (upcoming) base, accent and ok washes cross-fade on top. */}
+        <View style={[s.fill, s.diamond, { backgroundColor: colors.ink }]} />
+        <Animated.View style={[s.fill, s.diamond, { backgroundColor: colors.pri, opacity: current }]} />
+        <Animated.View style={[s.fill, s.diamond, { backgroundColor: colors.ok, opacity: done }]} />
+      </Animated.View>
+      {onPress ? (
+        <PressableScale
+          style={s.content}
+          onPress={onPress}
+          haptic={false}
+          scaleTo={Motion.scale.card}
+          accessibilityLabel={a11yLabel}
+          accessibilityHint="Double tap to mark this stop as reached"
+          accessibilityRole="button"
+        >
+          {text}
+        </PressableScale>
+      ) : (
+        <View style={s.content} accessible accessibilityLabel={a11yLabel} accessibilityRole="text">
+          {text}
+        </View>
+      )}
     </View>
   );
 }
-
-const CIRCLE = 32;
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: WeRideSpacing.md },
-  timeline: { alignItems: 'center', width: CIRCLE },
-  circleWrap: { width: CIRCLE, height: CIRCLE, alignItems: 'center', justifyContent: 'center' },
-  circle: {
-    borderRadius: CIRCLE / 2,
-    borderWidth: 2,
-    borderColor: WeRideColors.border,
-    backgroundColor: WeRideColors.dark2,
-  },
-  circleDone: { borderColor: WeRideColors.green, backgroundColor: WeRideColors.greenDim },
-  circleCurrent: { borderColor: WeRideColors.primary, backgroundColor: WeRideColors.primaryDim },
-  glyphWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  circleIcon: { position: 'absolute', fontSize: 14, lineHeight: 18, textAlign: 'center' },
-  checkIcon: { color: WeRideColors.green },
-  line: { width: 2, minHeight: 20, flex: 1, backgroundColor: WeRideColors.border, overflow: 'hidden' },
-  lineFill: { ...StyleSheet.absoluteFillObject, backgroundColor: WeRideColors.green },
-  contentWrap: { flex: 1 },
-  contentGap: { paddingBottom: WeRideSpacing.lg },
-  content: { minHeight: 44, justifyContent: 'center' },
-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: WeRideSpacing.sm },
-});

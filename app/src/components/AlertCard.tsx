@@ -3,15 +3,17 @@
  * Tapping the card expands it (LayoutAnimation) to reveal real cluster fields
  * (report count, hazard score, distance when known) and, for active hazards, a
  * "Mark resolved" action with inline loading / success / error text.
- * New variant: accent border, "New" tag and a one-time highlight pulse
+ * New variant: accent border, "New" pill and a one-time highlight pulse
  * (opacity overlay, native driver). Rows enter with a staggered FadeIn.
- * The emoji is the hazard-type glyph (content), not chrome.
+ * Look: demo card (22-radius, `line` rim) with a 42 px `card2` icon well. The
+ * well shows the demo icon for the hazard type (`icon`), or the emoji glyph
+ * (content) when no icon is given.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
-import { Button, FadeIn, PressableCard, haptic, useReducedMotion } from '../ui';
+import { withAlpha } from '../theme/palettes';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
+import { Button, FadeIn, Icon, IconName, Pill, PressableCard, haptic, useReducedMotion } from '../ui';
 
 export interface AlertDetail {
   label: string;
@@ -19,7 +21,9 @@ export interface AlertDetail {
 }
 
 interface Props {
-  emoji: string;
+  /** Demo icon for the hazard type (preferred over `emoji`). */
+  icon?: IconName;
+  emoji?: string;
   title: string;
   meta: string;
   isNew?: boolean;
@@ -51,7 +55,26 @@ export function animateNextLayout(): void {
 
 type ResolveState = 'idle' | 'loading' | 'done' | 'error';
 
-export default function AlertCard({ emoji, title, meta, isNew, index = 0, details = [], onResolve }: Props) {
+export default function AlertCard({ icon, emoji, title, meta, isNew, index = 0, details = [], onResolve }: Props) {
+  const { colors, type } = useTheme();
+  const styles = useStyles(({ colors: c, type: t }) => ({
+    card: { padding: 16 },
+    header: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 44 },
+    iconTile: {
+      width: 42, height: 42, borderRadius: 13, backgroundColor: c.card2, borderWidth: 1.5, borderColor: c.line,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    icon: { fontSize: 20, lineHeight: 24 },
+    textWrap: { flex: 1 },
+    chevron: { width: 18, alignItems: 'center' },
+    body: { gap: 10, paddingTop: 14 },
+    divider: { height: 1.5, backgroundColor: c.line, marginBottom: 4 },
+    detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 24 },
+    resolveBtn: { marginTop: 6 },
+    statusOk: { ...t.smStrong, color: c.ok, marginTop: 4 },
+    statusErr: { ...t.smStrong, color: c.bad, marginTop: 4 },
+    pulse: { backgroundColor: withAlpha(c.pri, 0.14) },
+  }));
   const reduced = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
   const [resolveState, setResolveState] = useState<ResolveState>('idle');
@@ -106,7 +129,7 @@ export default function AlertCard({ emoji, title, meta, isNew, index = 0, detail
   return (
     <FadeIn index={index}>
       <PressableCard
-        radius={WeRideRadius.xl}
+        radius={22}
         active={isNew}
         onPress={toggle}
         haptic="tap"
@@ -125,21 +148,21 @@ export default function AlertCard({ emoji, title, meta, isNew, index = 0, detail
           style={styles.header}
         >
           <View style={styles.iconTile}>
-            <Text style={styles.icon}>{emoji}</Text>
+            {icon ? <Icon name={icon} size={20} color={colors.ink} /> : <Text style={styles.icon}>{emoji}</Text>}
           </View>
           <View style={styles.textWrap}>
-            <Text style={type.heading}>{title}</Text>
-            <Text style={type.caption}>{meta}</Text>
+            <Text style={type.listTitle}>{title}</Text>
+            <Text style={[type.listSub, { marginTop: 3 }]}>{meta}</Text>
           </View>
-          {isNew ? <Text style={type.eyebrow}>NEW</Text> : null}
-          <Animated.Text
+          {isNew ? <Pill tone="accent" label="New" /> : null}
+          <Animated.View
             style={[
               styles.chevron,
               { transform: [{ rotate: chevron.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] }) }] },
             ]}
           >
-            ›
-          </Animated.Text>
+            <Icon name="chev" size={18} color={colors.ink3} />
+          </Animated.View>
         </View>
 
         {expanded ? (
@@ -147,14 +170,14 @@ export default function AlertCard({ emoji, title, meta, isNew, index = 0, detail
             <View style={styles.divider} />
             {details.map((d) => (
               <View key={d.label} style={styles.detailRow}>
-                <Text style={type.caption}>{d.label}</Text>
+                <Text style={type.sm}>{d.label}</Text>
                 <Text style={type.bodyStrong}>{d.value}</Text>
               </View>
             ))}
             {showResolve ? (
               <Button
                 label="Mark resolved"
-                variant="secondary"
+                variant="soft"
                 size="sm"
                 loading={resolveState === 'loading'}
                 onPress={resolve}
@@ -163,12 +186,12 @@ export default function AlertCard({ emoji, title, meta, isNew, index = 0, detail
               />
             ) : null}
             {resolveState === 'done' ? (
-              <Text style={[type.captionStrong, styles.statusOk]} accessibilityLiveRegion="polite">
+              <Text style={styles.statusOk} accessibilityLiveRegion="polite">
                 Marked resolved
               </Text>
             ) : null}
             {resolveState === 'error' ? (
-              <Text style={[type.captionStrong, styles.statusErr]} accessibilityRole="alert">
+              <Text style={styles.statusErr} accessibilityRole="alert">
                 Could not mark resolved. Try again.
               </Text>
             ) : null}
@@ -181,26 +204,3 @@ export default function AlertCard({ emoji, title, meta, isNew, index = 0, detail
     </FadeIn>
   );
 }
-
-const styles = StyleSheet.create({
-  card: { padding: WeRideSpacing.lg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.md },
-  iconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: WeRideRadius.lg,
-    backgroundColor: WeRideColors.dark2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  icon: { fontSize: 20, lineHeight: 24 },
-  textWrap: { flex: 1 },
-  chevron: { ...type.heading, color: WeRideColors.textSub, width: 16, textAlign: 'center' },
-  body: { gap: WeRideSpacing.sm, paddingTop: WeRideSpacing.md },
-  divider: { height: 1, backgroundColor: WeRideColors.border, marginBottom: WeRideSpacing.xs },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 24 },
-  resolveBtn: { marginTop: WeRideSpacing.sm },
-  statusOk: { color: WeRideColors.green, marginTop: WeRideSpacing.xs },
-  statusErr: { color: WeRideColors.red, marginTop: WeRideSpacing.xs },
-  pulse: { backgroundColor: WeRideColors.primaryDim },
-});

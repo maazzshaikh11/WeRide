@@ -101,7 +101,7 @@ describe('VoiceScreen', () => {
     const t = texts(tree);
     expect(t).toContain('Group Voice');
     expect(t).toContain('CONNECTED');
-    expect(t).toContain('Channel open');
+    expect(t).toContain('CHANNEL OPEN');
     expect(t).toContain('RIDERS IN THIS RIDE · 3');
     expect(t).toContain('You');
     expect(t).toContain('Rider abcd');
@@ -114,15 +114,15 @@ describe('VoiceScreen', () => {
   test('connecting while VoxClient.start is pending', async () => {
     mockVox.start.mockReturnValue(new Promise(() => undefined));
     const tree = await renderAsync();
-    expect(texts(tree)).toContain('CONNECTING');
-    expect(texts(tree)).toContain('Connecting');
+    // The status pill and the plate title both say it.
+    expect(texts(tree).split('CONNECTING')).toHaveLength(3);
   });
 
   test('start failure shows not connected and disables controls', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     mockVox.start.mockRejectedValue(new Error('no webrtc'));
     const tree = await renderAsync();
-    expect(texts(tree)).toContain('Not connected');
+    expect(texts(tree)).toContain('NOT CONNECTED');
     expect(button(tree, 'Mute microphone').props.disabled).toBe(true);
     warn.mockRestore();
   });
@@ -133,10 +133,10 @@ describe('VoiceScreen', () => {
     act(() => button(tree, 'Mute microphone').props.onPress());
     const muted = button(tree, 'Unmute microphone');
     expect(muted.props.accessibilityState).toMatchObject({ selected: true });
-    expect(texts(tree)).toContain('Your mic is muted');
+    expect(texts(tree)).toContain('YOUR MIC IS MUTED');
     act(() => muted.props.onPress());
     expect(mockVox.setVoiceActive).toHaveBeenCalledWith(true);
-    expect(texts(tree)).toContain('Channel open');
+    expect(texts(tree)).toContain('CHANNEL OPEN');
   });
 
   test('mic denied: explains, offers Open settings, never starts VoxClient', async () => {
@@ -157,7 +157,7 @@ describe('VoiceScreen', () => {
     useAppStore.setState({ userId: null, groupId: null });
     const tree = await renderAsync();
     expect(mockVox.ctor).not.toHaveBeenCalled();
-    expect(texts(tree)).toContain('Not connected');
+    expect(texts(tree)).toContain('NOT CONNECTED');
     expect(texts(tree)).toContain('Open a ride to join its voice channel');
   });
 
@@ -168,7 +168,7 @@ describe('VoiceScreen', () => {
     });
     expect(mockVox.stop).toHaveBeenCalled();
     expect(useToastStore.getState().toasts[0].message).toBe('You left the voice channel');
-    expect(texts(tree)).toContain('Not connected');
+    expect(texts(tree)).toContain('NOT CONNECTED');
   });
 
   const real = (tree: renderer.ReactTestRenderer, label: string) =>

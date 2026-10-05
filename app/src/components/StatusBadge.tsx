@@ -1,21 +1,17 @@
 /**
- * StatusBadge — pill-shaped status badges (spec §5.4).
- * Variants: safe (green), watching (blue), offline/spoofed (red), stale (grey).
+ * StatusBadge — status pill (demo `.pill`, spec §5.4).
+ * Variants: safe (ok), watching (blue), error (bad), muted (neutral).
  * Status is never conveyed by color alone — label text always present (spec §11).
  */
 import React from 'react';
-import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import { View, Text, StyleProp, ViewStyle } from 'react-native';
+import { Pill, PillTone } from '../ui';
+import { withAlpha } from '../theme/palettes';
+import { useTheme } from '../theme/ThemeProvider';
 
 export type BadgeVariant = 'safe' | 'watching' | 'error' | 'muted';
 
-const VARIANT_STYLES: Record<BadgeVariant, { bg: string; border: string; text: string }> = {
-  safe:    { bg: WeRideColors.greenDim, border: '#22C55E44', text: WeRideColors.green },
-  watching:{ bg: '#3B82F61F',           border: '#3B82F644', text: WeRideColors.blue },
-  error:   { bg: WeRideColors.redDim,   border: '#FF3B3B55', text: WeRideColors.red },
-  muted:   { bg: WeRideColors.dark3,    border: WeRideColors.border, text: WeRideColors.textSub },
-};
+const TONE: Record<Exclude<BadgeVariant, 'watching'>, PillTone> = { safe: 'ok', error: 'bad', muted: 'default' };
 
 interface Props {
   label: string;
@@ -24,20 +20,17 @@ interface Props {
 }
 
 export default function StatusBadge({ label, variant, style }: Props) {
-  const v = VARIANT_STYLES[variant];
+  const { colors, type } = useTheme();
+  if (variant !== 'watching') return <Pill label={label} tone={TONE[variant]} style={style} />;
+  // The demo has no blue pill; same geometry as Pill with a blue tint.
   return (
-    <View style={[styles.badge, { backgroundColor: v.bg, borderColor: v.border }, style]}>
-      <Text style={[type.labelStrong, { color: v.text }]}>{label}</Text>
+    <View
+      style={[
+        { height: 26, paddingHorizontal: 10, borderRadius: 13, alignSelf: 'flex-start', justifyContent: 'center', backgroundColor: withAlpha(colors.blue, 0.16) },
+        style,
+      ]}
+    >
+      <Text style={[type.pill, { color: colors.blue }]} numberOfLines={1}>{label.toUpperCase()}</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  badge: {
-    borderWidth: 1,
-    borderRadius: WeRideRadius.pill,
-    paddingHorizontal: WeRideSpacing.sm,
-    paddingVertical: WeRideSpacing.xs,
-    alignSelf: 'flex-start',
-  },
-});

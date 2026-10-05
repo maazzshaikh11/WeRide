@@ -217,8 +217,9 @@ describe('AlertsScreen list states', () => {
 
     pushSnapshot([cluster('c1', 'oil_spill', 'active', Date.now())]);
     expect(texts(tree)).not.toContain('No hazards reported');
-    expect(texts(tree)).toContain('Oil spill');
-    expect(texts(tree)).toContain('1 ACTIVE');
+    expect(texts(tree)).toContain('OIL SPILL'); // report tile
+    expect(texts(tree)).toContain('Oil spill'); // alert card
+    expect(texts(tree)).toContain('1 ACTIVE HAZARD'); // yellow summary plate
   });
 
   test('a failed subscribe shows an error with a working retry', () => {

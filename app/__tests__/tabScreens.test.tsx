@@ -178,7 +178,7 @@ describe('StopsScreen', () => {
     const joined = texts.join(' ');
     expect(joined).toContain('Planned Stops');
     expect(joined).toContain('Destination');
-    expect(joined).toContain('Up next'); // demo tag label, not the raw 'current' status
+    expect(joined).toContain('UP NEXT'); // demo tag label, not the raw 'current' status
   });
 
   test('tapping the current stop marks it done and pushes a toast', () => {
@@ -321,7 +321,7 @@ describe('AlertsScreen', () => {
     const joined = tree.findAll((n) => (n.type as unknown) === 'Text').map((n) => JSON.stringify(n.props.children)).join(' ');
     expect(joined).toContain('Road Alerts');
     expect(joined).toContain('Pothole');
-    expect(joined).toContain('Oil spill'); // all contract types are offered
+    expect(joined).toContain('OIL SPILL'); // all contract types are offered
     expect(joined).toContain('2 reports'); // card meta from the cluster
   });
 });
@@ -343,8 +343,8 @@ describe('StatBox', () => {
     const tree = render(<StatBox value="12.4" label="km" />);
     const shown = () =>
       tree.root.findAll((n) => (n.type as unknown) === 'Text').map((n) => ([] as unknown[]).concat(n.props.children).join(''));
-    expect(shown()).toEqual(['12.4', 'km']);
+    expect(shown()).toEqual(['12.4', 'KM']);
     act(() => tree.update(<StatBox value="13.0" label="km" />));
-    expect(shown()).toEqual(['13.0', 'km']);
+    expect(shown()).toEqual(['13.0', 'KM']);
   });
 });

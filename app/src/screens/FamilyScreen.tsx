@@ -11,12 +11,11 @@
  *     and no link to hand out.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, Share } from 'react-native';
+import { ScrollView, Text, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import ScreenHeader from '../components/ScreenHeader';
-import { Button, FadeIn, haptic } from '../ui';
+import { Button, Card, FadeIn, List, ListItem, haptic } from '../ui';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useToastStore } from '../store/toastStore';
 
@@ -26,6 +25,15 @@ export function locationShareMessage(lat: number, lng: number): string {
 }
 
 export default function FamilyScreen() {
+  const { type } = useTheme();
+  const styles = useStyles(({ colors }) => ({
+    safe: { flex: 1, backgroundColor: colors.bg },
+    content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
+    card: { marginTop: 24 },
+    list: { marginTop: 16 },
+    cardBody: { marginTop: 8 },
+    primaryBtn: { marginTop: 16 },
+  }));
   const currentLocation = useRouteStore((s) => s.currentLocation);
   const push = useToastStore((s) => s.push);
 
@@ -61,50 +69,32 @@ export default function FamilyScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader title="Family" />
+        <ScreenHeader eyebrow="Me" title="Family" />
 
         <FadeIn>
-          <View style={styles.card}>
-            <Text style={type.heading}>Send my location</Text>
+          <Card style={styles.card}>
+            <Text style={type.h3}>Send my location</Text>
             <Text style={[type.body, styles.cardBody]}>
               Shares a map pin of where you are right now with anyone you choose. It is a one-time
               snapshot, not a live feed.
             </Text>
-            <Button
-              label="Send my location"
-              onPress={shareLocation}
-              loading={sharing}
-              style={styles.primaryBtn}
-            />
-          </View>
+            <Button label="Send my location" onPress={shareLocation} loading={sharing} style={styles.primaryBtn} />
+          </Card>
         </FadeIn>
 
+        {/* The demo's family sheet lists watchers with toggles; there is no watcher backend, so
+            this is a single honest row stating what is unavailable instead. */}
         <FadeIn index={1}>
-          <View style={[styles.card, styles.cardMuted]}>
-            <Text style={type.heading}>Live tracking link</Text>
-            <Text style={[type.body, styles.cardBody]}>
-              Not available yet. Nobody outside your ride group can see your position today, and there
-              is no tracking link to hand out.
-            </Text>
-          </View>
+          <List style={styles.list}>
+            <ListItem
+              first
+              icon="eye"
+              title="Live tracking link"
+              subtitle="Not available yet. Nobody outside your ride group can see your position today, and there is no tracking link to hand out."
+            />
+          </List>
         </FadeIn>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: WeRideColors.dark },
-  content: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.xxl, gap: WeRideSpacing.md },
-  card: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xl,
-    padding: WeRideSpacing.lg,
-    gap: WeRideSpacing.xs,
-  },
-  cardMuted: { backgroundColor: WeRideColors.dark2 },
-  cardBody: { color: WeRideColors.textSub },
-  primaryBtn: { marginTop: WeRideSpacing.md },
-});

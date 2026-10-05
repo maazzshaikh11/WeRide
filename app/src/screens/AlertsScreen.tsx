@@ -10,15 +10,13 @@
  *    snapshot stream.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View, StyleSheet, Text } from 'react-native';
+import { ScrollView, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import ScreenHeader from '../components/ScreenHeader';
-import LivePill from '../components/LivePill';
 import AlertCard from '../components/AlertCard';
 import HazardChip, { HazardChipFeedback } from '../components/HazardChip';
-import { Button, FadeIn, Skeleton, haptic } from '../ui';
+import { Button, Card, FadeIn, IconName, Pill, Plate, SectionLabel, Skeleton, haptic } from '../ui';
 import { useAppStore } from '../store/appStore';
 import { useRidersStore } from '../store/ridersStore';
 import { useRouteStore } from '@routing/client/routeStore';
@@ -33,6 +31,15 @@ export const HAZARD_EMOJI: Record<HazardType, string> = {
   accident: '🚨',
   debris: '🧱',
   other: '⚠️',
+};
+
+/** Demo icon per hazard type (demo HZT). */
+export const HAZARD_ICON: Record<HazardType, IconName> = {
+  pothole: 'pothole',
+  oil_spill: 'drop',
+  accident: 'crash',
+  debris: 'debris',
+  other: 'more',
 };
 
 /** The real hazard_report contract types, in the order the chips appear. */
@@ -75,7 +82,20 @@ export function sortClusters(list: HazardCluster[]): HazardCluster[] {
 
 const SKELETON_HEIGHT = 74;
 
+const plural = (n: number) => `${n} active hazard${n !== 1 ? 's' : ''}`;
+
 export default function AlertsScreen() {
+  const { type } = useTheme();
+  const styles = useStyles(({ colors }) => ({
+    safe: { flex: 1, backgroundColor: colors.bg },
+    content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
+    summary: { marginTop: 24 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    hint: { marginTop: 14 },
+    cardList: { gap: 12 },
+    blockBody: { marginTop: 8 },
+    retryBtn: { marginTop: 14 },
+  }));
   const groupId = useAppStore((s) => s.groupId);
   const userId = useAppStore((s) => s.userId);
   const riders = useRidersStore((s) => s.riders);
@@ -158,19 +178,31 @@ export default function AlertsScreen() {
   const submitting = submittingType !== null;
 
   let pill: React.ReactNode = null;
-  if (isLoading) pill = <LivePill variant="gold" label="SYNCING" />;
-  else if (clusters) pill = <LivePill variant={activeCount > 0 ? 'live' : 'grey'} label={`${activeCount} ACTIVE`} />;
+  if (isLoading) pill = <Pill tone="accent" label="SYNCING" />;
+  // With active hazards the yellow plate below carries the count instead.
+  else if (clusters && activeCount === 0) pill = <Pill label="0 ACTIVE" />;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader title="Road Alerts" right={pill} />
+        <ScreenHeader eyebrow="This ride" title="Road Alerts" right={pill} />
 
-        <Text style={[type.label, styles.sectionLabel]}>REPORT A HAZARD</Text>
+        {clusters && activeCount > 0 ? (
+          <Plate
+            tone="yellow"
+            icon="haz"
+            title={plural(activeCount)}
+            subtitle="Reported on this ride"
+            style={styles.summary}
+          />
+        ) : null}
+
+        <SectionLabel style={{ marginTop: clusters && activeCount > 0 ? 28 : 24 }}>Report a hazard</SectionLabel>
         <View style={styles.chipRow}>
           {HAZARD_OPTIONS.map((opt) => (
             <HazardChip
               key={opt.type}
+              icon={HAZARD_ICON[opt.type]}
               emoji={HAZARD_EMOJI[opt.type]}
               label={opt.label}
               disabled={submitting || !groupId}
@@ -180,35 +212,37 @@ export default function AlertsScreen() {
             />
           ))}
         </View>
-        <Text style={[type.caption, styles.hint]}>
+        <Text style={[type.sm, styles.hint]}>
           {submitting
             ? 'Sending your report…'
             : 'Reports use your current location. A hazard is listed once two reports match in the same spot.'}
         </Text>
 
-        <Text style={[type.label, styles.sectionLabel]}>ON THIS RIDE</Text>
+        <SectionLabel>On this ride</SectionLabel>
         {!groupId ? (
           <EmptyBlock title="No ride selected" body="Open a ride to report and see hazards." />
         ) : loadError ? (
           <FadeIn>
-            <View style={styles.block} accessibilityRole="alert">
-              <Text style={type.heading}>Could not load hazards</Text>
-              <Text style={[type.body, styles.blockBody]}>Check your connection and try again.</Text>
+            <Card>
+              <View accessibilityRole="alert">
+                <Text style={type.h3}>Could not load hazards</Text>
+                <Text style={[type.body, styles.blockBody]}>Check your connection and try again.</Text>
+              </View>
               <Button
                 label="Retry"
-                variant="secondary"
+                variant="soft"
                 size="sm"
                 onPress={() => setAttempt((n) => n + 1)}
                 accessibilityLabel="Retry loading hazards"
                 style={styles.retryBtn}
               />
-            </View>
+            </Card>
           </FadeIn>
         ) : sorted === null ? (
           <View style={styles.cardList} accessibilityLabel="Loading hazards" accessibilityState={{ busy: true }}>
             {[0, 1, 2].map((i) => (
               <View key={i} testID="alerts-skeleton">
-                <Skeleton height={SKELETON_HEIGHT} radius={WeRideRadius.xl} />
+                <Skeleton height={SKELETON_HEIGHT} radius={22} />
               </View>
             ))}
           </View>
@@ -237,7 +271,7 @@ export default function AlertsScreen() {
               return (
                 <AlertCard
                   key={c.cluster_id}
-                  emoji={HAZARD_EMOJI[c.hazard_type] ?? HAZARD_EMOJI.other}
+                  icon={HAZARD_ICON[c.hazard_type] ?? HAZARD_ICON.other}
                   title={`${label}${c.status === 'resolved' ? ' (resolved)' : ''}`}
                   meta={meta}
                   isNew={newIds.has(c.cluster_id)}
@@ -255,31 +289,13 @@ export default function AlertsScreen() {
 }
 
 function EmptyBlock({ title, body }: { title: string; body: string }) {
+  const { type } = useTheme();
   return (
     <FadeIn>
-      <View style={styles.block}>
-        <Text style={type.heading}>{title}</Text>
-        <Text style={[type.body, styles.blockBody]}>{body}</Text>
-      </View>
+      <Card>
+        <Text style={type.h3}>{title}</Text>
+        <Text style={[type.body, { marginTop: 8 }]}>{body}</Text>
+      </Card>
     </FadeIn>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: WeRideColors.dark },
-  content: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.xxl },
-  sectionLabel: { marginBottom: WeRideSpacing.sm },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: WeRideSpacing.sm },
-  hint: { marginTop: WeRideSpacing.md, marginBottom: WeRideSpacing.xxl },
-  cardList: { gap: WeRideSpacing.md },
-  block: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xl,
-    padding: WeRideSpacing.lg,
-    gap: WeRideSpacing.xs,
-  },
-  blockBody: { color: WeRideColors.textSub },
-  retryBtn: { marginTop: WeRideSpacing.md },
-});

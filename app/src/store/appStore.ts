@@ -15,6 +15,8 @@ export type TabName = 'Home' | 'Stops' | 'Voice' | 'Family' | 'Alerts' | 'Histor
 interface AppState {
   userId: string | null;
   groupId: string | null;
+  /** Display name of the current ride (null until known). Cleared when the ride changes. */
+  groupName: string | null;
   /** Wall-clock ms when the current group/ride session started (for "started N min ago"). */
   rideStartedAt: number | null;
   familySharingEnabled: boolean;
@@ -22,6 +24,7 @@ interface AppState {
   currentTab: TabName;
   setUserId: (id: string | null) => void;
   setGroupId: (id: string | null) => void;
+  setGroupName: (name: string | null) => void;
   setFamilySharingEnabled: (on: boolean) => void;
   setSocketConnected: (connected: boolean) => void;
   setCurrentTab: (tab: TabName) => void;
@@ -30,13 +33,21 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   userId: null,
   groupId: null,
+  groupName: null,
   rideStartedAt: null,
   familySharingEnabled: false,
   socketConnected: false,
   currentTab: 'Home',
   setUserId: (id) => set({ userId: id }),
   // Joining a group starts the ride session clock; leaving clears it.
-  setGroupId: (id) => set({ groupId: id, rideStartedAt: id ? Date.now() : null }),
+  // A different ride invalidates the remembered name.
+  setGroupId: (id) =>
+    set((s) => ({
+      groupId: id,
+      groupName: id !== null && id === s.groupId ? s.groupName : null,
+      rideStartedAt: id ? Date.now() : null,
+    })),
+  setGroupName: (name) => set({ groupName: name }),
   setFamilySharingEnabled: (on) => set({ familySharingEnabled: on }),
   setSocketConnected: (connected) => set({ socketConnected: connected }),
   setCurrentTab: (tab) => set({ currentTab: tab }),

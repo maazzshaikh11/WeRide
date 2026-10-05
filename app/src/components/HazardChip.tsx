@@ -85,8 +85,9 @@ export default function HazardChip({ emoji, label, onPress, disabled, busy, feed
 
 const styles = StyleSheet.create({
   chip: {
-    flexGrow: 1,
-    flexBasis: '30%',
+    // Fixed share of the row (no grow): the 2 chips on the second row must match the 3 above.
+    flexGrow: 0,
+    flexBasis: '31%',
     minHeight: 64,
     alignItems: 'center',
     justifyContent: 'center',

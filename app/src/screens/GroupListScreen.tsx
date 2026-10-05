@@ -154,6 +154,7 @@ export default function GroupListScreen({ navigation }: any) {
 
   const uid = firebaseAuth.currentUser?.uid;
   const setGroupId = useAppStore((s) => s.setGroupId);
+  const setGroupName = useAppStore((s) => s.setGroupName);
   const setUserId = useAppStore((s) => s.setUserId);
   const groupService = useMemo(() => new GroupService(), []);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -252,6 +253,7 @@ export default function GroupListScreen({ navigation }: any) {
     // Each ride starts from a clean slate (route/plan/stops/riders).
     resetRideSession();
     setGroupId(g.id);
+    setGroupName(g.name);
     navigation.navigate('MainApp', { groupId: g.id });
   };
 
@@ -600,7 +602,7 @@ const styles = StyleSheet.create({
   noticeOk: { color: WeRideColors.green, marginTop: WeRideSpacing.sm },
   listContent: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: 96 },
   cardWrap: { marginBottom: WeRideSpacing.md },
-  sectionLabel: { ...type.eyebrow, marginTop: WeRideSpacing.sm, marginBottom: WeRideSpacing.md },
+  sectionLabel: { ...type.eyebrow, textTransform: 'uppercase', marginTop: WeRideSpacing.sm, marginBottom: WeRideSpacing.md },
   // Non-pressable twin of the RideCard surface, for the skeleton placeholders.
   cardSurface: {
     backgroundColor: WeRideColors.dark3,

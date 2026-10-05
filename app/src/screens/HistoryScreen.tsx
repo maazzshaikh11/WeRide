@@ -27,7 +27,7 @@ interface Props {
 export default function HistoryScreen({ navigation }: Props = {}) {
   const route = useRouteStore((s) => s.route);
   const riders = useRidersStore((s) => s.riders);
-  const groupId = useAppStore((s) => s.groupId);
+  const groupName = useAppStore((s) => s.groupName);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -38,7 +38,7 @@ export default function HistoryScreen({ navigation }: Props = {}) {
           <View style={styles.stack}>
             <FadeIn>
               <HistoryCard
-                name={`Ride ${groupId?.slice(0, 8) ?? ''}`.trim()}
+                name={groupName ?? 'Current ride'}
                 meta="In progress"
                 active
                 stats={[

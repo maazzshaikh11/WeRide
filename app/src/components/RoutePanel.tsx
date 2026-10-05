@@ -34,6 +34,8 @@ interface Props {
   avoidHazards?: boolean;
   onToggleAvoidHazards?: () => void;
   onOpenInGoogleMaps?: () => void;
+  /** Lets the screen move floating controls out of the way of the expanded sheet. */
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 /**
@@ -148,6 +150,7 @@ export default function RoutePanel({
   avoidHazards = false,
   onToggleAvoidHazards,
   onOpenInGoogleMaps,
+  onExpandedChange,
 }: Props) {
   const route = useRouteStore((s) => s.route);
   const isLoading = useRouteStore((s) => s.isLoading);
@@ -194,7 +197,7 @@ export default function RoutePanel({
   const placeholderStats = recalculating && route == null;
 
   return (
-    <BottomSheet collapsedHeight={COLLAPSED_HEIGHT} maxHeight={MAX_HEIGHT}>
+    <BottomSheet collapsedHeight={COLLAPSED_HEIGHT} maxHeight={MAX_HEIGHT} onExpandedChange={onExpandedChange}>
       {({ expanded, toggle }) => (
         <PressableScale
           scaleTo={0.99}

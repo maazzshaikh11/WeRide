@@ -91,10 +91,13 @@ export default function RideCard({
             </View>
             {dateLabel ? <Text style={styles.date} numberOfLines={1}>{dateLabel}</Text> : null}
           </View>
-          {showMap ? null : headerRight}
         </View>
 
-        <Text style={styles.title} numberOfLines={1}>{title}</Text>
+        {/* No map to overlay: the code sits beside the title, not in the badge/date row. */}
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, styles.titleFlex]} numberOfLines={1}>{title}</Text>
+          {showMap ? null : headerRight}
+        </View>
         {route ? <Text style={styles.route} numberOfLines={1}>{route}</Text> : null}
 
         {stats.length > 0 ? (
@@ -156,7 +159,9 @@ const styles = StyleSheet.create({
   badge: { borderRadius: WeRideRadius.pill, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { ...type.labelStrong, fontSize: 11, letterSpacing: 0.9, textTransform: 'uppercase' },
   date: { ...type.label, flexShrink: 1, textTransform: 'uppercase' },
-  title: { ...type.titleSm, marginTop: WeRideSpacing.sm + 2 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: WeRideSpacing.sm, marginTop: WeRideSpacing.sm + 2 },
+  titleFlex: { flex: 1, minWidth: 0 },
+  title: { ...type.titleSm },
   route: { ...type.caption, color: WeRideColors.textSub, fontSize: 13, lineHeight: 18, marginTop: 4 },
   stats: {
     flexDirection: 'row', gap: WeRideSpacing.sm, marginTop: WeRideSpacing.md,

@@ -27,11 +27,17 @@ interface Props {
   collapsedHeight: number;
   maxHeight: number;
   initialCollapsed?: boolean;
+  /** Fires whenever the sheet snaps open/closed (and once on mount). */
+  onExpandedChange?: (expanded: boolean) => void;
   children: (state: { expanded: boolean; toggle: () => void }) => React.ReactNode;
 }
 
-export default function BottomSheet({ collapsedHeight, maxHeight, initialCollapsed = true, children }: Props) {
+export default function BottomSheet({ collapsedHeight, maxHeight, initialCollapsed = true, onExpandedChange, children }: Props) {
   const [expanded, setExpanded] = useState(!initialCollapsed);
+  useEffect(() => {
+    onExpandedChange?.(expanded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
   const heightAnim = useRef(new Animated.Value(collapsedHeight)).current;
   const startY = useRef(0);
   const currentHeight = useRef(collapsedHeight);

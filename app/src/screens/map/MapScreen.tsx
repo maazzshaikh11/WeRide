@@ -13,7 +13,7 @@
  *  - VoxClient untouched — Voice tab owns voice now (Person D)
  */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, Linking, ScrollView } from 'react-native';
+import { View, StyleSheet, Text, Linking, ScrollView, Animated, useWindowDimensions } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -35,7 +35,7 @@ import ToastContainer from '../../components/ToastContainer';
 import NetworkBanner from '../../components/NetworkBanner';
 import SignalMenu from '../../components/SignalMenu';
 import RoutePanel from '../../components/RoutePanel';
-import { COLLAPSED_HEIGHT as ROUTE_PANEL_COLLAPSED_H } from '../../components/routePanelState';
+import { COLLAPSED_HEIGHT as ROUTE_PANEL_COLLAPSED_H, MAX_HEIGHT as ROUTE_PANEL_MAX_H } from '../../components/routePanelState';
 import SosModal from '../../components/SosModal';
 import Fab, { FAB_SIZE } from '../../components/Fab';
 import NavFab from '../../components/NavFab';
@@ -46,8 +46,9 @@ import { resolveSos } from '@hazard/services/sosService';
 import { resolveHazard } from '@hazard/services/hazardService';
 import { useRidePlanStore } from '../../store/ridePlanStore';
 import { useStopsStore } from '../../store/stopsStore';
-import { PressableScale } from '../../ui';
+import { Motion, PressableScale, useReducedMotion } from '../../ui';
 import { fitPadding } from '../../utils/mapFit';
+import { nextNetworkBanner, NetworkTracker } from '../../utils/networkBanner';
 import { fitPointsFor, fitSignature } from './rideGeometry';
 import { useRouteFit } from './useRouteFit';
 import { ROUTE_COLOR } from './mapStyle';
@@ -98,6 +99,13 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
   const avoidHazardTypes = useRouteStore((s) => s.avoidHazardTypes);
   const push = useToastStore((s) => s.push);
   const insets = useSafeAreaInsets();
+  const { height: windowH } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
+
+  // The expanded route sheet grows over the FAB column (SOS included). The column
+  // rides up with it on the same spring, capped so it never runs into the header.
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const fabLift = useRef(new Animated.Value(0)).current;
 
   // Camera: frame the route (Google Maps style); follow the rider only on request.
   const cameraRef = useRef<MapboxGL.Camera>(null);
@@ -118,7 +126,7 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
   // Ride name for the header (demo shows "Lonavala Loop", not the group ID).
   const [rideName, setRideName] = useState<string | null>(null);
 
-  const prevConnectedRef = useRef<boolean | null>(null);
+  const networkRef = useRef<NetworkTracker>({ everConnected: false, prev: null });
 
   // Keep a stable ref to the service so useEffect cleanup can always call .stop()
   const serviceRef = useRef<TrackingService | null>(null);
@@ -191,7 +199,10 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
     groupService
       .getGroup(groupId)
       .then((group) => {
-        if (group?.name) setRideName(group.name);
+        if (group?.name) {
+          setRideName(group.name);
+          useAppStore.getState().setGroupName?.(group.name);
+        }
       })
       .catch((e: unknown) => {
         console.warn('[MapScreen] Group name load failed:', e);
@@ -236,21 +247,29 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
     };
   }, [groupId, userId, push]);
 
-  // Network banner state transitions (spec §3.3.5, FLOW 12)
+  // Network banner: only after the socket was actually up and then dropped
+  // (the first connect after mount is not a recovery).
   useEffect(() => {
-    if (prevConnectedRef.current === null) {
-      prevConnectedRef.current = connected;
-      return;
-    }
-    if (prevConnectedRef.current && !connected) {
-      setNetworkBanner('lost');
-    } else if (!prevConnectedRef.current && connected) {
-      setNetworkBanner('recovered');
-    }
-    prevConnectedRef.current = connected;
+    const { tracker, banner } = nextNetworkBanner(networkRef.current, connected);
+    networkRef.current = tracker;
+    if (banner) setNetworkBanner(banner);
   }, [connected]);
 
   const riderCount = riders.size;
+
+  const fabColumnH = 4 * FAB_SIZE + 3 * FAB_GAP;
+  const maxLift = Math.max(
+    0,
+    Math.min(
+      ROUTE_PANEL_MAX_H - ROUTE_PANEL_COLLAPSED_H,
+      windowH - FAB_COLUMN_BOTTOM - fabColumnH - (insets.top + HEADER_CONTENT_H + GUTTER),
+    ),
+  );
+  const fabLiftPx = sheetExpanded ? maxLift : 0;
+  useEffect(() => {
+    if (reducedMotion) fabLift.setValue(-fabLiftPx);
+    else Animated.spring(fabLift, { toValue: -fabLiftPx, ...Motion.spring, useNativeDriver: true }).start();
+  }, [fabLiftPx, reducedMotion, fabLift]);
 
   const plan = useMemo(
     () => ({ start: planStart, stops: planStops, destination: planDestination }),
@@ -431,11 +450,11 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
         riderId={userId ?? ''}
         onSend={() => setSignalMenuOpen(false)}
         right={FAB_COLUMN_W + FAB_GAP}
-        bottom={FAB_COLUMN_BOTTOM + FAB_SIZE + FAB_GAP}
+        bottom={FAB_COLUMN_BOTTOM + FAB_SIZE + FAB_GAP + fabLiftPx}
       />
 
       {/* 3.3.6 FAB column */}
-      <View style={styles.fabColumn}>
+      <Animated.View style={[styles.fabColumn, { transform: [{ translateY: fabLift }] }]}>
         {/* Recenter: the accent border and the glyph colour cross-fade (Fab) instead of swapping. */}
         <Fab
           onPress={toggleFollow}
@@ -471,7 +490,7 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
           onHoldComplete={() => setSosModalOpen(true)}
           disabled={sosActive}
         />
-      </View>
+      </Animated.View>
 
       {/* Bottom stack: info cards, SOS info cards, bottom sheet */}
       <View style={styles.bottomStack} pointerEvents="box-none">
@@ -510,6 +529,7 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
 
         <View pointerEvents="box-none">
           <RoutePanel
+            onExpandedChange={setSheetExpanded}
             avoidHazards={avoidHazardTypes.length > 0}
             onToggleAvoidHazards={() => {
               const toggle = getToggleAvoidHazards();

@@ -23,6 +23,8 @@ export interface Group {
   ride_type?: RideType | null;
   /** Planned start, epoch ms. */
   start_time_ms?: number | null;
+  /** Saved by Create Ride: start, stops and destination coordinates. */
+  ride_plan?: RidePlanPayload | null;
 }
 
 /** Optional ride metadata chosen in the Create Ride modal. */

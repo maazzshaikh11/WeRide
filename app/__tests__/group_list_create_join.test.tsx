@@ -4,7 +4,8 @@
  * stores and theme are real.
  */
 import React from 'react';
-import { Alert } from 'react-native';
+import { timeOfDay } from '../src/utils/rides';
+import { Alert, LayoutAnimation } from 'react-native';
 import { act, create, ReactTestInstance } from 'react-test-renderer';
 
 const mockFirebaseAuth: { currentUser: { uid: string } | null; signOut: jest.Mock } = {
@@ -56,6 +57,7 @@ jest.mock('@routing/group/groupService', () => ({
 
 import GroupListScreen from '../src/screens/GroupListScreen';
 import { useAppStore } from '../src/store/appStore';
+import { Skeleton, TextField } from '../src/ui';
 
 const ORIGINAL_SET_GROUP_ID = useAppStore.getState().setGroupId;
 const NOW = Date.now();
@@ -108,6 +110,19 @@ async function deliver(groups: any[]) {
     mockHandlers!.onGroups(groups);
   });
 }
+/** The real touchable (carries onPressIn); findByProps would return the outer wrapper. */
+function realPressable(tree: ReturnType<typeof create>, label: string): ReactTestInstance {
+  const found = tree.root.findAll(
+    (n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function'
+  );
+  if (!found.length) throw new Error(`no pressable labelled "${label}"`);
+  return found[0];
+}
+async function pressReal(tree: ReturnType<typeof create>, label: string) {
+  await act(async () => {
+    await realPressable(tree, label).props.onPress({ nativeEvent: {} });
+  });
+}
 async function press(tree: ReturnType<typeof create>, label: string) {
   await act(async () => {
     await byLabel(tree, label).props.onPress();
@@ -144,11 +159,22 @@ afterEach(() => {
 describe('GroupListScreen states', () => {
   test('shows the title, Sign out, join row and create FAB', () => {
     const { tree } = render();
-    expect(hasText(tree, 'My rides')).toBe(true);
+    // Greeting header (time-of-day + "rider") with the date eyebrow above it.
+    expect(hasText(tree, ', rider')).toBe(true);
     expect(hasLabel(tree, 'Sign out')).toBe(true);
     expect(hasLabel(tree, 'Join code input')).toBe(true);
     expect(hasLabel(tree, 'Join group')).toBe(true);
     expect(hasLabel(tree, 'Create new ride')).toBe(true);
+  });
+
+  test('skeleton cards show while loading and are replaced by the real cards', async () => {
+    const { tree } = render();
+    expect(tree.root.findAllByType(Skeleton).length).toBeGreaterThanOrEqual(3);
+    expect(hasLabel(tree, 'Open ride Morning Ride')).toBe(false);
+    await deliver([G1, G2_LEGACY]);
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    expect(hasLabel(tree, 'Open ride Morning Ride')).toBe(true);
+    expect(hasLabel(tree, 'Open ride Evening Ride')).toBe(true);
   });
 
   test('loading state until the first snapshot, then the rides', async () => {
@@ -197,12 +223,20 @@ describe('GroupListScreen states', () => {
 });
 
 describe('GroupListScreen cards', () => {
-  test('card shows riders, ride type, start line and join code', async () => {
+  test('cards show badge, date, stats (riders, type, start time) and the join code, grouped in sections', async () => {
     const { tree } = render();
     await deliver([G1, G2_LEGACY]);
-    expect(hasText(tree, '2 riders · Sport')).toBe(true);
-    expect(hasText(tree, '1 rider')).toBe(true);
-    expect(hasText(tree, 'Starts in 25 min')).toBe(true);
+    // Sections: the scheduled ride is "Up next"; the unscheduled legacy ride is under "Your rides".
+    expect(hasText(tree, 'Up next')).toBe(true);
+    expect(hasText(tree, 'Your rides')).toBe(true);
+    // Badges reflect the schedule only.
+    expect(hasText(tree, 'Upcoming')).toBe(true);
+    expect(hasText(tree, 'Planned')).toBe(true);
+    // Stats come from real fields.
+    expect(hasText(tree, 'Sport')).toBe(true);
+    expect(hasText(tree, timeOfDay(new Date(G1.start_time_ms as number)))).toBe(true);
+    expect(hasText(tree, 'riders')).toBe(true);
+    expect(hasText(tree, 'rider')).toBe(true);
     expect(hasLabel(tree, 'Join code K7M2QX')).toBe(true);
     // Legacy ride: no invented start/code, and a Copy ID action instead
     expect(hasLabel(tree, 'Copy ride ID for Evening Ride')).toBe(true);
@@ -224,6 +258,49 @@ describe('GroupListScreen cards', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('MainApp', { groupId: 'group-1' });
   });
 
+  test('pressing the card itself opens the ride', async () => {
+    const { tree, navigation } = render();
+    await deliver([G1]);
+    await pressReal(tree, 'Open ride Morning Ride');
+    expect(mockCalls).toEqual(['reset']);
+    expect(navigation.navigate).toHaveBeenCalledWith('MainApp', { groupId: 'group-1' });
+  });
+
+  test('pressing Copy does not open the ride', async () => {
+    const { tree, navigation } = render();
+    await deliver([G1]);
+    const card = realPressable(tree, 'Open ride Morning Ride');
+    const copyBtn = realPressable(tree, 'Copy join code for Morning Ride');
+    // a separate pressable nested inside the card, not the card's own handler
+    expect(copyBtn).not.toBe(card);
+    expect(card.findAll((n) => n === copyBtn)).toHaveLength(1);
+    await pressReal(tree, 'Copy join code for Morning Ride');
+    expect(mockSetString).toHaveBeenCalledWith('K7M2QX');
+    expect(navigation.navigate).not.toHaveBeenCalled();
+    expect(mockCalls).toEqual([]);
+  });
+
+  test('pressing Leave does not open the ride', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const { tree, navigation } = render();
+    await deliver([G1]);
+    await pressReal(tree, 'Leave Morning Ride');
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(navigation.navigate).not.toHaveBeenCalled();
+    expect(mockCalls).toEqual([]);
+  });
+
+  test('a removed ride animates out and the remaining card stays', async () => {
+    const configure = jest.spyOn(LayoutAnimation, 'configureNext').mockImplementation(() => undefined);
+    const { tree } = render();
+    await deliver([G1, G2_LEGACY]);
+    expect(configure).not.toHaveBeenCalled(); // first load is not animated
+    await deliver([G2_LEGACY]);
+    expect(configure).toHaveBeenCalledTimes(1);
+    expect(hasLabel(tree, 'Open ride Morning Ride')).toBe(false);
+    expect(hasLabel(tree, 'Open ride Evening Ride')).toBe(true);
+  });
+
   test('Copy puts the join code on the clipboard and flips to Copied for ~1.8s', async () => {
     jest.useFakeTimers();
     const { tree } = render();
@@ -237,6 +314,11 @@ describe('GroupListScreen cards', () => {
     expect(hasText(tree, 'Copied')).toBe(true);
     act(() => {
       jest.advanceTimersByTime(200);
+    });
+    // reverted: the "Copied" label fades out (stays mounted ~200ms) then unmounts
+    expect(hasText(tree, 'Copy')).toBe(true);
+    act(() => {
+      jest.advanceTimersByTime(300);
     });
     expect(hasText(tree, 'Copied')).toBe(false);
     expect(hasText(tree, 'Copy')).toBe(true);
@@ -345,6 +427,18 @@ describe('GroupListScreen join', () => {
     expect(hasText(tree, 'Joined')).toBe(false);
     expect(byLabel(tree, 'Join code input').props.value).toBe('ZZZZZZ');
     expect(alert).not.toHaveBeenCalled();
+  });
+
+  test('a failed join passes the message to the field (shake + error text)', async () => {
+    mockSvc.joinGroup.mockRejectedValue(new Error('Group "ZZZZZZ" not found'));
+    const { tree } = render();
+    await deliver([]);
+    expect(tree.root.findByType(TextField).props.error).toBeNull();
+    typeJoin(tree, 'zzzzzz');
+    await press(tree, 'Join group');
+    expect(tree.root.findByType(TextField).props.error).toBe('Group "ZZZZZZ" not found');
+    typeJoin(tree, 'zzzzz');
+    expect(tree.root.findByType(TextField).props.error).toBeNull();
   });
 
   test('Join is disabled while in flight and does not double-submit', async () => {

@@ -5,33 +5,131 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, TextInput, FlatList, Text, StyleSheet, Pressable, Alert, ActivityIndicator,
+  View, FlatList, Text, StyleSheet, Alert, ActivityIndicator, Animated,
+  LayoutAnimation, Platform, UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { firebaseAuth } from '../services/firebaseService';
 import { useAppStore } from '../store/appStore';
 import { resetRideSession } from '../store/rideSession';
-import { WeRideColors, WeRideFonts, WeRideRadius, WeRideSpacing } from '../theme/theme';
+import { WeRideColors, WeRideFonts, WeRideSpacing } from '../theme/theme';
 import { type } from '../theme/typography';
 import { GroupService, Group } from '@routing/group/groupService';
 import CreateRideModal from '../components/CreateRideModal';
-import { describeStart } from '../utils/startTime';
+import RideCard from '../components/RideCard';
+import {
+  dayLabel, formatKm, greetingFor, planDistanceKm, planPoints, rideBadge, sectionRides, shortPlace,
+  startLabel, timeOfDay,
+} from '../utils/rides';
+import {
+  Button, FadeIn, PressableScale, Skeleton, TextField, haptic, useReducedMotion,
+} from '../ui';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
 type Notice = { id: string; text: string } | null;
 
 const COPIED_MS = 1800;
 const TICK_MS = 60_000;
+const COPIED_FADE_MS = 160;
+
+// Android needs layout animations switched on once (no-op elsewhere / in jest).
+if (Platform.OS === 'android' && typeof UIManager?.setLayoutAnimationEnabledExperimental === 'function') {
+  try {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  } catch {
+    // Optional nicety.
+  }
+}
+
+/**
+ * Smooth the NEXT layout change: cards below a removed/added ride slide into
+ * place and a removed card fades out. Entering cards are animated by FadeIn.
+ */
+function animateLayout(): void {
+  try {
+    LayoutAnimation.configureNext({
+      duration: 240,
+      update: { type: LayoutAnimation.Types.easeInEaseOut },
+      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+    });
+  } catch {
+    // Layout animation is a nicety; never block a data update.
+  }
+}
+
+/**
+ * Copy chip label: the idle label cross-fades into "Copied" (which pops in from
+ * a slightly smaller scale) and back. Opacity/transform only, native driver.
+ * "Copied" stays mounted just long enough to fade out, then unmounts.
+ */
+function CopyLabel({ idle, copied, reduced }: { idle: string; copied: boolean; reduced: boolean }) {
+  const t = useRef(new Animated.Value(copied ? 1 : 0)).current;
+  const [showCopied, setShowCopied] = useState(copied);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (copied) setShowCopied(true);
+    else timer = setTimeout(() => setShowCopied(false), COPIED_FADE_MS + 40);
+    if (reduced) t.setValue(copied ? 1 : 0);
+    else Animated.timing(t, { toValue: copied ? 1 : 0, duration: COPIED_FADE_MS, useNativeDriver: true }).start();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [copied, reduced, t]);
+
+  return (
+    <View style={styles.copyLabel}>
+      <Animated.Text
+        style={[type.captionStrong, styles.copyText, { opacity: t.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
+      >
+        {idle}
+      </Animated.Text>
+      {showCopied ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            styles.copiedWrap,
+            {
+              opacity: t,
+              transform: [{ scale: reduced ? 1 : t.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
+            },
+          ]}
+        >
+          <Text style={[type.captionStrong, styles.copyText]} numberOfLines={1}>Copied</Text>
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
 
 function errorText(e: unknown, fallback: string): string {
   const m = (e as { message?: unknown } | null)?.message;
   return typeof m === 'string' && m.trim() ? m : fallback;
 }
 
-function riderCount(g: Group): string {
-  const n = g.member_ids?.length ?? 0;
-  return `${n} ${n === 1 ? 'rider' : 'riders'}`;
+type Row =
+  | { kind: 'label'; key: string; text: string }
+  | { kind: 'ride'; key: string; group: Group; variant: 'hero' | 'standard' | 'compact' };
+
+/** Flatten the sections (Up next / Your rides / Earlier) into list rows. */
+function buildRows(groups: Group[], now: number): Row[] {
+  const { upNext, rides, earlier } = sectionRides(groups, now);
+  const rows: Row[] = [];
+  if (upNext) {
+    rows.push({ kind: 'label', key: 'l-next', text: 'Up next' });
+    rows.push({ kind: 'ride', key: upNext.id, group: upNext, variant: 'hero' });
+  }
+  if (rides.length) {
+    rows.push({ kind: 'label', key: 'l-rides', text: 'Your rides' });
+    rides.forEach((g) => rows.push({ kind: 'ride', key: g.id, group: g, variant: 'standard' }));
+  }
+  if (earlier.length) {
+    rows.push({ kind: 'label', key: 'l-earlier', text: 'Earlier' });
+    earlier.forEach((g) => rows.push({ kind: 'ride', key: g.id, group: g, variant: 'compact' }));
+  }
+  return rows;
 }
 
 export default function GroupListScreen({ navigation }: any) {
@@ -60,6 +158,12 @@ export default function GroupListScreen({ navigation }: any) {
   const groupService = useMemo(() => new GroupService(), []);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
+  const reduced = useReducedMotion();
+  const reducedRef = useRef(reduced);
+  reducedRef.current = reduced;
+  // Used to animate only real list changes (a leave/join), not the first load.
+  const listReady = useRef(false);
+  const listCount = useRef(0);
 
   useEffect(() => {
     mounted.current = true;
@@ -71,6 +175,7 @@ export default function GroupListScreen({ navigation }: any) {
 
   // Subscribe to my groups; `reloadKey` resubscribes after an error.
   useEffect(() => {
+    listReady.current = false;
     if (!uid) {
       setGroups([]);
       setStatus('ready');
@@ -81,6 +186,9 @@ export default function GroupListScreen({ navigation }: any) {
     try {
       return groupService.myGroups(
         (fetched) => {
+          if (listReady.current && fetched.length !== listCount.current && !reducedRef.current) animateLayout();
+          listReady.current = true;
+          listCount.current = fetched.length;
           setGroups(fetched);
           setStatus('ready');
         },
@@ -130,8 +238,10 @@ export default function GroupListScreen({ navigation }: any) {
       if (!mounted.current) return;
       setJoinCode('');
       setJoined({ input });
+      haptic('success');
     } catch (e) {
       if (!mounted.current) return;
+      haptic('error');
       setJoinError(errorText(e, 'Could not join this ride.'));
     } finally {
       if (mounted.current) setJoining(false);
@@ -150,9 +260,11 @@ export default function GroupListScreen({ navigation }: any) {
     try {
       Clipboard.setString(value);
     } catch {
+      haptic('error');
       setCardNotice({ id: key, text: 'Could not copy. Try again.' });
       return;
     }
+    haptic('success');
     setCopiedKey(key);
     if (copyTimer.current) clearTimeout(copyTimer.current);
     copyTimer.current = setTimeout(() => setCopiedKey(null), COPIED_MS);
@@ -201,114 +313,176 @@ export default function GroupListScreen({ navigation }: any) {
 
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
-  const renderGroup = ({ item }: { item: Group }) => {
-    const start = describeStart(item.start_time_ms, now);
-    const meta = [riderCount(item), item.ride_type].filter(Boolean).join(' · ');
+  const selfInitial = firebaseAuth.currentUser?.email?.trim()?.[0]?.toUpperCase();
+
+  const renderRow = ({ item: row, index }: { item: Row; index: number }) => {
+    if (row.kind === 'label') {
+      return (
+        <FadeIn index={index < 8 ? index : 0}>
+          <Text style={styles.sectionLabel} accessibilityRole="header">{row.text}</Text>
+        </FadeIn>
+      );
+    }
+    const item = row.group;
     const code = item.join_code;
     const copyKey = item.id;
     const copied = copiedKey === copyKey;
     const leaving = leavingId === item.id;
     const notice = cardNotice && cardNotice.id === item.id ? cardNotice.text : null;
-    return (
-      <View style={styles.card}>
-        <Pressable
-          onPress={() => openRide(item)}
-          style={({ pressed }) => [styles.cardBody, pressed && styles.pressed]}
-          accessibilityLabel={`Open ride ${item.name}`}
-          accessibilityRole="button"
-        >
-          <Text style={type.heading} numberOfLines={2}>{item.name}</Text>
-          <Text style={[type.caption, styles.meta]}>{meta}</Text>
-          {start ? <Text style={[type.captionStrong, styles.start]}>{start}</Text> : null}
-        </Pressable>
+    const copyLabel = code ? `Copy join code for ${item.name}` : `Copy ride ID for ${item.name}`;
 
-        <View style={styles.cardActions}>
-          {code ? <Text style={styles.codeChip} selectable accessibilityLabel={`Join code ${code}`}>{code}</Text> : null}
-          <Pressable
-            style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
-            onPress={() => copy(copyKey, code ?? item.id)}
-            accessibilityRole="button"
-            accessibilityLabel={code ? `Copy join code for ${item.name}` : `Copy ride ID for ${item.name}`}
-          >
-            <Text style={[type.captionStrong, { color: WeRideColors.primary }]}>
-              {copied ? 'Copied' : code ? 'Copy' : 'Copy ID'}
-            </Text>
-          </Pressable>
-          <View style={styles.spacer} />
-          <Pressable
-            style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed, leaving && styles.disabled]}
-            onPress={() => confirmLeave(item)}
-            disabled={leaving}
-            accessibilityRole="button"
-            accessibilityLabel={`Leave ${item.name}`}
-            accessibilityState={{ disabled: leaving, busy: leaving }}
-          >
-            {leaving ? (
-              <ActivityIndicator size="small" color={WeRideColors.error} />
-            ) : (
-              <Text style={[type.captionStrong, { color: WeRideColors.error }]}>Leave</Text>
-            )}
-          </Pressable>
-        </View>
+    const points = planPoints(item);
+    const km = planDistanceKm(item);
+    const members = item.member_ids?.length ?? 0;
+    const stats = [
+      // Straight-line along the planned waypoints, not road distance: marked with "~".
+      ...(km != null ? [{ value: `~${formatKm(km)}`, label: 'km' }] : []),
+      { value: String(members), label: members === 1 ? 'rider' : 'riders' },
+      ...(item.ride_type ? [{ value: item.ride_type, label: 'type' }] : []),
+      ...(item.start_time_ms ? [{ value: timeOfDay(new Date(item.start_time_ms)), label: 'start' }] : []),
+    ];
+
+    return (
+      // Only the first screenful staggers; rows mounted later (scroll) appear at once.
+      <FadeIn index={index < 8 ? index : 0} style={styles.cardWrap}>
+        <RideCard
+          variant={row.variant}
+          badge={rideBadge(item, now)}
+          dateLabel={startLabel(item.start_time_ms)}
+          title={item.name}
+          from={shortPlace(item.ride_plan?.start?.label)}
+          to={shortPlace(item.ride_plan?.destination?.label)}
+          stats={stats}
+          mapPoints={points}
+          memberCount={members}
+          selfInitial={selfInitial}
+          onPress={() => openRide(item)}
+          accessibilityLabel={`Open ride ${item.name}`}
+          // Children (Copy / Leave) are their own pressables; iOS groups them into this
+          // element for VoiceOver, so expose them as custom actions too.
+          accessibilityActions={[
+            { name: 'copy', label: code ? 'Copy join code' : 'Copy ride ID' },
+            { name: 'leave', label: 'Leave ride' },
+          ]}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === 'copy') copy(copyKey, code ?? item.id);
+            else if (e.nativeEvent.actionName === 'leave' && !leaving) confirmLeave(item);
+          }}
+          headerRight={
+            <View style={styles.codeRow}>
+              {code ? <Text style={styles.codeChip} numberOfLines={1} accessibilityLabel={`Join code ${code}`}>{code}</Text> : null}
+              <PressableScale
+                style={styles.actionBtn}
+                onPress={() => copy(copyKey, code ?? item.id)}
+                haptic={false}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                accessibilityRole="button"
+                accessibilityLabel={copyLabel}
+              >
+                <CopyLabel idle={code ? 'Copy' : 'Copy ID'} copied={copied} reduced={reduced} />
+              </PressableScale>
+            </View>
+          }
+          footerActions={
+            <PressableScale
+              style={styles.actionBtn}
+              onPress={() => confirmLeave(item)}
+              disabled={leaving}
+              haptic="warning"
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Leave ${item.name}`}
+              accessibilityState={{ disabled: leaving, busy: leaving }}
+            >
+              {leaving ? (
+                <ActivityIndicator size="small" color={WeRideColors.error} />
+              ) : (
+                <Text style={[type.captionStrong, { color: WeRideColors.error }]}>Leave</Text>
+              )}
+            </PressableScale>
+          }
+        />
         {notice ? (
-          <Text style={[type.caption, styles.noticeError]} accessibilityLiveRegion="polite">{notice}</Text>
+          <FadeIn>
+            <Text style={[type.caption, styles.noticeError]} accessibilityLiveRegion="polite">{notice}</Text>
+          </FadeIn>
         ) : null}
-      </View>
+      </FadeIn>
     );
   };
 
   const renderEmpty = () => {
     if (status === 'loading') {
+      // Same structure and height as a real card, so cards replace these in place.
       return (
         <View accessibilityLabel="Loading rides" accessibilityLiveRegion="polite">
           {[0, 1, 2].map((i) => (
-            <View key={i} style={[styles.card, styles.skeletonCard]}>
-              <View style={[styles.skeletonLine, { width: '55%' }]} />
-              <View style={[styles.skeletonLine, { width: '30%', marginTop: WeRideSpacing.sm }]} />
-            </View>
+            <FadeIn key={i} index={i} style={styles.cardWrap}>
+              <View style={styles.cardSurface}>
+                <Skeleton width="100%" height={148} radius={0} />
+                <View style={styles.skelBody}>
+                  <View style={styles.skelTitle}>
+                    <Skeleton width="55%" height={16} />
+                  </View>
+                  <View style={[styles.skelLine, styles.meta]}>
+                    <Skeleton width="38%" height={12} />
+                  </View>
+                  <View style={[styles.skelLine, styles.skelStats]}>
+                    <Skeleton width="80%" height={12} />
+                  </View>
+                </View>
+              </View>
+            </FadeIn>
           ))}
         </View>
       );
     }
     if (status === 'error') {
       return (
-        <View style={styles.statePanel} accessibilityRole="alert">
-          <Text style={type.heading}>Couldn't load your rides</Text>
-          <Text style={[type.body, styles.stateText]}>
-            {loadError ?? 'Check your connection and try again.'}
-          </Text>
-          <Pressable
-            style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}
-            onPress={retry}
-            accessibilityRole="button"
-            accessibilityLabel="Try again"
-          >
-            <Text style={[type.buttonSm, { color: WeRideColors.primary }]}>Try again</Text>
-          </Pressable>
-        </View>
+        <FadeIn>
+          <View style={styles.statePanel} accessibilityRole="alert">
+            <Text style={type.heading}>Couldn't load your rides</Text>
+            <Text style={[type.body, styles.stateText]}>
+              {loadError ?? 'Check your connection and try again.'}
+            </Text>
+            <Button label="Try again" variant="secondary" size="sm" onPress={retry} style={styles.retryBtn} />
+          </View>
+        </FadeIn>
       );
     }
     return (
-      <View style={styles.statePanel}>
-        <Text style={type.heading}>No rides yet</Text>
-        <Text style={[type.body, styles.stateText]}>
-          Create one with the + button, or join with a code.
-        </Text>
-      </View>
+      <FadeIn>
+        <View style={styles.statePanel}>
+          <Text style={type.heading}>No rides yet</Text>
+          <Text style={[type.body, styles.stateText]}>
+            Create one with the + button, or join with a code.
+          </Text>
+        </View>
+      </FadeIn>
     );
   };
 
   const canJoin = joinCode.trim().length > 0 && !joining;
+  const rows = useMemo(() => buildRows(groups, now), [groups, now]);
+  const upcomingCount = groups.filter((g) => (g.start_time_ms ?? 0) > now).length;
+  const headerEyebrow = [dayLabel(new Date(now)), upcomingCount > 0 ? `${upcomingCount} upcoming` : null]
+    .filter(Boolean)
+    .join(' · ')
+    .toUpperCase();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={type.title} accessibilityRole="header">My rides</Text>
-          <Pressable
-            style={({ pressed }) => [styles.signOutBtn, pressed && styles.pressed, signingOut && styles.disabled]}
+          <View style={styles.headerText}>
+            <Text style={type.eyebrow} numberOfLines={1}>{headerEyebrow}</Text>
+            <Text style={type.title} accessibilityRole="header" numberOfLines={1}>{greetingFor(new Date(now))}, rider</Text>
+          </View>
+          <PressableScale
+            style={styles.signOutBtn}
             onPress={signOut}
             disabled={signingOut}
+            haptic="tap"
             accessibilityRole="button"
             accessibilityLabel="Sign out"
             accessibilityState={{ disabled: signingOut, busy: signingOut }}
@@ -318,18 +492,19 @@ export default function GroupListScreen({ navigation }: any) {
             ) : (
               <Text style={[type.bodyStrong, { color: WeRideColors.textSub }]}>Sign out</Text>
             )}
-          </Pressable>
+          </PressableScale>
         </View>
         {signOutError ? (
-          <Text style={[type.caption, styles.bannerError]} accessibilityLiveRegion="polite">{signOutError}</Text>
+          <FadeIn>
+            <Text style={[type.caption, styles.bannerError]} accessibilityLiveRegion="polite">{signOutError}</Text>
+          </FadeIn>
         ) : null}
 
         <View style={styles.joinWrap}>
           <View style={styles.joinRow}>
-            <TextInput
-              style={styles.input}
+            <TextField
+              containerStyle={styles.joinField}
               placeholder="Join code"
-              placeholderTextColor={WeRideColors.textSub}
               value={joinCode}
               onChangeText={onJoinChange}
               autoCapitalize="characters"
@@ -337,45 +512,41 @@ export default function GroupListScreen({ navigation }: any) {
               returnKeyType="go"
               onSubmitEditing={submitJoin}
               editable={!joining}
+              error={joinError}
               accessibilityLabel="Join code input"
             />
-            <Pressable
-              style={({ pressed }) => [styles.joinButton, pressed && styles.joinButtonPressed, !canJoin && styles.disabled]}
-              onPress={submitJoin}
-              disabled={!canJoin}
+            <Button
+              label="Join"
               accessibilityLabel="Join group"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !canJoin, busy: joining }}
-            >
-              {joining ? (
-                <ActivityIndicator size="small" color={WeRideColors.primary} />
-              ) : (
-                <Text style={[type.bodyStrong, { color: WeRideColors.primary }]}>Join</Text>
-              )}
-            </Pressable>
+              variant="secondary"
+              onPress={submitJoin}
+              loading={joining}
+              disabled={!canJoin}
+              style={styles.joinButton}
+            />
           </View>
-          {joinError ? (
-            <Text style={[type.caption, styles.noticeError]} accessibilityLiveRegion="polite">{joinError}</Text>
-          ) : null}
           {joined ? (
-            <Text style={[type.caption, styles.noticeOk]} accessibilityLiveRegion="polite">
-              {joinedName ? `Joined ${joinedName}` : 'Joined the ride'}
-            </Text>
+            <FadeIn>
+              <Text style={[type.caption, styles.noticeOk]} accessibilityLiveRegion="polite">
+                {joinedName ? `Joined ${joinedName}` : 'Joined the ride'}
+              </Text>
+            </FadeIn>
           ) : null}
         </View>
 
         <FlatList
-          data={status === 'ready' ? groups : []}
-          keyExtractor={(item) => item.id}
+          data={status === 'ready' ? rows : []}
+          keyExtractor={(item) => item.key}
           contentContainerStyle={styles.listContent}
-          renderItem={renderGroup}
+          renderItem={renderRow}
           ListEmptyComponent={renderEmpty}
           extraData={[copiedKey, leavingId, cardNotice, now]}
           keyboardShouldPersistTaps="handled"
         />
 
-        <Pressable
-          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        <PressableScale
+          style={styles.fab}
+          haptic="select"
           onPress={() => {
             // Fresh draft: don't pre-fill the form with the previous ride's plan.
             resetRideSession();
@@ -385,7 +556,7 @@ export default function GroupListScreen({ navigation }: any) {
           accessibilityRole="button"
         >
           <Text style={styles.fabText}>+</Text>
-        </Pressable>
+        </PressableScale>
 
         <CreateRideModal
           visible={createModalOpen}
@@ -411,6 +582,7 @@ const styles = StyleSheet.create({
     paddingTop: WeRideSpacing.md,
     paddingBottom: WeRideSpacing.sm,
   },
+  headerText: { flex: 1, minWidth: 0, paddingRight: WeRideSpacing.sm },
   signOutBtn: {
     minHeight: 44,
     minWidth: 44,
@@ -420,64 +592,33 @@ const styles = StyleSheet.create({
   },
   bannerError: { color: WeRideColors.error, paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.sm },
   joinWrap: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.lg },
-  joinRow: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.sm },
-  input: {
-    ...type.input,
-    flex: 1,
-    height: 48,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.md,
-    paddingHorizontal: WeRideSpacing.md,
-    backgroundColor: WeRideColors.dark3,
-  },
-  joinButton: {
-    minHeight: 48,
-    minWidth: 72,
-    paddingHorizontal: WeRideSpacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.md,
-  },
-  joinButtonPressed: { backgroundColor: WeRideColors.primaryDim },
-  disabled: { opacity: 0.5 },
-  pressed: { opacity: 0.7 },
+  // flex-start: the field's error text grows it downward without moving the button.
+  joinRow: { flexDirection: 'row', alignItems: 'flex-start', gap: WeRideSpacing.sm },
+  joinField: { flex: 1 },
+  joinButton: { minWidth: 72 },
   noticeError: { color: WeRideColors.error, marginTop: WeRideSpacing.sm },
   noticeOk: { color: WeRideColors.green, marginTop: WeRideSpacing.sm },
   listContent: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: 96 },
-  card: {
+  cardWrap: { marginBottom: WeRideSpacing.md },
+  sectionLabel: { ...type.eyebrow, marginTop: WeRideSpacing.sm, marginBottom: WeRideSpacing.md },
+  // Non-pressable twin of the RideCard surface, for the skeleton placeholders.
+  cardSurface: {
     backgroundColor: WeRideColors.dark3,
     borderWidth: 1,
     borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xxl,
-    padding: WeRideSpacing.lg,
-    marginBottom: WeRideSpacing.md,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
-  cardBody: { minHeight: 44 },
+  skelBody: { padding: WeRideSpacing.lg },
+  skelStats: { marginTop: WeRideSpacing.lg },
   meta: { marginTop: WeRideSpacing.xs },
-  start: { marginTop: WeRideSpacing.xs, color: WeRideColors.text },
-  cardActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: WeRideSpacing.sm,
-    marginTop: WeRideSpacing.md,
-  },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.xs },
   codeChip: {
     fontFamily: WeRideFonts.monoBold,
-    fontSize: 15,
-    lineHeight: 20,
-    letterSpacing: 2,
+    fontSize: 13,
+    lineHeight: 16,
+    letterSpacing: 1.5,
     color: WeRideColors.text,
-    backgroundColor: WeRideColors.dark2,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.md,
-    paddingHorizontal: WeRideSpacing.md,
-    paddingVertical: WeRideSpacing.sm,
-    overflow: 'hidden',
   },
   actionBtn: {
     minHeight: 44,
@@ -486,21 +627,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  spacer: { flex: 1 },
-  skeletonCard: { height: 84 },
-  skeletonLine: { height: 14, borderRadius: WeRideRadius.sm, backgroundColor: WeRideColors.border },
+  // Line boxes match the real text line-heights (heading 22, caption 16) so heights agree.
+  skelTitle: { height: 22, justifyContent: 'center' },
+  skelLine: { height: 16, justifyContent: 'center' },
+  copyLabel: { minWidth: 48, alignItems: 'center', justifyContent: 'center' },
+  copiedWrap: { alignItems: 'center', justifyContent: 'center' },
+  copyText: { color: WeRideColors.primary },
   statePanel: { paddingVertical: WeRideSpacing.xxxl, alignItems: 'center' },
   stateText: { color: WeRideColors.textSub, marginTop: WeRideSpacing.xs, textAlign: 'center' },
-  retryBtn: {
-    minHeight: 44,
-    paddingHorizontal: WeRideSpacing.xl,
-    marginTop: WeRideSpacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: WeRideColors.primary,
-    borderRadius: WeRideRadius.md,
-  },
+  retryBtn: { marginTop: WeRideSpacing.lg },
   fab: {
     position: 'absolute',
     bottom: WeRideSpacing.xxl,
@@ -513,6 +648,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 4,
   },
-  fabPressed: { opacity: 0.85, transform: [{ scale: 0.92 }] },
   fabText: { ...type.title, color: WeRideColors.onPrimary, fontFamily: WeRideFonts.body, fontSize: 28 },
 });

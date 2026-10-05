@@ -102,14 +102,15 @@ describe('WeRide Theme', () => {
       // Values are the bundled fonts' PostScript names, which resolve on BOTH
       // platforms (iOS UIAppFonts matches PostScript name; Android matches the file
       // name in assets/fonts).
-      expect(WeRideFonts.primary).toBe('Figtree-Regular');
-      expect(WeRideFonts.heading).toBe('Fraunces-SemiBold');
-      expect(WeRideFonts.bodyBold).toBe('Figtree-Bold');
-      expect(WeRideFonts.code).toBe('SpaceMono-Bold');
+      expect(WeRideFonts.primary).toBe('Overpass-Medium');
+      expect(WeRideFonts.heading).toBe('Overpass-ExtraBold');
+      expect(WeRideFonts.bodyBold).toBe('Overpass-ExtraBold');
+      expect(WeRideFonts.num).toBe('OverpassMono-Bold');
+      expect(WeRideFonts.code).toBe('OverpassMono-Bold');
     });
 
-    it('separates display (Fraunces) and body (Figtree) families', () => {
-      expect(WeRideFonts.heading).toBe(WeRideFonts.display);
+    it('separates display (Black) from body (Medium) weights of the one family', () => {
+      expect(WeRideFonts.display).toBe('Overpass-Black');
       expect(WeRideFonts.display).not.toBe(WeRideFonts.body);
     });
   });

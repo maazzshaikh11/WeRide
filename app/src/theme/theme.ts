@@ -68,28 +68,36 @@ export const WeRideColors = {
 } as const;
 
 /**
- * Typography tokens (spec §1.2) — Fraunces for display, Figtree for UI text.
+ * Typography tokens — Overpass (UI) + Overpass Mono (numbers), as in the approved demo.html.
  * Custom fonts are bundled (app/assets/fonts, Android assets, iOS UIAppFonts).
  * Family strings are the PostScript names, which resolve on BOTH platforms:
  * iOS matches UIAppFonts by PostScript name; Android matches the file name
  * in assets/fonts (files are named <PostScriptName>.ttf).
+ *
+ * Four static weights stand in for the demo's variable-font weights:
+ * Medium 500 · Bold 700 (demo 650-750) · ExtraBold 800 (800-850) · Black 900.
  */
 export const WeRideFonts = {
-  display: 'Fraunces-SemiBold',   // large titles and stat numbers (soft serif)
-  heading: 'Fraunces-SemiBold',   // screen titles, modal headings
-  body: 'Figtree-Regular',        // default body text
-  bodyMedium: 'Figtree-Medium',
-  bodySemibold: 'Figtree-SemiBold', // ride names, card titles, buttons
-  bodyBold: 'Figtree-Bold',         // emphasised values
-  // `mono*` names are kept so existing call sites don't churn; labels, eyebrows
-  // and badges now use Figtree like the rest of the UI.
-  mono: 'Figtree-Medium',
-  monoBold: 'Figtree-Bold',
-  /** A real monospace, only where character clarity matters (join codes). */
-  code: 'SpaceMono-Bold',
+  medium: 'Overpass-Medium',
+  bold: 'Overpass-Bold',
+  extraBold: 'Overpass-ExtraBold',
+  black: 'Overpass-Black',
+  /** Tabular numerals — speed, ETA, distances, codes. */
+  num: 'OverpassMono-Bold',
+  // Semantic names kept so existing call sites don't churn.
+  display: 'Overpass-Black',      // large titles and stat numbers
+  heading: 'Overpass-ExtraBold',  // screen titles, modal headings
+  body: 'Overpass-Medium',        // default body text
+  bodyMedium: 'Overpass-Medium',
+  bodySemibold: 'Overpass-Bold',  // ride names, card titles, buttons
+  bodyBold: 'Overpass-ExtraBold', // emphasised values
+  mono: 'Overpass-Medium',
+  monoBold: 'Overpass-ExtraBold',
+  /** Monospace, where character clarity matters (join codes). */
+  code: 'OverpassMono-Bold',
   // Legacy aliases kept for existing imports
-  primary: 'Figtree-Regular',
-  headline: 'Fraunces-SemiBold',
+  primary: 'Overpass-Medium',
+  headline: 'Overpass-ExtraBold',
 } as const;
 
 /** Spacing scale (spec §1.3). */

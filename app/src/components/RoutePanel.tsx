@@ -1,8 +1,9 @@
 /**
  * RoutePanel — dark bottom sheet on the map (spec §3.3.8, §4.6).
  * Collapsed: ride name/meta, avatar stack, stat row (km left, min eta, next stop).
- * Expanded: music player, safety score bar, avoid-hazards toggle,
- * Google Maps deep link, turn-by-turn placeholder.
+ * Expanded: safety score bar, avoid-hazards toggle, Google Maps deep link.
+ * Guidance is destination-level (route line, distance, ETA); turn-by-turn is
+ * handed off to Google Maps — no turn list is ever invented.
  * Data: useRouteStore() (Person C), useRidersStore() (Person A).
  */
 import React from 'react';
@@ -16,14 +17,11 @@ import { useStopsStore } from '@app/store/stopsStore';
 import BottomSheet from './BottomSheet';
 import StatBox from './StatBox';
 import AvatarStack from './AvatarStack';
-import MusicPlayer from './MusicPlayer';
 
 interface Props {
   avoidHazards?: boolean;
   onToggleAvoidHazards?: () => void;
   onOpenInGoogleMaps?: () => void;
-  /** SOS/music duck integration (spec: music ducks on SOS) */
-  duckReason?: string | null;
 }
 
 const COLLAPSED_HEIGHT = 208;
@@ -33,7 +31,6 @@ export default function RoutePanel({
   avoidHazards = false,
   onToggleAvoidHazards,
   onOpenInGoogleMaps,
-  duckReason,
 }: Props) {
   const route = useRouteStore((s) => s.route);
   const isLoading = useRouteStore((s) => s.isLoading);
@@ -44,6 +41,9 @@ export default function RoutePanel({
   const stops = useStopsStore((s) => s.stops);
 
   const riderNames = Array.from(riders.keys());
+  // Riders actually reporting (not stale/grey) plus this device. Seeded
+  // last-known positions of offline members must not inflate the count.
+  const liveRiders = Array.from(riders.values()).filter((r) => r.markerState !== 'GREY').length + 1;
   const eta = route ? Math.round(route.eta_minutes) : null;
   const distance = route ? route.distance_km.toFixed(1) : null;
   const safety = route?.safety_score ?? null;
@@ -77,7 +77,7 @@ export default function RoutePanel({
             {/* Row 1: ride name + meta */}
             <View style={styles.titleRow}>
               <Text style={styles.rideName}>
-                {riderNames.length} rider{riderNames.length !== 1 ? 's' : ''} · Convoy synced
+                {liveRiders} rider{liveRiders !== 1 ? 's' : ''} live
               </Text>
               <Text style={styles.rideMeta}>
                 {metaText}
@@ -102,9 +102,6 @@ export default function RoutePanel({
                 </>
               )}
             </View>
-
-            {/* Row 4: music mini-player (demo shows it in the collapsed sheet) */}
-            <MusicPlayer duckReason={duckReason} />
 
             {/* Expanded content */}
             {expanded && (
@@ -147,7 +144,9 @@ export default function RoutePanel({
                   </TouchableOpacity>
                 </View>
 
-                <Text style={styles.tbtPlaceholder}>Turn-by-turn navigation (coming soon)</Text>
+                <Text style={styles.tbtPlaceholder}>
+                  Turn-by-turn isn't built in. Open the route in Google Maps for step-by-step directions.
+                </Text>
               </ScrollView>
             )}
           </View>

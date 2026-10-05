@@ -32,7 +32,6 @@ import { getToggleAvoidHazards } from './overlays/routeControls';
 import LivePill from '../../components/LivePill';
 import ToastContainer from '../../components/ToastContainer';
 import NetworkBanner from '../../components/NetworkBanner';
-import FuelBanner from '../../components/FuelBanner';
 import SignalMenu from '../../components/SignalMenu';
 import NavHint from '../../components/NavHint';
 import RoutePanel from '../../components/RoutePanel';
@@ -93,7 +92,6 @@ export default function MapScreen() {
   const [sosModalOpen, setSosModalOpen] = useState(false);
   const [sosEvents, setSosEvents] = useState<ActiveSos[]>([]);
   const [selectedHazard, setSelectedHazard] = useState<any>(null);
-  const [showFuelBanner, setShowFuelBanner] = useState(true);
   const [networkBanner, setNetworkBanner] = useState<'lost' | 'recovered' | null>(null);
   const [sosActive, setSosActive] = useState(false);
   // Ride name for the header (demo shows "Lonavala Loop", not the group ID).
@@ -359,20 +357,6 @@ export default function MapScreen() {
       {/* 4.5 FL status badge */}
       <FlStatusOverlay />
 
-      {/* 3.3.4 Fuel banner (conditional, stub threshold per spec) */}
-      {showFuelBanner && route && route.distance_km > 50 && (() => {
-        const nextStop = useStopsStore.getState().stops.find((s) => s.status !== 'done');
-        const stopName = nextStop ? nextStop.name : 'next stop';
-        return (
-          <View style={styles.bannerWrap}>
-            <FuelBanner
-              message={`Next pump is ${Math.round(route.distance_km)} km away — fuel up at the ${stopName} coming up.`}
-              onDismiss={() => setShowFuelBanner(false)}
-            />
-          </View>
-        );
-      })()}
-
       {/* 3.3.5 Network banner */}
       {networkBanner && (
         <View style={styles.bannerWrap}>
@@ -475,7 +459,6 @@ export default function MapScreen() {
               }
             }}
             onOpenInGoogleMaps={openGoogleMaps}
-            duckReason={sosActive ? 'SOS active' : null}
           />
         </View>
       </View>

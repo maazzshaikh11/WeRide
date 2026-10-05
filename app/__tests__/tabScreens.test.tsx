@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
+import { Share } from 'react-native';
 
 /** Renders a component inside act() so passive effects run synchronously. */
 const mountedTrees: renderer.ReactTestRenderer[] = [];
@@ -120,10 +121,11 @@ jest.mock('@routing/client/routeStore', () => {
     setLastValidLocation: jest.fn(),
     setActiveClusters: jest.fn(),
   };
-  return {
-    useRouteStore: (selector?: (s: typeof state) => unknown) => (selector ? selector(state) : state),
-    __esModule: true,
-  };
+  const useRouteStore: any = (selector?: (s: typeof state) => unknown) =>
+    (selector ? selector(state) : state);
+  useRouteStore.getState = () => state;
+  useRouteStore.setState = (partial: Partial<typeof state>) => Object.assign(state, partial);
+  return { useRouteStore, __esModule: true };
 });
 
 jest.mock('../src/store/ridersStore', () => {
@@ -143,6 +145,7 @@ jest.mock('../src/store/ridersStore', () => {
 import { useAppStore } from '../src/store/appStore';
 import { useStopsStore } from '../src/store/stopsStore';
 import { useToastStore } from '../src/store/toastStore';
+import { useRouteStore } from '@routing/client/routeStore';
 import StopsScreen from '../src/screens/StopsScreen';
 import VoiceScreen from '../src/screens/VoiceScreen';
 import FamilyScreen from '../src/screens/FamilyScreen';
@@ -188,24 +191,50 @@ describe('VoiceScreen', () => {
 });
 
 describe('FamilyScreen', () => {
-  test('renders toggle card, link row and member cards', () => {
-    useAppStore.setState({ userId: 'user-1', groupId: 'group-1', familySharingEnabled: false });
+  test('shows real share action and states live tracking is unavailable (no fake watchers)', () => {
+    useAppStore.setState({ userId: 'user-1', groupId: 'group-1' });
     const tree = render(<FamilyScreen />).root;
     const joined = tree.findAll((n) => (n.type as unknown) === 'Text').map((n) => JSON.stringify(n.props.children)).join(' ');
-    expect(joined).toContain('Family Tracking');
-    expect(joined).toContain('Live tracking link');
-    expect(joined).toContain('Copy link');
+    expect(joined).toContain('Send my location');
+    expect(joined).toContain('Not available yet');
+    // Previously fabricated content must be gone.
+    expect(joined).not.toContain('Mom');
+    expect(joined).not.toContain('Hritika');
+    expect(joined).not.toContain('weride.app/track');
   });
 
-  test('toggling sharing updates appStore and pushes toast', () => {
-    useAppStore.setState({ userId: 'user-1', groupId: 'group-1', familySharingEnabled: false });
+  test('sharing without a verified fix warns instead of sharing a fake position', async () => {
     useToastStore.setState({ toasts: [] });
+    useRouteStore.setState({ currentLocation: null });
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as any);
     const tree = render(<FamilyScreen />).root;
-    const sw = tree.find((n) => n.props.accessibilityRole === 'switch');
-    act(() => {
-      sw.props.onPress();
+    const btn = tree.find((n) => n.props.accessibilityLabel === 'Send my location' && typeof n.props.onPress === 'function');
+    await act(async () => {
+      await btn.props.onPress();
     });
-    expect(useAppStore.getState().familySharingEnabled).toBe(true);
+    expect(shareSpy).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts[0].variant).toBe('warn');
+    shareSpy.mockRestore();
+  });
+
+  test('sharing with a fix shares a Google Maps pin of the real coordinates', async () => {
+    useRouteStore.setState({
+      currentLocation: {
+        rider_id: 'user-1', group_id: 'group-1', timestamp_hlc: '1:0',
+        lat: 18.5204, lng: 73.8567, speed_mps: 0, heading_deg: 0,
+        spoof_flag: false, nis_score: 0, accuracy_m: 5,
+      },
+    });
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as any);
+    const tree = render(<FamilyScreen />).root;
+    const btn = tree.find((n) => n.props.accessibilityLabel === 'Send my location' && typeof n.props.onPress === 'function');
+    await act(async () => {
+      await btn.props.onPress();
+    });
+    expect(shareSpy).toHaveBeenCalledWith({
+      message: expect.stringContaining('query=18.520400,73.856700'),
+    });
+    shareSpy.mockRestore();
   });
 });
 

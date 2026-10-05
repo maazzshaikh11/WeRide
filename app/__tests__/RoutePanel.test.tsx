@@ -125,12 +125,12 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
     expect(ignoringText.length).toBeGreaterThan(0);
   });
 
-  test('expanded view shows turn-by-turn placeholder', () => {
+  test('expanded view hands turn-by-turn off to Google Maps (no invented turns)', () => {
     const tree = renderer.create(<RoutePanel />).root;
     act(() => {
       tree.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
     });
-    const tbt = findTextNodes(tree, (t) => t.includes('Turn-by-turn navigation (coming soon)'));
+    const tbt = findTextNodes(tree, (t) => t.includes("Turn-by-turn isn't built in"));
     expect(tbt.length).toBeGreaterThan(0);
   });
 

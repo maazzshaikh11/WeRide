@@ -141,7 +141,6 @@ jest.mock('../src/components/RoutePanel', () => ({ __esModule: true, default: ()
 jest.mock('../src/components/ToastContainer', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/LivePill', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/NetworkBanner', () => ({ __esModule: true, default: () => null }));
-jest.mock('../src/components/FuelBanner', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/SignalMenu', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/NavHint', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/SosModal', () => ({ __esModule: true, default: () => null }));

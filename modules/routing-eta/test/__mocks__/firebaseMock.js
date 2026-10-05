@@ -15,7 +15,18 @@ const firestoreFactory = () => ({
           error.code = 'not-found';
           throw error;
         }
-        mockGroups[id] = { ...mockGroups[id], ...updates };
+        const next = { ...mockGroups[id] };
+        for (const [k, v] of Object.entries(updates)) {
+          if (v && v.type === 'arrayUnion') {
+            const cur = next[k] || [];
+            next[k] = cur.includes(v.value) ? cur : [...cur, v.value];
+          } else if (v && v.type === 'arrayRemove') {
+            next[k] = (next[k] || []).filter((x) => x !== v.value);
+          } else {
+            next[k] = v;
+          }
+        }
+        mockGroups[id] = next;
       },
       get: async () => ({
         exists: !!mockGroups[id],
@@ -24,6 +35,17 @@ const firestoreFactory = () => ({
       }),
     }),
     where: (field, op, value) => ({
+      limit: (n) => ({
+        get: async () => {
+          const results = Object.values(mockGroups)
+            .filter((group) => group[field] === value)
+            .slice(0, n);
+          return {
+            empty: results.length === 0,
+            docs: results.map((doc) => ({ id: doc.id, data: () => doc })),
+          };
+        },
+      }),
       onSnapshot: (onSuccess, onError) => {
         try {
           const results = Object.values(mockGroups).filter((group) => {
@@ -48,6 +70,7 @@ const firestoreFactory = () => ({
   FieldValue: {
     serverTimestamp: () => new Date(),
     arrayUnion: (value) => ({ type: 'arrayUnion', value }),
+    arrayRemove: (value) => ({ type: 'arrayRemove', value }),
   },
 });
 
@@ -61,4 +84,9 @@ module.exports.default = firestoreFactory;
 module.exports.FieldValue = {
   serverTimestamp: () => new Date(),
   arrayUnion: (value) => ({ type: 'arrayUnion', value }),
+  arrayRemove: (value) => ({ type: 'arrayRemove', value }),
+};
+// Test helper: wipe the in-memory store between tests.
+module.exports.__reset = () => {
+  mockGroups = {};
 };

@@ -6,11 +6,10 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Modal, Pressable, TextInput, Animated,
+  View, Text, Modal, Pressable, TextInput, Animated,
   ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, LayoutAnimation, UIManager,
 } from 'react-native';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { geocodeSearchStrict, GeoResult } from '../utils/geocode';
 import { START_PRESETS, StartPreset, startTimeFromPreset } from '../utils/startTime';
 import { useRidePlanStore, PlannedStop } from '../store/ridePlanStore';
@@ -18,7 +17,7 @@ import { useToastStore } from '../store/toastStore';
 import { GroupService, RIDE_TYPES, RideType, RideMeta } from '@routing/group/groupService';
 import { useAppStore } from '../store/appStore';
 import {
-  Button, FadeIn, PressableCard, PressableScale, TextField, haptic, useReducedMotion,
+  Button, Chip, FadeIn, Icon, PressableCard, PressableScale, TextField, haptic, useReducedMotion,
 } from '../ui';
 
 type Field = 'start' | 'destination' | 'stop';
@@ -68,47 +67,6 @@ function animateLayout(): void {
 }
 
 /**
- * Selectable chip. The selected look (accent border + tint + accent label) is an
- * overlay that cross-fades with the idle label; opacity only, native driver.
- * The overlay duplicate is hidden from screen readers; selection is exposed
- * through accessibilityState.selected.
- */
-function Chip({
-  label, selected, onPress, reduced,
-}: { label: string; selected: boolean; onPress: () => void; reduced: boolean }) {
-  const sel = useRef(new Animated.Value(selected ? 1 : 0)).current;
-  useEffect(() => {
-    if (reduced) sel.setValue(selected ? 1 : 0);
-    else Animated.timing(sel, { toValue: selected ? 1 : 0, duration: FADE_MS, useNativeDriver: true }).start();
-  }, [selected, reduced, sel]);
-
-  return (
-    <PressableScale
-      style={styles.chip}
-      onPress={onPress}
-      haptic="select"
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ selected }}
-    >
-      <Animated.Text
-        style={[type.bodyStrong, styles.chipIdle, { opacity: sel.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
-      >
-        {label}
-      </Animated.Text>
-      <Animated.View
-        pointerEvents="none"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        style={[styles.chipSelected, { opacity: sel }]}
-      >
-        <Text style={[type.bodyStrong, { color: WeRideColors.primary }]}>{label}</Text>
-      </Animated.View>
-    </PressableScale>
-  );
-}
-
-/**
  * Mounts its children with a fade-in and, when `visible` flips false, fades
  * them out before unmounting (then lets the content below slide up).
  */
@@ -138,6 +96,64 @@ function PresenceFade({
 }
 
 export default function CreateRideModal({ visible, onClose, onCreated }: Props) {
+  const { colors, type } = useTheme();
+  const styles = useStyles(({ colors: c, type: t }) => ({
+    overlay: { flex: 1, backgroundColor: c.scrim, justifyContent: 'flex-end' },
+    overlayPress: { flex: 1 },
+    // Demo `.sheet`: radius 30 top, 12/20/38 padding, grab handle 44x5.
+    box: {
+      backgroundColor: c.bg,
+      borderTopLeftRadius: 30,
+      borderTopRightRadius: 30,
+      maxHeight: '90%',
+      paddingTop: 12,
+      paddingHorizontal: 20,
+      paddingBottom: 38,
+    },
+    grab: { width: 44, height: 5, borderRadius: 3, backgroundColor: c.line2, alignSelf: 'center', marginBottom: 18 },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8 },
+    headerTitle: { ...t.h2, marginTop: 8 },
+    closeBtn: {
+      width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line,
+    },
+    scroll: { flexGrow: 0, flexShrink: 1 },
+    scrollContent: { paddingBottom: 8 },
+    locRow: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 60, paddingVertical: 10, paddingHorizontal: 18, marginTop: 10 },
+    dot: {
+      width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: c.ink,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    dotFilled: { borderColor: c.ink, backgroundColor: c.pri },
+    dotPlus: { borderWidth: 0 },
+    locTextWrap: { flex: 1 },
+    locLabel: { ...t.fieldLabel },
+    locValue: { ...t.listTitle, marginTop: 4 },
+    locHint: { ...t.listSub, marginTop: 4 },
+    searchField: { marginTop: 14 },
+    searching: { marginTop: 8, alignSelf: 'center' },
+    searchMsgRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 },
+    searchMsg: { ...t.sm, flex: 1, color: c.bad },
+    searchMsgSolo: { ...t.sm, marginTop: 8 },
+    retryBtn: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+    retryText: { ...t.smStrong, textDecorationLine: 'underline', textDecorationColor: c.pri },
+    results: { marginTop: 8 },
+    resultWrap: { marginBottom: 8 },
+    resultRow: { minHeight: 52, justifyContent: 'center', paddingVertical: 10, paddingHorizontal: 16 },
+    section: { marginTop: 24 },
+    sectionLabel: { ...t.fieldLabel, marginLeft: 2, marginBottom: 8 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    stopRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 52,
+      backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line,
+      borderRadius: 18, paddingLeft: 16, marginBottom: 8,
+    },
+    stopIconText: { fontSize: 16, lineHeight: 20 },
+    stopLabel: { ...t.listTitle, flex: 1, marginLeft: 8 },
+    stopBtnWrap: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    reason: { ...t.sm, marginTop: 16, textAlign: 'center' },
+    createBtn: { marginTop: 16 },
+  }));
   const { start, destination, stops, setStart, setDestination, addStop, removeStop, moveStop } =
     useRidePlanStore();
   const setGroupId = useAppStore((s) => s.setGroupId);
@@ -247,7 +263,7 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
 
   const renderLocationRow = (label: string, hint: string, value: GeoResult | null, f: Field) => (
     <PressableCard
-      radius={WeRideRadius.lg}
+      radius={18}
       active={field === f}
       style={styles.locRow}
       haptic="select"
@@ -257,14 +273,14 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
       accessibilityState={{ selected: field === f }}
     >
       <View style={[styles.dot, f === 'destination' && styles.dotFilled, f === 'stop' && styles.dotPlus]}>
-        {f === 'stop' ? <Text style={[type.captionStrong, { color: WeRideColors.textSub }]}>+</Text> : null}
+        {f === 'stop' ? <Icon name="plus" size={16} color={colors.ink2} /> : null}
       </View>
       <View style={styles.locTextWrap}>
-        <Text style={[type.label, styles.upper]}>{label}</Text>
+        <Text style={styles.locLabel}>{label.toUpperCase()}</Text>
         {value ? (
-          <Text style={[type.body, styles.locValue]} numberOfLines={1}>{value.label}</Text>
+          <Text style={styles.locValue} numberOfLines={1}>{value.label}</Text>
         ) : (
-          <Text style={[type.caption, styles.locValue]}>{hint}</Text>
+          <Text style={styles.locHint}>{hint}</Text>
         )}
       </View>
     </PressableCard>
@@ -277,10 +293,11 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
         <Pressable style={styles.overlayPress} onPress={onClose} accessibilityLabel="Close create ride" />
         <View style={styles.box}>
+          <View style={styles.grab} />
           <View style={styles.headerRow}>
             <View>
-              <Text style={type.eyebrow}>NEW RIDE</Text>
-              <Text style={type.titleSm}>Plan your route</Text>
+              <Text style={type.label}>NEW RIDE</Text>
+              <Text style={styles.headerTitle} accessibilityRole="header">Plan your route</Text>
             </View>
             <PressableScale
               onPress={onClose}
@@ -289,7 +306,7 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
               accessibilityRole="button"
               accessibilityLabel="Close"
             >
-              <Text style={[type.body, { color: WeRideColors.textSub }]}>✕</Text>
+              <Icon name="close" size={20} color={colors.ink} />
             </PressableScale>
           </View>
 
@@ -312,12 +329,12 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
               returnKeyType="search"
               accessibilityLabel="Location search input"
             />
-            {searching ? <ActivityIndicator color={WeRideColors.primary} style={styles.searching} /> : null}
+            {searching ? <ActivityIndicator color={colors.ink2} style={styles.searching} /> : null}
 
             {search.status === 'error' ? (
               <FadeIn>
                 <View style={styles.searchMsgRow} accessibilityLiveRegion="polite">
-                  <Text style={[type.caption, styles.searchMsg, { color: WeRideColors.error }]}>
+                  <Text style={styles.searchMsg}>
                     Search is unavailable — check your connection
                   </Text>
                   <PressableScale
@@ -327,14 +344,14 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
                     accessibilityRole="button"
                     accessibilityLabel="Retry search"
                   >
-                    <Text style={[type.captionStrong, { color: WeRideColors.primary }]}>Retry</Text>
+                    <Text style={styles.retryText}>Retry</Text>
                   </PressableScale>
                 </View>
               </FadeIn>
             ) : null}
             {search.status === 'done' && results.length === 0 ? (
               <FadeIn>
-                <Text style={[type.caption, styles.searchMsgSolo]} accessibilityLiveRegion="polite">
+                <Text style={styles.searchMsgSolo} accessibilityLiveRegion="polite">
                   {`No places found for "${search.query}"`}
                 </Text>
               </FadeIn>
@@ -345,14 +362,14 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
                 {results.map((item, i) => (
                   <FadeIn key={`${item.lat},${item.lng},${i}`} index={i} style={styles.resultWrap}>
                     <PressableCard
-                      radius={WeRideRadius.lg}
+                      radius={18}
                       style={styles.resultRow}
                       haptic="select"
                       onPress={() => pick(item)}
                       accessibilityRole="button"
                       accessibilityLabel={`Select ${item.label}`}
                     >
-                      <Text style={type.body} numberOfLines={2}>{item.label}</Text>
+                      <Text style={type.listTitle} numberOfLines={2}>{item.label}</Text>
                     </PressableCard>
                   </FadeIn>
                 ))}
@@ -361,12 +378,12 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
 
             {stops.length > 0 && (
               <View style={styles.section}>
-                <Text style={[type.label, styles.sectionLabel]}>STOPS</Text>
+                <Text style={styles.sectionLabel}>STOPS</Text>
                 {stops.map((s: PlannedStop, i) => (
                   <FadeIn key={s.id}>
                     <View style={styles.stopRow}>
                       <Text style={styles.stopIconText}>{s.icon}</Text>
-                      <Text style={[type.body, styles.stopLabel]} numberOfLines={1}>{s.label}</Text>
+                      <Text style={styles.stopLabel} numberOfLines={1}>{s.label}</Text>
                       <PressableScale
                         style={styles.stopBtnWrap}
                         onPress={() => { if (!reduced) animateLayout(); moveStop(s.id, -1); }}
@@ -375,7 +392,7 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
                         accessibilityRole="button"
                         accessibilityLabel="Move stop up"
                       >
-                        <Text style={[styles.stopBtn, i === 0 && styles.stopBtnDisabled]}>↑</Text>
+                        <Icon name="up" size={20} color={i === 0 ? colors.ink3 : colors.ink} />
                       </PressableScale>
                       <PressableScale
                         style={styles.stopBtnWrap}
@@ -385,7 +402,7 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
                         accessibilityRole="button"
                         accessibilityLabel="Move stop down"
                       >
-                        <Text style={[styles.stopBtn, i === stops.length - 1 && styles.stopBtnDisabled]}>↓</Text>
+                        <Icon name="down" size={20} color={i === stops.length - 1 ? colors.ink3 : colors.ink} />
                       </PressableScale>
                       <PressableScale
                         style={styles.stopBtnWrap}
@@ -394,7 +411,7 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
                         accessibilityRole="button"
                         accessibilityLabel="Remove stop"
                       >
-                        <Text style={styles.stopRemove}>✕</Text>
+                        <Icon name="close" size={20} color={colors.bad} />
                       </PressableScale>
                     </View>
                   </FadeIn>
@@ -403,30 +420,28 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
             )}
 
             <View style={styles.section}>
-              <Text style={[type.label, styles.sectionLabel]}>RIDE TYPE · OPTIONAL</Text>
+              <Text style={styles.sectionLabel}>RIDE TYPE · OPTIONAL</Text>
               <View style={styles.chipRow}>
                 {RIDE_TYPES.map((t) => (
                   <Chip
                     key={t}
                     label={t}
-                    selected={rideType === t}
+                    on={rideType === t}
                     onPress={() => setRideType((cur) => (cur === t ? null : t))}
-                    reduced={reduced}
                   />
                 ))}
               </View>
             </View>
 
             <View style={styles.section}>
-              <Text style={[type.label, styles.sectionLabel]}>START TIME · OPTIONAL</Text>
+              <Text style={styles.sectionLabel}>START TIME · OPTIONAL</Text>
               <View style={styles.chipRow}>
                 {START_PRESETS.map((p) => (
                   <Chip
                     key={p}
                     label={p}
-                    selected={startPreset === p}
+                    on={startPreset === p}
                     onPress={() => setStartPreset((cur) => (cur === p ? null : p))}
-                    reduced={reduced}
                   />
                 ))}
               </View>
@@ -434,7 +449,7 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
           </ScrollView>
 
           <PresenceFade visible={destination == null} reduced={reduced}>
-            <Text style={[type.caption, styles.reason]} accessibilityLiveRegion="polite">
+            <Text style={styles.reason} accessibilityLiveRegion="polite">
               Choose a destination to continue
             </Text>
           </PresenceFade>
@@ -450,77 +465,3 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: '#000000CC', justifyContent: 'flex-end' },
-  overlayPress: { flex: 1 },
-  box: {
-    backgroundColor: WeRideColors.dark2,
-    borderTopLeftRadius: WeRideRadius.xxxl,
-    borderTopRightRadius: WeRideRadius.xxxl,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    maxHeight: '90%',
-    paddingBottom: WeRideSpacing.xxl,
-  },
-  headerRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: WeRideSpacing.lg, paddingTop: WeRideSpacing.lg, paddingBottom: WeRideSpacing.sm,
-  },
-  closeBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  scroll: { flexGrow: 0, flexShrink: 1 },
-  scrollContent: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.sm },
-  upper: { textTransform: 'uppercase' },
-  locRow: {
-    flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.md,
-    minHeight: 56,
-    padding: WeRideSpacing.md, marginTop: WeRideSpacing.sm,
-  },
-  dot: {
-    width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: WeRideColors.textSub,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  dotFilled: { borderColor: WeRideColors.primary, backgroundColor: WeRideColors.primary },
-  dotPlus: { borderWidth: 0 },
-  locTextWrap: { flex: 1 },
-  locValue: { marginTop: WeRideSpacing.xs },
-  searchField: { marginTop: WeRideSpacing.md },
-  searching: { marginTop: WeRideSpacing.sm, alignSelf: 'center' },
-  searchMsgRow: { flexDirection: 'row', alignItems: 'center', marginTop: WeRideSpacing.sm, gap: WeRideSpacing.sm },
-  searchMsg: { flex: 1 },
-  searchMsgSolo: { marginTop: WeRideSpacing.sm },
-  retryBtn: { minHeight: 44, minWidth: 44, paddingHorizontal: WeRideSpacing.md, alignItems: 'center', justifyContent: 'center' },
-  results: { marginTop: WeRideSpacing.sm },
-  resultWrap: { marginBottom: WeRideSpacing.sm },
-  resultRow: { minHeight: 44, justifyContent: 'center', padding: WeRideSpacing.md },
-  section: { marginTop: WeRideSpacing.lg },
-  sectionLabel: { marginBottom: WeRideSpacing.sm },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: WeRideSpacing.sm },
-  chip: {
-    minHeight: 44, paddingHorizontal: WeRideSpacing.lg, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: WeRideColors.dark3, borderWidth: 1, borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.pill,
-  },
-  chipIdle: { color: WeRideColors.textSub },
-  // Overlay faded in when selected: covers the chip including its 1px border.
-  chipSelected: {
-    position: 'absolute', top: -1, left: -1, right: -1, bottom: -1,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: WeRideColors.primary, backgroundColor: WeRideColors.primaryDim,
-    borderRadius: WeRideRadius.pill,
-  },
-  stopRow: {
-    flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.xs,
-    minHeight: 48,
-    backgroundColor: WeRideColors.dark3, borderWidth: 1, borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.lg, paddingLeft: WeRideSpacing.md, marginBottom: WeRideSpacing.sm,
-  },
-  stopIconText: { fontSize: 16, lineHeight: 20 },
-  stopLabel: { flex: 1, marginLeft: WeRideSpacing.sm },
-  stopBtnWrap: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  stopBtn: { ...type.body, color: WeRideColors.primary },
-  stopBtnDisabled: { color: WeRideColors.textSub },
-  stopRemove: { ...type.body, color: WeRideColors.error },
-  reason: { marginHorizontal: WeRideSpacing.lg, marginTop: WeRideSpacing.md, textAlign: 'center' },
-  createBtn: { marginHorizontal: WeRideSpacing.lg, marginTop: WeRideSpacing.md },
-});

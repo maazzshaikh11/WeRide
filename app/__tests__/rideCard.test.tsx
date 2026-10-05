@@ -40,7 +40,7 @@ describe('RideCard', () => {
   it('shows badge, date, title, from → to, stats and View', () => {
     const t = render(<RideCard {...base} />);
     const all = texts(t);
-    expect(all).toEqual(expect.arrayContaining(['Upcoming', 'SUN, OCT 5 · 6:00 AM', 'Ride to Lonavala', 'Pune  →  Lonavala', '58', 'km', '6', 'riders']));
+    expect(all).toEqual(expect.arrayContaining(['UPCOMING', 'SUN, OCT 5 · 6:00 AM', 'Ride to Lonavala', 'Pune  →  Lonavala', '58', 'KM', '6', 'RIDERS']));
     expect(all.some((s) => s.includes('View'))).toBe(true);
   });
 
@@ -79,7 +79,7 @@ describe('RideCard', () => {
     const all = texts(t);
     expect(all).toContain('To Lonavala');
     expect(all).toEqual(expect.arrayContaining(['CODE', 'Leave']));
-    expect(all).not.toContain('km');
+    expect(all).not.toContain('KM');
   });
 });
 

@@ -8,16 +8,14 @@
  * none can be computed from real data.
  */
 import React from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
-import ScreenHeader from '../components/ScreenHeader';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import HistoryCard from '../components/HistoryCard';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useRidersStore } from '../store/ridersStore';
 import { useAppStore } from '../store/appStore';
-import { FadeIn } from '../ui';
+import { Card, FadeIn } from '../ui';
 
 interface Props {
   /** Provided by the tab navigator; absent when rendered standalone (tests). */
@@ -28,11 +26,19 @@ export default function HistoryScreen({ navigation }: Props = {}) {
   const route = useRouteStore((s) => s.route);
   const riders = useRidersStore((s) => s.riders);
   const groupName = useAppStore((s) => s.groupName);
+  const { type } = useTheme();
+  const styles = useStyles(({ colors: c, type: t }) => ({
+    safe: { flex: 1, backgroundColor: c.bg },
+    content: { paddingHorizontal: 20, paddingBottom: 40 },
+    title: { ...t.h1, paddingTop: 16, paddingBottom: 24 },
+    stack: { gap: 16 },
+    blockBody: { ...t.body, marginTop: 8 },
+  }));
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader title="Ride History" />
+        <Text style={styles.title} accessibilityRole="header">Ride History</Text>
 
         {route != null ? (
           <View style={styles.stack}>
@@ -51,33 +57,18 @@ export default function HistoryScreen({ navigation }: Props = {}) {
               />
             </FadeIn>
             <FadeIn index={1}>
-              <Text style={type.caption}>Completed rides are not saved yet, so only this ride is shown.</Text>
+              <Text style={type.sm}>Completed rides are not saved yet, so only this ride is shown.</Text>
             </FadeIn>
           </View>
         ) : (
           <FadeIn>
-            <View style={styles.block}>
-              <Text style={type.heading}>No completed rides yet</Text>
-              <Text style={[type.body, styles.blockBody]}>Rides you finish will be listed here.</Text>
-            </View>
+            <Card>
+              <Text style={type.h2}>No completed rides yet</Text>
+              <Text style={styles.blockBody}>Rides you finish will be listed here.</Text>
+            </Card>
           </FadeIn>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: WeRideColors.dark },
-  content: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.xxl },
-  stack: { gap: WeRideSpacing.md },
-  block: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xl,
-    padding: WeRideSpacing.lg,
-    gap: WeRideSpacing.xs,
-  },
-  blockBody: { color: WeRideColors.textSub },
-});

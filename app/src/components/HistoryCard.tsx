@@ -6,11 +6,9 @@
  * trigger it.
  */
 import React from 'react';
-import { View, Text, StyleSheet, Share } from 'react-native';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
-import StatBox from './StatBox';
-import { Button, PressableCard } from '../ui';
+import { View, Text, Share } from 'react-native';
+import { useStyles } from '../theme/ThemeProvider';
+import { Button, CenterLine, Pill, PressableCard } from '../ui';
 
 interface Stat {
   label: string;
@@ -34,6 +32,18 @@ export function rideShareMessage(name: string, stats: Stat[]): string {
 }
 
 export default function HistoryCard({ name, meta, active, stats, onPress, pressHint }: Props) {
+  const styles = useStyles(({ colors: c, type: t }) => ({
+    card: { padding: 18, gap: 16 },
+    staticCard: { backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line, borderRadius: 22 },
+    summary: { gap: 16 },
+    headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+    name: { ...t.h3, flex: 1 },
+    meta: { ...t.sm },
+    statsRow: { flexDirection: 'row' },
+    stat: { flex: 1, minWidth: 0 },
+    statValue: { ...t.statValue },
+    statKey: { ...t.statKey, marginTop: 6 },
+  }));
   const share = () => {
     Share.share({ message: rideShareMessage(name, stats) }).catch(() => {
       // User dismissed or the share sheet is unavailable — nothing to recover.
@@ -55,18 +65,22 @@ export default function HistoryCard({ name, meta, active, stats, onPress, pressH
       style={styles.summary}
     >
       <View style={styles.headerRow}>
-        <Text style={[type.heading, styles.name]} numberOfLines={1}>
+        <Text style={styles.name} numberOfLines={1}>
           {name}
         </Text>
-        <View style={styles.metaWrap}>
-          {active ? <View style={styles.activeDot} /> : null}
-          <Text style={[type.caption, active && styles.metaActive]}>{meta}</Text>
-        </View>
+        {active ? <Pill label={meta} tone="ok" /> : <Text style={styles.meta}>{meta}</Text>}
       </View>
+
+      <CenterLine dim />
 
       <View style={styles.statsRow}>
         {stats.map((s) => (
-          <StatBox key={s.label} value={s.value} label={s.label} style={styles.stat} />
+          <View key={s.label} style={styles.stat}>
+            <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {s.value}
+            </Text>
+            <Text style={styles.statKey} numberOfLines={1}>{s.label.toUpperCase()}</Text>
+          </View>
         ))}
       </View>
     </View>
@@ -75,7 +89,7 @@ export default function HistoryCard({ name, meta, active, stats, onPress, pressH
   const shareButton = (
     <Button
       label="Share ride"
-      variant="secondary"
+      variant="soft"
       size="sm"
       onPress={share}
       accessibilityLabel={`Share ride card for ${name}`}
@@ -93,7 +107,7 @@ export default function HistoryCard({ name, meta, active, stats, onPress, pressH
 
   return (
     <PressableCard
-      radius={WeRideRadius.xl}
+      radius={22}
       active={active}
       onPress={onPress}
       haptic="tap"
@@ -107,24 +121,3 @@ export default function HistoryCard({ name, meta, active, stats, onPress, pressH
     </PressableCard>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    padding: WeRideSpacing.lg,
-    gap: WeRideSpacing.md,
-  },
-  staticCard: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xl,
-  },
-  summary: { gap: WeRideSpacing.md },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: WeRideSpacing.md },
-  name: { flex: 1 },
-  metaWrap: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.xs },
-  activeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: WeRideColors.green },
-  metaActive: { color: WeRideColors.green },
-  statsRow: { flexDirection: 'row', gap: WeRideSpacing.sm },
-  stat: { backgroundColor: WeRideColors.dark2 },
-});

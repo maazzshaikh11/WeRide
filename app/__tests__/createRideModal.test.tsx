@@ -184,9 +184,9 @@ describe('CreateRideModal ride meta', () => {
     expect(chip('Casual').props.accessibilityState).toMatchObject({ selected: false });
     await act(async () => chip('In 1 hour').props.onPress({ nativeEvent: {} }));
     expect(chip('In 1 hour').props.accessibilityState).toMatchObject({ selected: true });
-    // the duplicate "selected look" overlay is hidden from screen readers (no double announcement)
-    const hidden = chip('Sport').findAll((n) => n.props.importantForAccessibility === 'no-hide-descendants');
-    expect(hidden.length).toBeGreaterThan(0);
+    // selection is announced once, by the chip itself (no duplicate overlay node carrying the label)
+    const labels = tree.root.findAll((n) => (n.type as unknown) === 'Text' && n.props.children === 'Sport');
+    expect(labels).toHaveLength(1);
   });
 
   test('selections reset when the modal is reopened', async () => {

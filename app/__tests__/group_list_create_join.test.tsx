@@ -104,6 +104,9 @@ function texts(tree: ReturnType<typeof create>): string[] {
     .map((n) => n.children.map((c) => (typeof c === 'string' ? c : '')).join(''));
 }
 const hasText = (tree: ReturnType<typeof create>, s: string) => texts(tree).some((t) => t.includes(s));
+// The demo's pills / section labels / stat keys are uppercase.
+const hasTextCI = (tree: ReturnType<typeof create>, s: string) =>
+  texts(tree).some((t) => t.toLowerCase().includes(s.toLowerCase()));
 
 async function deliver(groups: any[]) {
   await act(async () => {
@@ -227,16 +230,16 @@ describe('GroupListScreen cards', () => {
     const { tree } = render();
     await deliver([G1, G2_LEGACY]);
     // Sections: the scheduled ride is "Up next"; the unscheduled legacy ride is under "Your rides".
-    expect(hasText(tree, 'Up next')).toBe(true);
-    expect(hasText(tree, 'Your rides')).toBe(true);
+    expect(hasTextCI(tree, 'Up next')).toBe(true);
+    expect(hasTextCI(tree, 'Your rides')).toBe(true);
     // Badges reflect the schedule only.
-    expect(hasText(tree, 'Upcoming')).toBe(true);
-    expect(hasText(tree, 'Planned')).toBe(true);
+    expect(hasTextCI(tree, 'Upcoming')).toBe(true);
+    expect(hasTextCI(tree, 'Planned')).toBe(true);
     // Stats come from real fields.
     expect(hasText(tree, 'Sport')).toBe(true);
     expect(hasText(tree, timeOfDay(new Date(G1.start_time_ms as number)))).toBe(true);
-    expect(hasText(tree, 'riders')).toBe(true);
-    expect(hasText(tree, 'rider')).toBe(true);
+    expect(hasTextCI(tree, 'riders')).toBe(true);
+    expect(hasTextCI(tree, 'rider')).toBe(true);
     expect(hasLabel(tree, 'Join code K7M2QX')).toBe(true);
     // Legacy ride: no invented start/code, and a Copy ID action instead
     expect(hasLabel(tree, 'Copy ride ID for Evening Ride')).toBe(true);

@@ -22,9 +22,18 @@ export interface StaticMapOptions {
   height: number;
   token: string | undefined | null;
   style?: string;
+  /** Route / destination pin colour, hex without '#' (default ember). */
+  routeHex?: string;
+  /** Start pin colour, hex without '#'. */
+  startHex?: string;
+  /** Dark casing drawn under the route line, hex without '#' (omit for none). */
+  outlineHex?: string;
 }
 
-export function buildStaticMapUrl({ points, width, height, token, style = 'dark-v11' }: StaticMapOptions): string | null {
+export function buildStaticMapUrl({
+  points, width, height, token, style = 'dark-v11',
+  routeHex = ROUTE_HEX, startHex = START_HEX, outlineHex,
+}: StaticMapOptions): string | null {
   if (!token) return null;
   const pts = points.filter((p) => isUsableCoord(p.lat, p.lng));
   if (pts.length === 0) return null;
@@ -35,9 +44,13 @@ export function buildStaticMapUrl({ points, width, height, token, style = 'dark-
   const fmt = (n: number) => n.toFixed(5);
 
   const overlays: string[] = [];
-  if (distinct) overlays.push(`path-4+${ROUTE_HEX}-1(${encodeURIComponent(encodePolyline(pts))})`);
-  if (distinct) overlays.push(`pin-s+${START_HEX}(${fmt(first.lng)},${fmt(first.lat)})`);
-  overlays.push(`pin-s+${ROUTE_HEX}(${fmt(last.lng)},${fmt(last.lat)})`);
+  if (distinct) {
+    const poly = encodeURIComponent(encodePolyline(pts));
+    if (outlineHex) overlays.push(`path-8+${outlineHex}-1(${poly})`);
+    overlays.push(`path-4+${routeHex}-1(${poly})`);
+    overlays.push(`pin-s+${startHex}(${fmt(first.lng)},${fmt(first.lat)})`);
+  }
+  overlays.push(`pin-s+${routeHex}(${fmt(last.lng)},${fmt(last.lat)})`);
 
   // 'auto' frames the overlays; with a single location there is no extent to fit.
   const view = distinct ? 'auto' : `${fmt(first.lng)},${fmt(first.lat)},14`;

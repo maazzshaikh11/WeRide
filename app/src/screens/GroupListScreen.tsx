@@ -13,8 +13,7 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import { firebaseAuth } from '../services/firebaseService';
 import { useAppStore } from '../store/appStore';
 import { resetRideSession } from '../store/rideSession';
-import { WeRideColors, WeRideFonts, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { GroupService, Group } from '@routing/group/groupService';
 import CreateRideModal from '../components/CreateRideModal';
 import RideCard from '../components/RideCard';
@@ -23,7 +22,7 @@ import {
   startLabel, timeOfDay,
 } from '../utils/rides';
 import {
-  Button, FadeIn, PressableScale, Skeleton, TextField, haptic, useReducedMotion,
+  Button, FadeIn, Icon, PressableScale, SectionLabel, Skeleton, TextField, haptic, useReducedMotion,
 } from '../ui';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
@@ -64,6 +63,11 @@ function animateLayout(): void {
  * "Copied" stays mounted just long enough to fade out, then unmounts.
  */
 function CopyLabel({ idle, copied, reduced }: { idle: string; copied: boolean; reduced: boolean }) {
+  const styles = useStyles(({ colors: c, type: ty }) => ({
+    copyLabel: { minWidth: 48, alignItems: 'center', justifyContent: 'center' },
+    copiedWrap: { alignItems: 'center', justifyContent: 'center' },
+    copyText: { ...ty.smStrong, color: c.ink },
+  }));
   const t = useRef(new Animated.Value(copied ? 1 : 0)).current;
   const [showCopied, setShowCopied] = useState(copied);
 
@@ -81,7 +85,7 @@ function CopyLabel({ idle, copied, reduced }: { idle: string; copied: boolean; r
   return (
     <View style={styles.copyLabel}>
       <Animated.Text
-        style={[type.captionStrong, styles.copyText, { opacity: t.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
+        style={[styles.copyText, { opacity: t.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
       >
         {idle}
       </Animated.Text>
@@ -97,7 +101,7 @@ function CopyLabel({ idle, copied, reduced }: { idle: string; copied: boolean; r
             },
           ]}
         >
-          <Text style={[type.captionStrong, styles.copyText]} numberOfLines={1}>Copied</Text>
+          <Text style={styles.copyText} numberOfLines={1}>Copied</Text>
         </Animated.View>
       ) : null}
     </View>
@@ -133,6 +137,45 @@ function buildRows(groups: Group[], now: number): Row[] {
 }
 
 export default function GroupListScreen({ navigation }: any) {
+  const { colors, type } = useTheme();
+  const styles = useStyles(({ colors: c, type: t }) => ({
+    safe: { flex: 1, backgroundColor: c.bg },
+    container: { flex: 1 },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16, gap: 12 },
+    headerText: { flex: 1, minWidth: 0 },
+    settingsBtn: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line },
+    headerTitle: { ...t.h1, marginTop: 8 },
+    bannerError: { ...t.sm, color: c.bad, paddingHorizontal: 20, paddingBottom: 8 },
+    joinWrap: { paddingHorizontal: 20, paddingBottom: 16 },
+    // flex-start: the field's error text grows it downward without moving the button.
+    joinRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    joinField: { flex: 1 },
+    joinButton: { minWidth: 88, height: 60 },
+    noticeError: { ...t.sm, color: c.bad, marginTop: 8 },
+    noticeOk: { ...t.sm, color: c.ok, marginTop: 8 },
+    listContent: { paddingHorizontal: 20, paddingBottom: 110 },
+    cardWrap: { marginBottom: 16 },
+    // Non-pressable twin of the RideCard surface, for the skeleton placeholders.
+    cardSurface: { backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line, borderRadius: 26, overflow: 'hidden' },
+    skelBody: { padding: 18 },
+    skelStats: { marginTop: 16 },
+    meta: { marginTop: 8 },
+    skel: { backgroundColor: c.line2 },
+    codeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    codeChip: { ...t.num, fontSize: 13, lineHeight: 16, letterSpacing: 1.5 },
+    actionBtn: { minHeight: 44, minWidth: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+    // Line boxes match the real text line-heights (h2 24, sm 18) so heights agree.
+    skelTitle: { height: 24, justifyContent: 'center' },
+    skelLine: { height: 18, justifyContent: 'center' },
+    statePanel: { paddingVertical: 48, alignItems: 'center' },
+    stateText: { ...t.body, marginTop: 8, textAlign: 'center' },
+    retryBtn: { marginTop: 24 },
+    fab: {
+      position: 'absolute', bottom: 32, right: 20, width: 58, height: 58, borderRadius: 18,
+      backgroundColor: c.pri, justifyContent: 'center', alignItems: 'center', elevation: 4,
+      borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.14)',
+    },
+  }));
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -321,7 +364,7 @@ export default function GroupListScreen({ navigation }: any) {
     if (row.kind === 'label') {
       return (
         <FadeIn index={index < 8 ? index : 0}>
-          <Text style={styles.sectionLabel} accessibilityRole="header">{row.text}</Text>
+          <SectionLabel style={index === 0 ? { marginTop: 0 } : undefined}>{row.text}</SectionLabel>
         </FadeIn>
       );
     }
@@ -397,16 +440,16 @@ export default function GroupListScreen({ navigation }: any) {
               accessibilityState={{ disabled: leaving, busy: leaving }}
             >
               {leaving ? (
-                <ActivityIndicator size="small" color={WeRideColors.error} />
+                <ActivityIndicator size="small" color={colors.bad} />
               ) : (
-                <Text style={[type.captionStrong, { color: WeRideColors.error }]}>Leave</Text>
+                <Text style={[type.smStrong, { color: colors.bad }]}>Leave</Text>
               )}
             </PressableScale>
           }
         />
         {notice ? (
           <FadeIn>
-            <Text style={[type.caption, styles.noticeError]} accessibilityLiveRegion="polite">{notice}</Text>
+            <Text style={styles.noticeError} accessibilityLiveRegion="polite">{notice}</Text>
           </FadeIn>
         ) : null}
       </FadeIn>
@@ -421,16 +464,16 @@ export default function GroupListScreen({ navigation }: any) {
           {[0, 1, 2].map((i) => (
             <FadeIn key={i} index={i} style={styles.cardWrap}>
               <View style={styles.cardSurface}>
-                <Skeleton width="100%" height={148} radius={0} />
+                <Skeleton width="100%" height={124} radius={0} style={styles.skel} />
                 <View style={styles.skelBody}>
                   <View style={styles.skelTitle}>
-                    <Skeleton width="55%" height={16} />
+                    <Skeleton width="55%" height={16} style={styles.skel} />
                   </View>
                   <View style={[styles.skelLine, styles.meta]}>
-                    <Skeleton width="38%" height={12} />
+                    <Skeleton width="38%" height={12} style={styles.skel} />
                   </View>
                   <View style={[styles.skelLine, styles.skelStats]}>
-                    <Skeleton width="80%" height={12} />
+                    <Skeleton width="80%" height={12} style={styles.skel} />
                   </View>
                 </View>
               </View>
@@ -443,11 +486,11 @@ export default function GroupListScreen({ navigation }: any) {
       return (
         <FadeIn>
           <View style={styles.statePanel} accessibilityRole="alert">
-            <Text style={type.heading}>Couldn't load your rides</Text>
-            <Text style={[type.body, styles.stateText]}>
+            <Text style={type.h2}>Couldn't load your rides</Text>
+            <Text style={styles.stateText}>
               {loadError ?? 'Check your connection and try again.'}
             </Text>
-            <Button label="Try again" variant="secondary" size="sm" onPress={retry} style={styles.retryBtn} />
+            <Button label="Try again" variant="soft" size="sm" onPress={retry} style={styles.retryBtn} />
           </View>
         </FadeIn>
       );
@@ -455,8 +498,8 @@ export default function GroupListScreen({ navigation }: any) {
     return (
       <FadeIn>
         <View style={styles.statePanel}>
-          <Text style={type.heading}>No rides yet</Text>
-          <Text style={[type.body, styles.stateText]}>
+          <Text style={type.h2}>No rides yet</Text>
+          <Text style={styles.stateText}>
             Create one with the + button, or join with a code.
           </Text>
         </View>
@@ -477,28 +520,33 @@ export default function GroupListScreen({ navigation }: any) {
       <View style={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={type.eyebrow} numberOfLines={1}>{headerEyebrow}</Text>
-            <Text style={type.title} accessibilityRole="header" numberOfLines={1}>{greetingFor(new Date(now))}, rider</Text>
+            <Text style={type.label} numberOfLines={1}>{headerEyebrow}</Text>
+            <Text style={styles.headerTitle} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {greetingFor(new Date(now))}, rider
+            </Text>
           </View>
           <PressableScale
-            style={styles.signOutBtn}
-            onPress={signOut}
-            disabled={signingOut}
+            onPress={() => navigation.navigate('Settings')}
             haptic="tap"
             accessibilityRole="button"
-            accessibilityLabel="Sign out"
-            accessibilityState={{ disabled: signingOut, busy: signingOut }}
+            accessibilityLabel="Settings"
+            style={styles.settingsBtn}
           >
-            {signingOut ? (
-              <ActivityIndicator size="small" color={WeRideColors.textSub} />
-            ) : (
-              <Text style={[type.bodyStrong, { color: WeRideColors.textSub }]}>Sign out</Text>
-            )}
+            <Icon name="gear" size={22} />
           </PressableScale>
+          <Button
+            label="Sign out"
+            variant="ghost"
+            size="sm"
+            onPress={signOut}
+            loading={signingOut}
+            disabled={signingOut}
+            haptic="tap"
+          />
         </View>
         {signOutError ? (
           <FadeIn>
-            <Text style={[type.caption, styles.bannerError]} accessibilityLiveRegion="polite">{signOutError}</Text>
+            <Text style={styles.bannerError} accessibilityLiveRegion="polite">{signOutError}</Text>
           </FadeIn>
         ) : null}
 
@@ -520,7 +568,7 @@ export default function GroupListScreen({ navigation }: any) {
             <Button
               label="Join"
               accessibilityLabel="Join group"
-              variant="secondary"
+              variant="soft"
               onPress={submitJoin}
               loading={joining}
               disabled={!canJoin}
@@ -529,7 +577,7 @@ export default function GroupListScreen({ navigation }: any) {
           </View>
           {joined ? (
             <FadeIn>
-              <Text style={[type.caption, styles.noticeOk]} accessibilityLiveRegion="polite">
+              <Text style={styles.noticeOk} accessibilityLiveRegion="polite">
                 {joinedName ? `Joined ${joinedName}` : 'Joined the ride'}
               </Text>
             </FadeIn>
@@ -557,7 +605,7 @@ export default function GroupListScreen({ navigation }: any) {
           accessibilityLabel="Create new ride"
           accessibilityRole="button"
         >
-          <Text style={styles.fabText}>+</Text>
+          <Icon name="plus" size={26} color={colors.priInk} />
         </PressableScale>
 
         <CreateRideModal
@@ -572,83 +620,3 @@ export default function GroupListScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: WeRideColors.dark },
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: WeRideSpacing.lg,
-    paddingTop: WeRideSpacing.md,
-    paddingBottom: WeRideSpacing.sm,
-  },
-  headerText: { flex: 1, minWidth: 0, paddingRight: WeRideSpacing.sm },
-  signOutBtn: {
-    minHeight: 44,
-    minWidth: 44,
-    paddingHorizontal: WeRideSpacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bannerError: { color: WeRideColors.error, paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.sm },
-  joinWrap: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: WeRideSpacing.lg },
-  // flex-start: the field's error text grows it downward without moving the button.
-  joinRow: { flexDirection: 'row', alignItems: 'flex-start', gap: WeRideSpacing.sm },
-  joinField: { flex: 1 },
-  joinButton: { minWidth: 72 },
-  noticeError: { color: WeRideColors.error, marginTop: WeRideSpacing.sm },
-  noticeOk: { color: WeRideColors.green, marginTop: WeRideSpacing.sm },
-  listContent: { paddingHorizontal: WeRideSpacing.lg, paddingBottom: 96 },
-  cardWrap: { marginBottom: WeRideSpacing.md },
-  sectionLabel: { ...type.eyebrow, textTransform: 'uppercase', marginTop: WeRideSpacing.sm, marginBottom: WeRideSpacing.md },
-  // Non-pressable twin of the RideCard surface, for the skeleton placeholders.
-  cardSurface: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  skelBody: { padding: WeRideSpacing.lg },
-  skelStats: { marginTop: WeRideSpacing.lg },
-  meta: { marginTop: WeRideSpacing.xs },
-  codeRow: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.xs },
-  codeChip: {
-    fontFamily: WeRideFonts.code,
-    fontSize: 13,
-    lineHeight: 16,
-    letterSpacing: 1.5,
-    color: WeRideColors.text,
-  },
-  actionBtn: {
-    minHeight: 44,
-    minWidth: 44,
-    paddingHorizontal: WeRideSpacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Line boxes match the real text line-heights (heading 22, caption 16) so heights agree.
-  skelTitle: { height: 22, justifyContent: 'center' },
-  skelLine: { height: 16, justifyContent: 'center' },
-  copyLabel: { minWidth: 48, alignItems: 'center', justifyContent: 'center' },
-  copiedWrap: { alignItems: 'center', justifyContent: 'center' },
-  copyText: { color: WeRideColors.primary },
-  statePanel: { paddingVertical: WeRideSpacing.xxxl, alignItems: 'center' },
-  stateText: { color: WeRideColors.textSub, marginTop: WeRideSpacing.xs, textAlign: 'center' },
-  retryBtn: { marginTop: WeRideSpacing.lg },
-  fab: {
-    position: 'absolute',
-    bottom: WeRideSpacing.xxl,
-    right: WeRideSpacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: WeRideColors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-  },
-  fabText: { ...type.title, color: WeRideColors.onPrimary, fontFamily: WeRideFonts.body, fontSize: 28 },
-});

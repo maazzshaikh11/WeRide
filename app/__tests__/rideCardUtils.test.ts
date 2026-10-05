@@ -36,6 +36,19 @@ describe('buildStaticMapUrl', () => {
     { lat: 18.6, lng: 73.7 },
     { lat: 18.7546, lng: 73.4062 },
   ];
+  it('takes theme colours: route, start pin and an optional dark casing under the route', () => {
+    const u = buildStaticMapUrl({
+      points: pts, width: 400, height: 200, token: 'pk.abc', style: 'light-v11',
+      routeHex: 'FFC20E', startHex: '0C7A47', outlineHex: '14140F',
+    })!;
+    expect(u).toContain('/styles/v1/mapbox/light-v11/static/');
+    expect(u).toContain('path-8+14140F-1(');
+    expect(u).toContain('path-4+FFC20E-1(');
+    expect(u).toContain('pin-s+0C7A47(');
+    expect(u).toContain('pin-s+FFC20E(73.40620,18.75460)');
+    expect(u).not.toContain('FF4D00');
+  });
+
   it('null without a token or points (caller falls back to the sketch)', () => {
     expect(buildStaticMapUrl({ points: pts, width: 400, height: 200, token: '' })).toBeNull();
     expect(buildStaticMapUrl({ points: [], width: 400, height: 200, token: 'pk.x' })).toBeNull();

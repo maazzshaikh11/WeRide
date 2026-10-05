@@ -1,8 +1,8 @@
 /**
  * Rider markers overlay — owned by Person A. Redesigned per master spec §4.1.
- * 32×32 circles with Space Mono initials; GREEN/RED/GREY states;
- * leader crown, "You" label, stale badge, speech bubbles (via SymbolLayer
- * callouts + RN overlays). Info card dark-themed.
+ * Avatar circles with initials, ringed in the page background like the demo
+ * `.av`; verified / stale / flagged states are the theme's ok / ink3 / bad.
+ * Info card uses the shared themed card family.
  * Reads from ridersStore (single source of truth); stale sweep every 1s.
  */
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -10,11 +10,15 @@ import { View, Text } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useRidersStore } from '@app/store/ridersStore';
 import { markerColorForState } from './riderMarkerState';
-import StatusBadge from '../../../components/StatusBadge';
-import { infoCardStyles as styles, INFO_CARD_RADIUS } from './infoCardStyles';
-import { FadeIn, PressableCard } from '../../../ui';
+import { useTheme } from '../../../theme/ThemeProvider';
+import { useInfoCardStyles, INFO_CARD_RADIUS } from './infoCardStyles';
+import { FadeIn, Pill, PressableCard } from '../../../ui';
+import type { PillTone } from '../../../ui';
 
-const CIRCLE_RADIUS = 16; // 32px diameter per master spec §4.1
+const CIRCLE_RADIUS = 18; // demo .av is 36px
+const RING_WIDTH = 2.5; // demo .av ring: 2.5px in the page background
+/** Initials colour on the avatar fill (demo .av uses near-black; white on the red flagged fill). */
+const INITIALS_DARK = '#10110E';
 const STALE_SWEEP_INTERVAL_MS = 1000;
 
 /** Space Mono-style initials from a rider id (2 chars, uppercase). */
@@ -40,14 +44,15 @@ function formatAccuracy(m: number): string {
 }
 
 /** Status label per spec §11 — never color-only. */
-function statusLabel(markerState: string, speed: number): { label: string; variant: 'safe' | 'error' | 'muted' } {
-  if (markerState === 'RED') return { label: 'SPOOFED', variant: 'error' };
-  if (markerState === 'GREY') return { label: 'STALE', variant: 'muted' };
-  if (speed > 20) return { label: 'Leading', variant: 'safe' };
-  return { label: 'On pace', variant: 'safe' };
+function statusLabel(markerState: string, speed: number): { label: string; tone: PillTone } {
+  if (markerState === 'RED') return { label: 'SPOOFED', tone: 'bad' };
+  if (markerState === 'GREY') return { label: 'STALE', tone: 'default' };
+  if (speed > 20) return { label: 'Leading', tone: 'ok' };
+  return { label: 'On pace', tone: 'ok' };
 }
 
 export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
+  const { colors } = useTheme();
   const riders = useRidersStore((state) => state.riders);
   const refreshStaleStates = useRidersStore((state) => state.refreshStaleStates);
   const selectedRiderId = useRidersStore((state) => state.selectedRiderId);
@@ -68,7 +73,7 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
     const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
 
     riders.forEach((entry, riderId) => {
-      const color = markerColorForState(entry.markerState);
+      const color = markerColorForState(entry.markerState, colors);
       features.push({
         type: 'Feature',
         id: riderId,
@@ -79,6 +84,7 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
         properties: {
           rider_id: riderId,
           markerColor: color,
+          initialsColor: entry.markerState === 'RED' ? '#FFFFFF' : INITIALS_DARK,
           initials: initialsFor(riderId),
           speed_mps: entry.location.speed_mps,
           heading_deg: entry.location.heading_deg,
@@ -94,7 +100,7 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
       type: 'FeatureCollection' as const,
       features,
     };
-  }, [riders]);
+  }, [riders, colors]);
 
   const shapeSourceRef = useRef<MapboxGL.ShapeSource>(null);
 
@@ -142,16 +148,16 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
           style={{
             circleRadius: CIRCLE_RADIUS,
             circleColor: ['get', 'markerColor'],
-            circleStrokeWidth: 2,
-            circleStrokeColor: '#111111',
+            circleStrokeWidth: RING_WIDTH,
+            circleStrokeColor: colors.bg,
           }}
         />
         <MapboxGL.SymbolLayer
           id="rider-initials"
           style={{
             textField: ['get', 'initials'] as any,
-            textSize: 10,
-            textColor: '#FFFFFF',
+            textSize: 11,
+            textColor: ['get', 'initialsColor'] as any,
             textAllowOverlap: true,
           }}
         />
@@ -171,6 +177,7 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
  * Shows rider short ID, speed/heading/accuracy, status badge.
  */
 export function RiderInfoCard() {
+  const styles = useInfoCardStyles();
   const selectedRiderId = useRidersStore((state) => state.selectedRiderId);
   const riders = useRidersStore((state) => state.riders);
   const selectRider = useRidersStore((state) => state.selectRider);
@@ -194,7 +201,7 @@ export function RiderInfoCard() {
       >
         <View style={styles.header}>
           <Text style={styles.title} numberOfLines={1}>Rider {selectedRiderId.slice(0, 8)}</Text>
-          <StatusBadge label={status.label} variant={status.variant} />
+          <Pill label={status.label} tone={status.tone} />
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Speed</Text>

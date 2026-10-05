@@ -1,5 +1,7 @@
 /**
- * SosModal — SOS confirmation modal (spec §3.3.11).
+ * SosModal — SOS confirmation modal (spec §3.3.11), in the demo's SOS language:
+ * a red road-sign Plate on a themed card over the theme's scrim; confirm is the
+ * red `danger` Button.
  * On confirm: triggerSos() (Person B), red toast, music ducks.
  *
  * Motion: the backdrop fades; the card scales + rises in on a spring
@@ -10,11 +12,11 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Modal, Animated, Pressable } from 'react-native';
-import { WeRideColors, WeRideRadius } from '../theme/theme';
-import { type } from '../theme/typography';
+import { Plates } from '../theme/palettes';
+import { useStyles } from '../theme/ThemeProvider';
 import { triggerSos } from '@hazard/services/sosService';
 import { useToastStore } from '../store/toastStore';
-import { Button, haptic, Motion, useReducedMotion } from '../ui';
+import { Button, haptic, Motion, Plate, useReducedMotion } from '../ui';
 import { muteToastHaptic } from './Toast';
 
 interface Props {
@@ -38,6 +40,25 @@ export default function SosModal({ visible, riderId, groupId, riderCount, locati
   const alive = useRef(true);
   const reduced = useReducedMotion();
   const push = useToastStore((s) => s.push);
+  const styles = useStyles(({ colors, type }) => ({
+    root: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.scrim },
+    overlayPress: { ...StyleSheet.absoluteFillObject },
+    box: {
+      backgroundColor: colors.card,
+      borderWidth: 1.5,
+      borderColor: colors.line,
+      borderRadius: 30,
+      padding: 20,
+      width: '100%',
+      gap: 14,
+    },
+    body: { ...type.body },
+    noFix: { ...type.smStrong, color: Plates.yellow.fg },
+    noFixPlate: { backgroundColor: Plates.yellow.bg, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14 },
+    actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
+    action: { flex: 1 },
+  }));
 
   useEffect(() => {
     alive.current = true;
@@ -103,13 +124,14 @@ export default function SosModal({ visible, riderId, groupId, riderCount, locati
         <Animated.View style={[styles.backdrop, { opacity: fade }]} pointerEvents="none" />
         <Pressable style={styles.overlayPress} onPress={onCancel} accessibilityLabel="Cancel SOS" />
         <Animated.View style={[styles.box, cardStyle]}>
-          <Text style={styles.eyebrow}>SOS</Text>
-          <Text style={styles.title}>Send SOS to group?</Text>
+          <Plate tone="red" icon="warn" title="Send SOS to group?" subtitle="Emergency alert" titleSize={22} titleLines={2} />
           <Text style={styles.body}>
             Your live location, speed and last known point will be shared instantly with all {riderCount} rider{riderCount !== 1 ? 's' : ''}.
           </Text>
           {!location ? (
-            <Text style={styles.noFix}>Waiting for your location. SOS can't be sent without a fix.</Text>
+            <View style={styles.noFixPlate}>
+              <Text style={styles.noFix}>Waiting for your location. SOS can't be sent without a fix.</Text>
+            </View>
           ) : null}
           <View style={styles.actions}>
             <Button
@@ -136,29 +158,3 @@ export default function SosModal({ visible, riderId, groupId, riderCount, locati
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000000b0' },
-  overlayPress: { ...StyleSheet.absoluteFillObject },
-  box: {
-    backgroundColor: WeRideColors.dark2,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xxxl,
-    padding: 20,
-    width: '100%',
-    gap: 12,
-  },
-  eyebrow: { ...type.labelStrong, color: WeRideColors.red },
-  title: { ...type.titleSm },
-  body: { ...type.body, color: WeRideColors.textSub },
-  noFix: { ...type.caption, color: WeRideColors.gold },
-  actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
-  action: { flex: 1 },
-});

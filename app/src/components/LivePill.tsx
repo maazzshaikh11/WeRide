@@ -1,12 +1,13 @@
 /**
  * LivePill — connection status pill (spec §3.3.1, §5.4).
- * Variants: red (LIVE), green (custom text), gold (SYNCING), grey (OFFLINE).
- * Pulsing dot per livePulse animation (1200ms loop).
+ * The demo `.pill`: 26 high, 13 radius, 11.5 ExtraBold caps.
+ * Variants: live (red pill, LIVE), green (ok tint), gold (accent pill, SYNCING),
+ * grey (default pill, OFFLINE). Pulsing dot per livePulse animation (1200ms loop).
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { WeRideColors, WeRideRadius } from '../theme/theme';
-import { type } from '../theme/typography';
+import { View, Text, Animated } from 'react-native';
+import { withAlpha } from '../theme/palettes';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { useReducedMotion } from '../ui';
 
 export type LivePillVariant = 'live' | 'green' | 'gold' | 'grey';
@@ -16,15 +17,26 @@ interface Props {
   label?: string;
 }
 
-const VARIANT_STYLES: Record<LivePillVariant, { bg: string; border: string; text: string; dot: string }> = {
-  live:   { bg: WeRideColors.redDim,   border: '#FF3B3B55', text: WeRideColors.red,   dot: WeRideColors.red },
-  green:  { bg: WeRideColors.greenDim, border: '#22C55E44', text: WeRideColors.green, dot: WeRideColors.green },
-  gold:   { bg: '#FBBF2444',           border: '#FBBF2455', text: '#fde68a',          dot: WeRideColors.gold },
-  grey:   { bg: '#33333355',           border: '#33333355', text: WeRideColors.textSub, dot: WeRideColors.textSub },
-};
-
 export default function LivePill({ variant, label }: Props) {
-  const v = VARIANT_STYLES[variant];
+  const { colors, type } = useTheme();
+  const styles = useStyles(() => ({
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 6,
+      height: 26,
+      paddingHorizontal: 10,
+      borderRadius: 13,
+    },
+    dot: { width: 8, height: 8, borderRadius: 4 },
+  }));
+  const v = ({
+    live: { bg: colors.bad, text: '#FFFFFF', border: 'transparent' },
+    green: { bg: withAlpha(colors.ok, 0.16), text: colors.ok, border: 'transparent' },
+    gold: { bg: colors.pri, text: colors.priInk, border: 'transparent' },
+    grey: { bg: colors.card2, text: colors.ink2, border: colors.line },
+  } as Record<LivePillVariant, { bg: string; text: string; border: string }>)[variant];
   const dotOpacity = useRef(new Animated.Value(1)).current;
   const reduced = useReducedMotion();
 
@@ -69,23 +81,9 @@ export default function LivePill({ variant, label }: Props) {
   const text = label ?? (variant === 'live' ? 'LIVE' : variant === 'gold' ? 'SYNCING' : 'OFFLINE');
 
   return (
-    <View style={[styles.pill, { backgroundColor: v.bg, borderColor: v.border }]}>
-      <Animated.View style={[styles.dot, { backgroundColor: v.dot, opacity: dotOpacity }]} />
-      <Text style={[styles.label, { color: v.text }]}>{text}</Text>
+    <View style={[styles.pill, { backgroundColor: v.bg, borderColor: v.border, borderWidth: v.border === 'transparent' ? 0 : 1.5 }]}>
+      <Animated.View style={[styles.dot, { backgroundColor: v.text, opacity: dotOpacity }]} />
+      <Text style={[type.pill, { color: v.text }]}>{text.toUpperCase()}</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: WeRideRadius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  label: { ...type.labelStrong, letterSpacing: 0.5 },
-});

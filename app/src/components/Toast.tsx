@@ -1,5 +1,7 @@
 /**
- * Toast — single toast item (spec §3.3.3, §5.7).
+ * Toast — single toast item (spec §3.3.3, §5.7), drawn as the demo's compact
+ * road-sign Plate: info -> black, warn -> yellow, error -> red, success -> green.
+ * Plate colours are fixed road-sign colours (same in every theme).
  * toastSlide animation: translateY -30 -> 0, opacity 0 -> 1, spring (native).
  * Tap anywhere on the toast (44pt+ target) to dismiss; auto-dismiss after 2600ms.
  *
@@ -9,22 +11,24 @@
  * confirmation) can mute that one with `muteToastHaptic(message)`.
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { WeRideColors, WeRideRadius } from '../theme/theme';
-import { type } from '../theme/typography';
+import { Animated, StyleSheet } from 'react-native';
+import type { PlateTone } from '../theme/palettes';
 import { ToastItem } from '../store/toastStore';
-import { haptic, HapticKind, PressableScale } from '../ui';
+import { haptic, HapticKind, Plate, PressableScale } from '../ui';
 
 const AUTO_DISMISS_MS = 2600;
 const MUTE_TTL_MS = 3000;
 
-const COLORS: Record<ToastItem['variant'], { border: string; dot: string }> = {
-  success: { border: '#22C55E55', dot: WeRideColors.green },
-  error: { border: '#FF3B3B66', dot: WeRideColors.red },
-  warn: { border: '#FBBF2455', dot: WeRideColors.gold },
+/** Plate tone per toast kind (demo `toast({ c })`). */
+export const TOAST_TONE: Record<ToastItem['variant'], PlateTone> = {
+  info: 'black',
+  warn: 'yellow',
+  error: 'red',
+  success: 'green',
 };
 
 const VARIANT_HAPTIC: Record<ToastItem['variant'], HapticKind> = {
+  info: 'select',
   success: 'success',
   warn: 'warning',
   error: 'error',
@@ -46,7 +50,6 @@ function consumeMute(message: string): boolean {
 
 export default function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: number) => void }) {
   const anim = useRef(new Animated.Value(0)).current;
-  const c = COLORS[toast.variant];
   const hapticFor = useRef<number | null>(null);
 
   // Once per toast: the id guard keeps re-renders (and effect re-runs) silent.
@@ -76,7 +79,6 @@ export default function Toast({ toast, onDismiss }: { toast: ToastItem; onDismis
     <Animated.View
       style={[
         styles.toast,
-        { borderColor: c.border },
         {
           opacity: anim,
           transform: [{
@@ -93,27 +95,13 @@ export default function Toast({ toast, onDismiss }: { toast: ToastItem; onDismis
         accessibilityRole="button"
         accessibilityLabel={`Dismiss notification: ${toast.message}`}
       >
-        <View style={[styles.dot, { backgroundColor: c.dot }]} />
-        <Text style={styles.text}>{toast.message}</Text>
+        <Plate compact tone={TOAST_TONE[toast.variant]} title={toast.message} />
       </PressableScale>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  toast: {
-    backgroundColor: '#111111F5',
-    borderWidth: 1,
-    borderRadius: WeRideRadius.xl,
-  },
-  press: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  text: { ...type.body, flex: 1 },
+  toast: { maxWidth: '100%' },
+  press: { minHeight: 44 },
 });

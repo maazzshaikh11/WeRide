@@ -9,6 +9,9 @@ import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import Toast, { muteToastHaptic } from '../src/components/Toast';
 import ToastContainer from '../src/components/ToastContainer';
 import { useToastStore } from '../src/store/toastStore';
+import { Plates } from '../src/theme/palettes';
+import { ThemeContext, buildTheme } from '../src/theme/ThemeProvider';
+import { THEMES } from '../src/theme/palettes';
 
 const mounted: ReactTestRenderer[] = [];
 function render(el: React.ReactElement) {
@@ -81,5 +84,49 @@ describe('Toast', () => {
     act(() => press.props.onPress({}));
     expect(dismiss).toHaveBeenCalledWith(7);
     expect(t.root.findAllByType(Text).map((n) => n.props.children)).toContain('Saved');
+  });
+
+  it.each([
+    ['info', 'black'],
+    ['warn', 'yellow'],
+    ['error', 'red'],
+    ['success', 'green'],
+  ] as const)('a %s toast is a compact %s Plate (same in every theme), sentence-case title', (variant, tone) => {
+    const bgOf = (t: ReactTestRenderer) =>
+      t.root
+        .findAll((n) => typeof n.type === 'string' && n.props.style)
+        .map((n) => Object.assign({}, ...([] as any[]).concat(n.props.style).flat(3).filter(Boolean)))
+        .map((s: any) => s.backgroundColor);
+    for (const [id, scheme] of [['demo', 'dark'], ['demo', 'light'], ['ember', 'light']] as const) {
+      const t = render(
+        <ThemeContext.Provider value={buildTheme(id, THEMES[id][scheme])}>
+          <Toast toast={{ id: 300, message: 'Crew regrouping', variant }} onDismiss={jest.fn()} />
+        </ThemeContext.Provider>,
+      );
+      expect(bgOf(t)).toContain(Plates[tone].bg);
+      const title = t.root.findAllByType(Text).find((n) => n.props.children === 'Crew regrouping')!;
+      const flat = Object.assign({}, ...([] as any[]).concat(title.props.style).flat(3).filter(Boolean));
+      expect(flat.color).toBe(Plates[tone].fg);
+      expect(flat.fontSize).toBe(15.5);
+    }
+  });
+
+  it('the Plate (and its text) keeps its colour while the surrounding theme changes', () => {
+    // Plates are road-sign colours: identical across all four palettes.
+    const colours = (['demo', 'ember'] as const).flatMap((id) =>
+      (['light', 'dark'] as const).map((scheme) => {
+        const t = render(
+          <ThemeContext.Provider value={buildTheme(id, THEMES[id][scheme])}>
+            <Toast toast={{ id: 301, message: 'Saved', variant: 'success' }} onDismiss={jest.fn()} />
+          </ThemeContext.Provider>,
+        );
+        return t.root
+          .findAll((n) => typeof n.type === 'string' && n.props.style)
+          .map((n) => Object.assign({}, ...([] as any[]).concat(n.props.style).flat(3).filter(Boolean)).backgroundColor)
+          .filter((c: any) => c === Plates.green.bg).length;
+      }),
+    );
+    expect(new Set(colours).size).toBe(1);
+    expect(colours[0]).toBeGreaterThan(0);
   });
 });

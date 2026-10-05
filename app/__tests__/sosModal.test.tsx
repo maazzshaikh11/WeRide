@@ -12,7 +12,8 @@ jest.mock('@hazard/services/sosService', () => ({
 }));
 
 import SosModal from '../src/components/SosModal';
-import { WeRideColors } from '../src/theme/theme';
+import { ThemeContext, buildTheme } from '../src/theme/ThemeProvider';
+import { Plates, THEMES, ThemeId, Scheme } from '../src/theme/palettes';
 import { useToastStore } from '../src/store/toastStore';
 
 const mounted: ReturnType<typeof create>[] = [];
@@ -69,7 +70,7 @@ describe('SosModal', () => {
     expect(send.props.variant).toBe('danger');
     const realSend = pressable(tree, 'Send SOS to group');
     const flat = ([] as any[]).concat(realSend.props.style).flat(3).filter(Boolean);
-    expect(flat.some((s: any) => s.backgroundColor === WeRideColors.red)).toBe(true);
+    expect(flat.some((s: any) => s.backgroundColor === buildTheme('demo', THEMES.demo.dark).colors.bad)).toBe(true);
 
     await act(async () => {
       send.props.onPress();
@@ -152,5 +153,30 @@ describe('SosModal', () => {
     errSpy.mockRestore();
     vibrate.mockRestore();
     (Platform as any).OS = 'ios';
+  });
+
+  it.each([
+    ['demo', 'dark'],
+    ['demo', 'light'],
+    ['ember', 'dark'],
+    ['ember', 'light'],
+  ] as [ThemeId, Scheme][])('re-colours with the theme: card, scrim and danger Button; the SOS plate stays road-sign red (%s %s)', (id, scheme) => {
+    const theme = buildTheme(id, THEMES[id][scheme]);
+    const tree = render(
+      <ThemeContext.Provider value={theme}>
+        <SosModal {...base} riderCount={2} location={{ lat: 1, lng: 2 }} />
+      </ThemeContext.Provider>,
+    );
+    const styleOf = (node: any) => Object.assign({}, ...([] as any[]).concat(node.props.style).flat(3).filter(Boolean));
+    // The modal card and backdrop take the theme's surface and scrim.
+    const all = tree.root.findAll((n) => typeof n.type === 'string' && n.props.style);
+    const bgs = all.map((n) => styleOf(n).backgroundColor);
+    expect(bgs).toContain(theme.colors.card);
+    expect(bgs).toContain(theme.colors.scrim);
+    // Send is the theme's `bad` red.
+    expect(styleOf(pressable(tree, 'Send SOS to group')).backgroundColor).toBe(theme.colors.bad);
+    // The SOS plate is a fixed road-sign red in every theme, with white text.
+    expect(bgs).toContain(Plates.red.bg);
+    expect(allText(tree)).toContain('SEND SOS TO GROUP?');
   });
 });

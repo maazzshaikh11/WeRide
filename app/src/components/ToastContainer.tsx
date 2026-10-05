@@ -30,9 +30,10 @@ export default function ToastContainer({ top = 14 }: Props) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 14,
+    right: 14,
     zIndex: 60,
     gap: 8,
+    alignItems: 'center',
   },
 });

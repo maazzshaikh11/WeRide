@@ -123,19 +123,30 @@ export function getMarkerStateForMissing(): MarkerState {
   return 'GREY';
 }
 
+/** The palette tokens a marker colour is drawn from. */
+export interface MarkerPalette {
+  ok: string;
+  bad: string;
+  ink3: string;
+}
+
+/** Static fallback (the pre-theme values) for callers without a palette. */
+const FALLBACK_PALETTE: MarkerPalette = { ok: '#22C55E', bad: '#FF3B3B', ink3: '#9AA0A6' };
+
 /**
- * Map a MarkerState to a hex color string from the WeRide theme.
+ * Map a MarkerState to a colour: verified -> `ok`, spoofed/flagged -> `bad`,
+ * stale/unknown -> `ink3` (the active theme's tokens when `palette` is given).
  *
  * This is the single source of truth for rider marker colors.
  * No other component should compute marker colors independently.
  */
-export function markerColorForState(state: MarkerState): string {
+export function markerColorForState(state: MarkerState, palette: MarkerPalette = FALLBACK_PALETTE): string {
   switch (state) {
     case 'GREEN':
-      return '#22C55E'; // WeRideColors.riderVerified
+      return palette.ok;
     case 'RED':
-      return '#FF3B3B'; // WeRideColors.riderFlagged
+      return palette.bad;
     case 'GREY':
-      return '#9AA0A6'; // WeRideColors.riderStale
+      return palette.ink3;
   }
 }

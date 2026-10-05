@@ -9,10 +9,12 @@
  * - HazardOverlayInfoCard: renders the bottom info card for selected hazard (outside MapView)
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
-import { WeRideColors, hazardColor } from '../../../theme/theme';
-import { infoCardStyles as cardStyles } from './infoCardStyles';
+import { hazardColor } from '../../../theme/theme';
+import { Plates } from '../../../theme/palettes';
+import { useStyles, useTheme } from '../../../theme/ThemeProvider';
+import { useInfoCardStyles } from './infoCardStyles';
 import { Button, FadeIn } from '../../../ui';
 import { subscribeToHazardClusters, HazardCluster, resolveHazard } from '@hazard/services/hazardService';
 
@@ -73,6 +75,26 @@ interface PolygonGeoJSON {
  * Does NOT wrap in its own MapboxGL.MapView.
  */
 export function HazardOverlayMapLayer({ groupId, onHazardPress }: MapLayerProps) {
+  const styles = useStyles(({ colors: c, type }) => ({
+    // demo hazard sign: a yellow rounded diamond with a dark rim and a `!`
+    marker: {
+      borderRadius: 8,
+      transform: [{ rotate: '45deg' }],
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: Plates.yellow.rim,
+      backgroundColor: Plates.yellow.bg,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    resolved: { backgroundColor: c.card2, borderColor: c.ink3, opacity: 0.7 },
+    markerText: { ...type.button, fontSize: 15, lineHeight: 18, color: Plates.yellow.fg, transform: [{ rotate: '-45deg' }] },
+    markerTextResolved: { color: c.ink3 },
+  }));
   const [clusters, setClusters] = useState<HazardCluster[]>([]);
   const unsubRef = useRef<(() => void) | null>(null);
 
@@ -150,12 +172,12 @@ export function HazardOverlayMapLayer({ groupId, onHazardPress }: MapLayerProps)
             fillColor: [
               'match',
               ['get', 'hazard_type'],
-              'pothole', WeRideColors.hazardPothole,
-              'oil_spill', WeRideColors.hazardOilSpill,
-              'accident', WeRideColors.hazardAccident,
-              'debris', WeRideColors.hazardDebris,
-              'other', WeRideColors.hazardOther,
-              WeRideColors.hazardOther,
+              'pothole', hazardColor('pothole'),
+              'oil_spill', hazardColor('oil_spill'),
+              'accident', hazardColor('accident'),
+              'debris', hazardColor('debris'),
+              'other', hazardColor('other'),
+              hazardColor('other'),
             ],
             fillOpacity: [
               'match',
@@ -166,12 +188,12 @@ export function HazardOverlayMapLayer({ groupId, onHazardPress }: MapLayerProps)
             fillOutlineColor: [
               'match',
               ['get', 'hazard_type'],
-              'pothole', WeRideColors.hazardPothole,
-              'oil_spill', WeRideColors.hazardOilSpill,
-              'accident', WeRideColors.hazardAccident,
-              'debris', WeRideColors.hazardDebris,
-              'other', WeRideColors.hazardOther,
-              WeRideColors.hazardOther,
+              'pothole', hazardColor('pothole'),
+              'oil_spill', hazardColor('oil_spill'),
+              'accident', hazardColor('accident'),
+              'debris', hazardColor('debris'),
+              'other', hazardColor('other'),
+              hazardColor('other'),
             ],
           }}
         />
@@ -221,18 +243,14 @@ export function HazardOverlayMapLayer({ groupId, onHazardPress }: MapLayerProps)
             <View
               style={[
                 styles.marker,
+                cluster.status === 'resolved' && styles.resolved,
                 {
-                  backgroundColor: cluster.status === 'resolved'
-                    ? WeRideColors.hazardResolved
-                    : hazardColor(cluster.hazard_type),
-                  width: 24 + cluster.hazard_score * 16,
-                  height: 24 + cluster.hazard_score * 16,
+                  width: 26 + cluster.hazard_score * 10,
+                  height: 26 + cluster.hazard_score * 10,
                 },
               ]}
             >
-              <Text style={styles.markerText}>
-                {cluster.report_count > 9 ? '9+' : cluster.report_count}
-              </Text>
+              <Text style={[styles.markerText, cluster.status === 'resolved' && styles.markerTextResolved]}>!</Text>
             </View>
           </TouchableOpacity>
         </MarkerView>
@@ -245,6 +263,8 @@ export function HazardOverlayMapLayer({ groupId, onHazardPress }: MapLayerProps)
  * Info card component — renders outside MapView as absolutely positioned bottom sheet.
  */
 export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve: _onResolve }: InfoCardProps) {
+  const { colors } = useTheme();
+  const cardStyles = useInfoCardStyles();
   const handleResolve = useCallback(async () => {
     if (!selectedCluster) return;
     try {
@@ -270,16 +290,14 @@ export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve: _
             style={[
               cardStyles.dot,
               {
-                backgroundColor: resolved
-                  ? WeRideColors.hazardResolved
-                  : hazardColor(selectedCluster.hazard_type),
+                backgroundColor: resolved ? colors.ink3 : hazardColor(selectedCluster.hazard_type),
               },
             ]}
           />
           <Text
             style={[
               cardStyles.title,
-              resolved && { color: WeRideColors.textSecondary },
+              resolved && { color: colors.ink2 },
             ]}
             numberOfLines={1}
           >
@@ -303,6 +321,7 @@ export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve: _
           <Button
             label="Dismiss"
             variant="secondary"
+            size="sm"
             accessibilityLabel="Dismiss hazard details"
             onPress={onDismiss}
             style={cardStyles.actionFlex}
@@ -310,6 +329,7 @@ export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve: _
           {selectedCluster.status === 'active' && (
             <Button
               label="Resolve hazard"
+              size="sm"
               accessibilityLabel="Resolve hazard"
               onPress={handleResolve}
               style={cardStyles.actionFlex}
@@ -320,23 +340,3 @@ export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve: _
     </FadeIn>
   );
 }
-
-const styles = StyleSheet.create({
-  marker: {
-    borderRadius: 999,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  markerText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-});

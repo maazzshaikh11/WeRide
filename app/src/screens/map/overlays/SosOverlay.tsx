@@ -12,8 +12,8 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
-import { WeRideColors } from '../../../theme/theme';
-import { infoCardStyles as cardStyles, INFO_CARD_RADIUS } from './infoCardStyles';
+import { useStyles, useTheme } from '../../../theme/ThemeProvider';
+import { useInfoCardStyles, INFO_CARD_RADIUS } from './infoCardStyles';
 import { Button, FadeIn, PressableCard, useReducedMotion } from '../../../ui';
 import { useAppStore } from '../../../store/appStore';
 import { subscribeToSosEvents, resolveSos, SOSElement } from '@hazard/services/sosService';
@@ -54,6 +54,26 @@ interface InfoCardsProps {
  * Reports sosEvents upward via onSosEventsChange callback.
  */
 export function SosOverlayMapLayer({ groupId, userId, onSosEventsChange }: MapLayerProps) {
+  const styles = useStyles(({ colors, type }) => ({
+    // demo SOS marker: `bad` disc with a white ring and a `!`
+    sosMarker: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 3,
+      borderColor: '#FFFFFF',
+      backgroundColor: colors.bad,
+      shadowColor: colors.bad,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.6,
+      shadowRadius: 9,
+      elevation: 8,
+    },
+    sosResolved: { backgroundColor: colors.ink3, shadowOpacity: 0 },
+    sosMarkerText: { ...type.button, fontSize: 17, lineHeight: 20, color: '#FFFFFF', marginTop: -1 },
+  }));
   const [sosEvents, setSosEvents] = useState<ActiveSos[]>([]);
   const unsubRef = useRef<(() => void) | null>(null);
 
@@ -165,8 +185,8 @@ export function SosOverlayMapLayer({ groupId, userId, onSosEventsChange }: MapLa
           <Animated.View
             style={[
               styles.sosMarker,
+              sos.resolved && styles.sosResolved,
               {
-                backgroundColor: sos.resolved ? WeRideColors.hazardResolved : WeRideColors.error,
                 opacity: sos.resolved ? 0.7 : 1,
                 transform: sos.pulseAnim ? [{ scale: sos.pulseAnim }] : [],
               },
@@ -187,6 +207,14 @@ export function SosOverlayMapLayer({ groupId, userId, onSosEventsChange }: MapLa
  */
 function SosBorderPulse() {
   const reduced = useReducedMotion();
+  const ringStyles = useStyles(({ colors }) => ({
+    ring: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: INFO_CARD_RADIUS,
+      borderWidth: 2,
+      borderColor: colors.bad,
+    },
+  }));
   const pulse = useRef(new Animated.Value(0.35)).current;
 
   useEffect(() => {
@@ -204,13 +232,15 @@ function SosBorderPulse() {
     return () => loop.stop();
   }, [pulse, reduced]);
 
-  return <Animated.View pointerEvents="none" style={[cardPulseStyles.ring, { opacity: pulse }]} />;
+  return <Animated.View pointerEvents="none" style={[ringStyles.ring, { opacity: pulse }]} />;
 }
 
 /**
  * Info cards component — renders outside MapView as absolutely positioned bottom cards.
  */
 export function SosOverlayInfoCards({ sosEvents, userId, onResolve, onNavigate }: InfoCardsProps) {
+  const { colors } = useTheme();
+  const cardStyles = useInfoCardStyles();
   return (
     <>
       {sosEvents.map((sos) => (
@@ -219,7 +249,7 @@ export function SosOverlayInfoCards({ sosEvents, userId, onResolve, onNavigate }
           <View style={{ opacity: sos.resolved ? 0.8 : 1 }}>
             <PressableCard
               radius={INFO_CARD_RADIUS}
-              style={[cardStyles.cardBody, !sos.resolved && { borderColor: WeRideColors.red }]}
+              style={[cardStyles.cardBody, !sos.resolved && { borderColor: colors.bad }]}
               onPress={() => onNavigate(sos.lat, sos.lng)}
               accessibilityRole="button"
               accessibilityLabel={`${sos.resolved ? 'Resolved SOS' : 'SOS'} from ${
@@ -231,13 +261,13 @@ export function SosOverlayInfoCards({ sosEvents, userId, onResolve, onNavigate }
                 <View
                   style={[
                     cardStyles.dot,
-                    { backgroundColor: sos.resolved ? WeRideColors.hazardResolved : WeRideColors.error },
+                    { backgroundColor: sos.resolved ? colors.ink3 : colors.bad },
                   ]}
                 />
                 <Text
                   style={[
                     cardStyles.title,
-                    { color: sos.resolved ? WeRideColors.textSecondary : WeRideColors.error },
+                    { color: sos.resolved ? colors.ink2 : colors.bad },
                   ]}
                   numberOfLines={1}
                 >
@@ -257,6 +287,7 @@ export function SosOverlayInfoCards({ sosEvents, userId, onResolve, onNavigate }
                 <Button
                   label="Cancel SOS"
                   variant="danger"
+                  size="sm"
                   accessibilityLabel="Cancel SOS"
                   onPress={() => onResolve(sos.sos_id)}
                 />
@@ -274,35 +305,3 @@ export function SosOverlayInfoCards({ sosEvents, userId, onResolve, onNavigate }
     </>
   );
 }
-
-const cardPulseStyles = StyleSheet.create({
-  ring: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: INFO_CARD_RADIUS,
-    borderWidth: 2,
-    borderColor: WeRideColors.red,
-  },
-});
-
-const styles = StyleSheet.create({
-  sosMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#FF3B3B',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 9,
-    elevation: 8,
-  },
-  sosMarkerText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: -2,
-  },
-});

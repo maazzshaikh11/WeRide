@@ -1,11 +1,11 @@
 /**
  * Toast store — global transient toast state (spec §5.7).
- * Variants: success (green), error (red), warn (gold).
+ * Variants: success (green plate), error (red), warn (yellow), info (black).
  * Auto-dismiss handled by ToastContainer.
  */
 import { create } from 'zustand';
 
-export type ToastVariant = 'success' | 'error' | 'warn';
+export type ToastVariant = 'success' | 'error' | 'warn' | 'info';
 
 export interface ToastItem {
   id: number;

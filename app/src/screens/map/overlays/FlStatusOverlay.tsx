@@ -7,8 +7,8 @@
  * only, so the header never shifts).
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet } from 'react-native';
-import { type } from '../../../theme/typography';
+import { Animated } from 'react-native';
+import { useTheme } from '../../../theme/ThemeProvider';
 import { getFlData } from '../../../services/localStorage';
 import { FlRoundLogger } from '@flvoice/fl/flRoundLogger';
 import { Motion, useReducedMotion } from '../../../ui';
@@ -18,6 +18,7 @@ interface FlBadgeState {
 }
 
 export default function FlStatusOverlay() {
+  const { type } = useTheme();
   const [state, setState] = useState<FlBadgeState>({
     message: 'Ride data stays on-device',
   });
@@ -52,12 +53,8 @@ export default function FlStatusOverlay() {
   }, [state.message, fade, reduced]);
 
   return (
-    <Animated.Text style={[styles.text, { opacity: fade }]} numberOfLines={1}>
+    <Animated.Text style={[type.listSub, { opacity: fade }]} numberOfLines={1}>
       {state.message}
     </Animated.Text>
   );
 }
-
-const styles = StyleSheet.create({
-  text: { ...type.caption },
-});

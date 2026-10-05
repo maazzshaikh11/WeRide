@@ -22,16 +22,26 @@ import { subscribeToHazardClusters } from '@hazard/services/hazardService';
 import { useRidePlanStore } from '@app/store/ridePlanStore';
 import { registerToggleAvoidHazards } from './routeControls';
 import { buildRidePins, routeLatLngs } from '../rideGeometry';
-import { ROUTE_CASING_COLOR, ROUTE_COLOR, PIN_DARK, PIN_LIGHT } from '../mapStyle';
+import { useTheme } from '../../../theme/ThemeProvider';
 
 interface Props {
   groupId: string;
 }
 
+/** Pin ink on the map: near-white labels / discs and the dark casing tone (demo road: dark casing + accent line). */
+const PIN_LIGHT = '#FFFFFF';
+const NIGHT_CASING = '#050605';
+
 // Distance threshold: only trigger recalc if moved > 100m (Phase 6 T-16)
 const RECALC_DISTANCE_THRESHOLD_M = 100;
 
 export default function RouteOverlay({ groupId }: Props) {
+  // Route colours come from the theme: an `ink`-dark casing under a `pri` line
+  // (in dark schemes `ink` is light, so the casing falls back to near-black).
+  const { colors } = useTheme();
+  const ROUTE_COLOR = colors.pri;
+  const ROUTE_CASING_COLOR = colors.scheme === 'light' ? colors.ink : NIGHT_CASING;
+  const PIN_DARK = ROUTE_CASING_COLOR;
   // Store subscriptions
   const route = useRouteStore((state) => state.route);
   const lastValidLocation = useRouteStore((state) => state.lastValidLocation);

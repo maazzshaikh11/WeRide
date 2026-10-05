@@ -10,10 +10,11 @@
  * - SosOverlayInfoCards: renders info cards for SOS events (outside MapView)
  */
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { WeRideColors } from '../../../theme/theme';
-import { infoCardStyles as cardStyles } from './infoCardStyles';
+import { infoCardStyles as cardStyles, INFO_CARD_RADIUS } from './infoCardStyles';
+import { Button, FadeIn, PressableCard, useReducedMotion } from '../../../ui';
 import { useAppStore } from '../../../store/appStore';
 import { subscribeToSosEvents, resolveSos, SOSElement } from '@hazard/services/sosService';
 
@@ -180,80 +181,108 @@ export function SosOverlayMapLayer({ groupId, userId, onSosEventsChange }: MapLa
 }
 
 /**
+ * Red ring over an unresolved SOS card's border: a slow opacity pulse on the
+ * native driver (static under reduced motion). Sits inside the card's own
+ * border, so it reads as the border breathing between hairline and 2 px red.
+ */
+function SosBorderPulse() {
+  const reduced = useReducedMotion();
+  const pulse = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    if (reduced || typeof Animated.loop !== 'function' || typeof Animated.sequence !== 'function') {
+      pulse.setValue(0.6);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1100, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.15, duration: 1100, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse, reduced]);
+
+  return <Animated.View pointerEvents="none" style={[cardPulseStyles.ring, { opacity: pulse }]} />;
+}
+
+/**
  * Info cards component — renders outside MapView as absolutely positioned bottom cards.
  */
 export function SosOverlayInfoCards({ sosEvents, userId, onResolve, onNavigate }: InfoCardsProps) {
-  const handleNavigate = useCallback((lat: number, lng: number) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    Linking.openURL(url).catch((err) => {
-      console.error('[SosOverlayInfoCards] Failed to open Google Maps:', err);
-      Alert.alert('Error', 'Could not open Google Maps. Is it installed?');
-    });
-  }, []);
-
   return (
     <>
       {sosEvents.map((sos) => (
-        <TouchableOpacity
-          key={`info-${sos.sos_id}`}
-          style={[
-            cardStyles.card,
-            !sos.resolved && { borderColor: WeRideColors.red },
-            { opacity: sos.resolved ? 0.8 : 1 },
-          ]}
-          onPress={() => onNavigate(sos.lat, sos.lng)}
-          accessibilityRole="button"
-          accessibilityLabel={`${sos.resolved ? 'Resolved SOS' : 'SOS'} from ${
-            sos.rider_id === userId ? 'you' : `rider ${sos.rider_id.slice(-4)}`
-          }. Tap for directions.`}
-        >
-          <View style={cardStyles.header}>
-            <View
-              style={[
-                cardStyles.dot,
-                { backgroundColor: sos.resolved ? WeRideColors.hazardResolved : WeRideColors.error },
-              ]}
-            />
-            <Text
-              style={[
-                cardStyles.title,
-                { color: sos.resolved ? WeRideColors.textSecondary : WeRideColors.error },
-              ]}
-              numberOfLines={1}
-            >
-              {sos.resolved ? 'Resolved: ' : 'Emergency: '}
-              {sos.rider_id === userId ? 'You' : `Rider ${sos.rider_id.slice(-4)}`}
-            </Text>
-          </View>
-
-          <View style={cardStyles.row}>
-            <Text style={cardStyles.label}>Location</Text>
-            <Text style={cardStyles.value}>
-              {sos.lat.toFixed(5)}, {sos.lng.toFixed(5)}
-            </Text>
-          </View>
-
-          {sos.isSender && !sos.resolved && (
-            <TouchableOpacity
-              style={[cardStyles.action, cardStyles.actionDanger]}
-              onPress={() => onResolve(sos.sos_id)}
+        <FadeIn key={`info-${sos.sos_id}`} style={cardStyles.cardWrap}>
+          {/* FadeIn owns the wrapper's opacity, so the resolved dimming lives one level in. */}
+          <View style={{ opacity: sos.resolved ? 0.8 : 1 }}>
+            <PressableCard
+              radius={INFO_CARD_RADIUS}
+              style={[cardStyles.cardBody, !sos.resolved && { borderColor: WeRideColors.red }]}
+              onPress={() => onNavigate(sos.lat, sos.lng)}
               accessibilityRole="button"
-              accessibilityLabel="Cancel SOS"
+              accessibilityLabel={`${sos.resolved ? 'Resolved SOS' : 'SOS'} from ${
+                sos.rider_id === userId ? 'you' : `rider ${sos.rider_id.slice(-4)}`
+              }. Tap for directions.`}
             >
-              <Text style={cardStyles.actionText}>Cancel SOS</Text>
-            </TouchableOpacity>
-          )}
+              {!sos.resolved ? <SosBorderPulse /> : null}
+              <View style={cardStyles.header}>
+                <View
+                  style={[
+                    cardStyles.dot,
+                    { backgroundColor: sos.resolved ? WeRideColors.hazardResolved : WeRideColors.error },
+                  ]}
+                />
+                <Text
+                  style={[
+                    cardStyles.title,
+                    { color: sos.resolved ? WeRideColors.textSecondary : WeRideColors.error },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {sos.resolved ? 'Resolved: ' : 'Emergency: '}
+                  {sos.rider_id === userId ? 'You' : `Rider ${sos.rider_id.slice(-4)}`}
+                </Text>
+              </View>
 
-          {sos.resolved ? (
-            <Text style={cardStyles.hint}>Resolved — will disappear in 5 min</Text>
-          ) : (
-            <Text style={cardStyles.hint}>Tap the card for directions in Google Maps</Text>
-          )}
-        </TouchableOpacity>
+              <View style={cardStyles.row}>
+                <Text style={cardStyles.label}>Location</Text>
+                <Text style={cardStyles.value}>
+                  {sos.lat.toFixed(5)}, {sos.lng.toFixed(5)}
+                </Text>
+              </View>
+
+              {sos.isSender && !sos.resolved && (
+                <Button
+                  label="Cancel SOS"
+                  variant="danger"
+                  accessibilityLabel="Cancel SOS"
+                  onPress={() => onResolve(sos.sos_id)}
+                />
+              )}
+
+              {sos.resolved ? (
+                <Text style={cardStyles.hint}>Resolved — will disappear in 5 min</Text>
+              ) : (
+                <Text style={cardStyles.hint}>Tap the card for directions in Google Maps</Text>
+              )}
+            </PressableCard>
+          </View>
+        </FadeIn>
       ))}
     </>
   );
 }
+
+const cardPulseStyles = StyleSheet.create({
+  ring: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: INFO_CARD_RADIUS,
+    borderWidth: 2,
+    borderColor: WeRideColors.red,
+  },
+});
 
 const styles = StyleSheet.create({
   sosMarker: {

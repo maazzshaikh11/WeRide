@@ -1,11 +1,16 @@
 /**
  * NetworkBanner — connection status banner (spec §3.3.5).
  * States: lost (gold) / recovered (green). Auto-dismiss recovered after 2.5s.
+ * Slides down + fades in on a spring (native driver); a state change replays
+ * the entrance so "recovered" reads as a new event. The dismiss timer is keyed
+ * on the state only, so a parent re-render (new onDismiss identity) never
+ * restarts it or replays the animation.
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { WeRideColors, WeRideRadius } from '../theme/theme';
 import { type } from '../theme/typography';
+import { Motion, PressableScale, useReducedMotion } from '../ui';
 
 interface Props {
   state: 'lost' | 'recovered';
@@ -16,14 +21,24 @@ interface Props {
 export default function NetworkBanner({ state, riderName, onDismiss }: Props) {
   const slide = useRef(new Animated.Value(0)).current;
   const isLost = state === 'lost';
+  const reduced = useReducedMotion();
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   useEffect(() => {
-    Animated.timing(slide, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-    if (!isLost) {
-      const t = setTimeout(() => onDismiss?.(), 2500);
-      return () => clearTimeout(t);
-    }
-  }, [slide, isLost, onDismiss]);
+    slide.setValue(0);
+    const anim = reduced
+      ? Animated.timing(slide, { toValue: 1, duration: 150, useNativeDriver: true })
+      : Animated.spring(slide, { toValue: 1, ...Motion.spring, useNativeDriver: true });
+    anim.start();
+    return () => anim.stop();
+  }, [slide, isLost, reduced]);
+
+  useEffect(() => {
+    if (isLost) return;
+    const t = setTimeout(() => onDismissRef.current?.(), 2500);
+    return () => clearTimeout(t);
+  }, [isLost]);
 
   return (
     <Animated.View
@@ -31,7 +46,7 @@ export default function NetworkBanner({ state, riderName, onDismiss }: Props) {
         styles.banner,
         { borderColor: isLost ? '#FBBF2466' : '#22C55E66' },
         {
-          opacity: slide,
+          opacity: slide.interpolate({ inputRange: [0, 0.6], outputRange: [0, 1], extrapolate: 'clamp' }),
           transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [-40, 0] }) }],
         },
       ]}
@@ -43,15 +58,16 @@ export default function NetworkBanner({ state, riderName, onDismiss }: Props) {
           : `${riderName} is active again. Position resynced.`}
       </Text>
       {!isLost && (
-        <Pressable
+        <PressableScale
           style={styles.close}
           onPress={onDismiss}
+          haptic="tap"
           hitSlop={8}
           accessibilityLabel="Dismiss notification"
           accessibilityRole="button"
         >
           <Text style={styles.closeText}>✕</Text>
-        </Pressable>
+        </PressableScale>
       )}
     </Animated.View>
   );

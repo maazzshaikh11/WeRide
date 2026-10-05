@@ -7,6 +7,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { WeRideColors, WeRideRadius } from '../theme/theme';
 import { type } from '../theme/typography';
+import { useReducedMotion } from '../ui';
 
 export type LivePillVariant = 'live' | 'green' | 'gold' | 'grey';
 
@@ -25,10 +26,16 @@ const VARIANT_STYLES: Record<LivePillVariant, { bg: string; border: string; text
 export default function LivePill({ variant, label }: Props) {
   const v = VARIANT_STYLES[variant];
   const dotOpacity = useRef(new Animated.Value(1)).current;
+  const reduced = useReducedMotion();
 
   // livePulse animation — dot opacity 1 → 0.3 → 1, 1200ms infinite loop.
   // Fully defensive against partial Animated mocks in test environments.
   useEffect(() => {
+    // Decorative pulse: a static dot under reduced motion.
+    if (reduced) {
+      dotOpacity.setValue(1);
+      return;
+    }
     const timing = Animated.timing;
     if (typeof timing !== 'function' || typeof Animated.sequence !== 'function') {
       return;
@@ -57,7 +64,7 @@ export default function LivePill({ variant, label }: Props) {
         // noop
       }
     };
-  }, [dotOpacity]);
+  }, [dotOpacity, reduced]);
 
   const text = label ?? (variant === 'live' ? 'LIVE' : variant === 'gold' ? 'SYNCING' : 'OFFLINE');
 

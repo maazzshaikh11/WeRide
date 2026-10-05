@@ -13,7 +13,7 @@
  *  - VoxClient untouched — Voice tab owns voice now (Person D)
  */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, Linking, Pressable, ScrollView } from 'react-native';
+import { View, StyleSheet, Text, Linking, ScrollView } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -46,6 +46,7 @@ import { resolveSos } from '@hazard/services/sosService';
 import { resolveHazard } from '@hazard/services/hazardService';
 import { useRidePlanStore } from '../../store/ridePlanStore';
 import { useStopsStore } from '../../store/stopsStore';
+import { PressableScale } from '../../ui';
 import { fitPadding } from '../../utils/mapFit';
 import { fitPointsFor, fitSignature } from './rideGeometry';
 import { useRouteFit } from './useRouteFit';
@@ -387,14 +388,15 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
       >
         <View style={[styles.headerBar, navigation ? styles.headerBarWithBack : null]}>
           {navigation ? (
-            <Pressable
+            <PressableScale
               style={styles.backBtn}
               onPress={goToRides}
+              haptic="tap"
               accessibilityLabel="Back to rides"
               accessibilityRole="button"
             >
               <Text style={styles.backText}>‹ Rides</Text>
-            </Pressable>
+            </PressableScale>
           ) : null}
           <View style={styles.headerTitles}>
             <Text style={styles.title} numberOfLines={1}>
@@ -434,20 +436,28 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
 
       {/* 3.3.6 FAB column */}
       <View style={styles.fabColumn}>
+        {/* Recenter: the accent border and the glyph colour cross-fade (Fab) instead of swapping. */}
         <Fab
           onPress={toggleFollow}
           active={following}
+          haptic="select"
           accessibilityLabel={following ? 'Show the whole route' : 'Follow my location'}
           accessibilityRole="button"
+          activeChildren={
+            <View style={[styles.locateRing, styles.locateRingOn]}>
+              <View style={[styles.locateDot, styles.locateDotOn]} />
+            </View>
+          }
         >
-          <View style={[styles.locateRing, following && styles.locateRingOn]}>
-            <View style={[styles.locateDot, following && styles.locateDotOn]} />
+          <View style={styles.locateRing}>
+            <View style={styles.locateDot} />
           </View>
         </Fab>
         <NavFab onPress={openGoogleMaps} />
         <Fab
           onPress={() => setSignalMenuOpen((v) => !v)}
           active={signalMenuOpen}
+          haptic="select"
           accessibilityLabel="Send a quick signal"
           accessibilityRole="button"
         >

@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import { Platform, Text, Vibration } from 'react-native';
 import RoutePanel, { COLLAPSED_HEIGHT } from '../src/components/RoutePanel';
 import { EMPTY_STATE_COPY, routePanelMode } from '../src/components/routePanelState';
 import { useRouteStore } from '@routing/client/routeStore';
@@ -66,6 +66,18 @@ function getTextContent(node: renderer.ReactTestInstance): string {
       .join('');
   }
   return '';
+}
+
+/** The real pressable (findByProps would return the outer wrapper component). */
+function pressableByLabel(tree: renderer.ReactTestInstance, label: string) {
+  return tree.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
+}
+
+/** Expand the sheet through the panel body's toggle. */
+function expand(tree: renderer.ReactTestInstance) {
+  act(() => {
+    pressableByLabel(tree, 'Expand ride details').props.onPress({});
+  });
 }
 
 function findTextNodes(
@@ -156,10 +168,7 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
     const tree = mount(<RoutePanel avoidHazards={true} />).root;
 
     // Expand the panel by pressing the sheet toggle
-    const pressables = tree.findAll((node) => node.type === TouchableOpacity);
-    act(() => {
-      pressables[0].props.onPress();
-    });
+    expand(tree);
 
     const safetyText = findTextNodes(tree, (t) => t.includes('Safety score'));
     expect(safetyText.length).toBeGreaterThan(0);
@@ -175,25 +184,19 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
 
   test('respects avoidHazards prop for toggle text', () => {
     const treeAvoiding = mount(<RoutePanel avoidHazards={true} />).root;
-    act(() => {
-      treeAvoiding.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
-    });
+    expand(treeAvoiding);
     const avoidingText = findTextNodes(treeAvoiding, (t) => t.includes('Avoiding hazards'));
     expect(avoidingText.length).toBeGreaterThan(0);
 
     const treeIgnoring = mount(<RoutePanel avoidHazards={false} />).root;
-    act(() => {
-      treeIgnoring.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
-    });
+    expand(treeIgnoring);
     const ignoringText = findTextNodes(treeIgnoring, (t) => t.includes('Hazards ignored'));
     expect(ignoringText.length).toBeGreaterThan(0);
   });
 
   test('expanded view hands turn-by-turn off to Google Maps (no invented turns)', () => {
     const tree = mount(<RoutePanel />).root;
-    act(() => {
-      tree.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
-    });
+    expand(tree);
     const tbt = findTextNodes(tree, (t) => t.includes("Turn-by-turn isn't built in"));
     expect(tbt.length).toBeGreaterThan(0);
   });
@@ -205,19 +208,75 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
       <RoutePanel avoidHazards={false} onToggleAvoidHazards={onToggle} onOpenInGoogleMaps={onGmaps} />,
     ).root;
 
-    act(() => {
-      tree.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
-    });
+    expand(tree);
 
-    const buttons = tree.findAll((n) => n.type === TouchableOpacity);
-    const toggleBtn = buttons.find((b) => {
-      try {
-        return findTextNodes(b, (t) => t.includes('Hazards ignored') || t.includes('Avoiding hazards')).length > 0;
-      } catch {
-        return false;
-      }
+    const toggle = pressableByLabel(tree, 'Avoiding hazards: off. Tap to enable');
+    const gmaps = pressableByLabel(tree, 'Open route in Google Maps');
+    expect(toggle).toBeDefined();
+    expect(gmaps).toBeDefined();
+    act(() => toggle.props.onPress({}));
+    act(() => gmaps.props.onPress({}));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onGmaps).toHaveBeenCalledTimes(1);
+  });
+
+  test('avoid-hazards toggle gives the select haptic on press', () => {
+    (Platform as any).OS = 'android';
+    const spy = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
+    const tree = mount(<RoutePanel avoidHazards={false} onToggleAvoidHazards={jest.fn()} />).root;
+    expand(tree);
+    spy.mockClear();
+    act(() => pressableByLabel(tree, 'Avoiding hazards: off. Tap to enable').props.onPress({}));
+    expect(spy).toHaveBeenCalledWith(12);
+    (Platform as any).OS = 'ios';
+    spy.mockRestore();
+  });
+
+  test('toggling avoid-hazards re-renders with the new state without throwing', () => {
+    const t = mount(<RoutePanel avoidHazards={false} />);
+    expand(t.root);
+    act(() => t.update(<RoutePanel avoidHazards />));
+    expect(findTextNodes(t.root, (x) => x.includes('Avoiding hazards')).length).toBeGreaterThan(0);
+    expect(pressableByLabel(t.root, 'Avoiding hazards: on. Tap to disable')).toBeDefined();
+  });
+
+  test('numbers update in place when the route changes (pop animation keeps the row)', () => {
+    useRouteStore.getState().setLastValidLocation(FIX);
+    const t = mount(<RoutePanel />);
+    expect(findTextNodes(t.root, (x) => x === '15')).toHaveLength(1);
+    act(() => {
+      useRouteStore.getState().setRoute(makeRoute(22, 18.4, 0.8));
     });
-    expect(toggleBtn).toBeDefined();
+    expect(findTextNodes(t.root, (x) => x === '22')).toHaveLength(1);
+    expect(findTextNodes(t.root, (x) => x === '18.4')).toHaveLength(1);
+    expect(findTextNodes(t.root, (x) => x === '15')).toHaveLength(0);
+  });
+
+  test('recalculating with a route keeps the numbers on screen (pulsing, not replaced)', () => {
+    useRouteStore.getState().setLastValidLocation(FIX);
+    useRouteStore.getState().setIsLoading(true);
+    const t = mount(<RoutePanel />);
+    expect(findTextNodes(t.root, (x) => x.includes('Recalculating')).length).toBeGreaterThan(0);
+    expect(findTextNodes(t.root, (x) => x === '15')).toHaveLength(1);
+    expect(findTextNodes(t.root, (x) => x === '10.0')).toHaveLength(1);
+    expect(findTextNodes(t.root, (x) => x.includes('MIN LEFT')).length).toBeGreaterThan(0);
+  });
+
+  test('recalculating with no route yet shows skeleton blocks, no numbers', () => {
+    useRouteStore.getState().setRoute(null);
+    useRouteStore.getState().setIsLoading(true);
+    const t = mount(<RoutePanel />);
+    expect(findTextNodes(t.root, (x) => x.includes('Recalculating')).length).toBeGreaterThan(0);
+    const skeletons = t.root.findAll((n) => n.props.accessibilityElementsHidden === true && (n.type as unknown) === 'View');
+    expect(skeletons.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('the handle toggles the sheet', () => {
+    const t = mount(<RoutePanel />);
+    expect(pressableByLabel(t.root, 'Expand sheet')).toBeDefined();
+    act(() => pressableByLabel(t.root, 'Expand sheet').props.onPress({}));
+    expect(pressableByLabel(t.root, 'Collapse sheet')).toBeDefined();
+    expect(findTextNodes(t.root, (x) => x.includes('Safety score')).length).toBeGreaterThan(0);
   });
 });
 

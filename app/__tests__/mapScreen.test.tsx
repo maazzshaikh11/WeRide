@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factories and lazy mock handles must use require() */
 /**
  * MapScreen TrackingService lifecycle tests (Phase 6, updated for master-spec redesign).
  *
@@ -401,5 +402,46 @@ describe('MapScreen — Phase 6 TrackingService lifecycle', () => {
     act(() => renderer.root.findByProps(BACK).props.onPress());
 
     expect(goBack).toHaveBeenCalledTimes(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Press feedback on the floating controls
+  // ---------------------------------------------------------------------------
+
+  test('back chip is a PressableScale-backed pressable and still goes back', () => {
+    const parentGoBack = jest.fn();
+    const navigation = { goBack: jest.fn(), getParent: jest.fn(() => ({ goBack: parentGoBack })) };
+    const renderer = renderWithUser('user-abc', 'group-1', { navigation });
+    const real = renderer.root.findAll(
+      (n: any) => n.props.accessibilityLabel === 'Back to rides' && typeof n.props.onPressIn === 'function',
+    )[0];
+    expect(real).toBeDefined();
+    act(() => real.props.onPress({}));
+    expect(parentGoBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('recenter and signal FABs use the select haptic; signal FAB active state follows its menu', () => {
+    const renderer = renderWithUser('user-abc');
+    const fab = (label: string) =>
+      renderer.root.findAll((n: any) => n.props.accessibilityLabel === label && n.type === 'View')[0];
+
+    const recenter = fab('Follow my location') ?? fab('Show the whole route');
+    expect(recenter.props.haptic).toBe('select');
+    expect(recenter.props.activeChildren).toBeTruthy(); // glyph colour cross-fades in Fab
+
+    expect(fab('Send a quick signal').props.haptic).toBe('select');
+    expect(fab('Send a quick signal').props.active).toBe(false);
+    act(() => fab('Send a quick signal').props.onPress());
+    expect(fab('Send a quick signal').props.active).toBe(true);
+    act(() => fab('Send a quick signal').props.onPress());
+    expect(fab('Send a quick signal').props.active).toBe(false);
+  });
+
+  test('NavFab and SosFab keep their accessibility labels', () => {
+    const renderer = renderWithUser('user-abc');
+    const has = (label: string) =>
+      renderer.root.findAll((n: any) => n.props.accessibilityLabel === label).length > 0;
+    expect(has('Navigate in Google Maps')).toBe(true);
+    expect(has('Hold for 2 seconds to send SOS')).toBe(true);
   });
 });

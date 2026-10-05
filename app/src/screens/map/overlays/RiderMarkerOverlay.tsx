@@ -6,12 +6,13 @@
  * Reads from ridersStore (single source of truth); stale sweep every 1s.
  */
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useRidersStore } from '@app/store/ridersStore';
 import { markerColorForState } from './riderMarkerState';
 import StatusBadge from '../../../components/StatusBadge';
-import { infoCardStyles as styles } from './infoCardStyles';
+import { infoCardStyles as styles, INFO_CARD_RADIUS } from './infoCardStyles';
+import { FadeIn, PressableCard } from '../../../ui';
 
 const CIRCLE_RADIUS = 16; // 32px diameter per master spec §4.1
 const STALE_SWEEP_INTERVAL_MS = 1000;
@@ -184,35 +185,38 @@ export function RiderInfoCard() {
   const status = statusLabel(entry.markerState, loc.speed_mps);
 
   return (
-    <Pressable
-      style={styles.card}
-      onPress={() => selectRider(null)}
-      accessibilityLabel={`Rider ${selectedRiderId.slice(0, 8)} details. Tap to dismiss.`}
-    >
-      <View style={styles.header}>
-        <Text style={styles.title} numberOfLines={1}>Rider {selectedRiderId.slice(0, 8)}</Text>
-        <StatusBadge label={status.label} variant={status.variant} />
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>Speed</Text>
-        <Text style={styles.value}>{formatSpeed(loc.speed_mps)}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>Heading</Text>
-        <Text style={styles.value}>{formatHeading(loc.heading_deg)}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>Accuracy</Text>
-        <Text style={styles.value}>{formatAccuracy(loc.accuracy_m)}</Text>
-      </View>
-      {__DEV__ && (
-        <View style={styles.row}>
-          <Text style={styles.label}>NIS</Text>
-          <Text style={styles.value}>
-            {Number.isFinite(loc.nis_score) ? loc.nis_score.toFixed(2) : '--'}
-          </Text>
+    <FadeIn key={selectedRiderId} style={styles.cardWrap}>
+      <PressableCard
+        radius={INFO_CARD_RADIUS}
+        style={styles.cardBody}
+        onPress={() => selectRider(null)}
+        accessibilityLabel={`Rider ${selectedRiderId.slice(0, 8)} details. Tap to dismiss.`}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title} numberOfLines={1}>Rider {selectedRiderId.slice(0, 8)}</Text>
+          <StatusBadge label={status.label} variant={status.variant} />
         </View>
-      )}
-    </Pressable>
+        <View style={styles.row}>
+          <Text style={styles.label}>Speed</Text>
+          <Text style={styles.value}>{formatSpeed(loc.speed_mps)}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Heading</Text>
+          <Text style={styles.value}>{formatHeading(loc.heading_deg)}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Accuracy</Text>
+          <Text style={styles.value}>{formatAccuracy(loc.accuracy_m)}</Text>
+        </View>
+        {__DEV__ && (
+          <View style={styles.row}>
+            <Text style={styles.label}>NIS</Text>
+            <Text style={styles.value}>
+              {Number.isFinite(loc.nis_score) ? loc.nis_score.toFixed(2) : '--'}
+            </Text>
+          </View>
+        )}
+      </PressableCard>
+    </FadeIn>
   );
 }

@@ -13,6 +13,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { WeRideColors, hazardColor } from '../../../theme/theme';
 import { infoCardStyles as cardStyles } from './infoCardStyles';
+import { Button, FadeIn } from '../../../ui';
 import { subscribeToHazardClusters, HazardCluster, resolveHazard } from '@hazard/services/hazardService';
 
 const { ShapeSource, FillLayer, SymbolLayer, MarkerView } = MapboxGL;
@@ -262,62 +263,61 @@ export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve: _
   const title = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
 
   return (
-    <View style={cardStyles.card}>
-      <View style={cardStyles.header}>
-        <View
-          style={[
-            cardStyles.dot,
-            {
-              backgroundColor: resolved
-                ? WeRideColors.hazardResolved
-                : hazardColor(selectedCluster.hazard_type),
-            },
-          ]}
-        />
-        <Text
-          style={[
-            cardStyles.title,
-            resolved && { color: WeRideColors.textSecondary },
-          ]}
-          numberOfLines={1}
-        >
-          {title}
-          {resolved && ' (resolved)'}
-        </Text>
-      </View>
-
-      <View style={cardStyles.row}>
-        <Text style={cardStyles.label}>Reports</Text>
-        <Text style={cardStyles.value}>{selectedCluster.report_count}</Text>
-      </View>
-      <View style={cardStyles.row}>
-        <Text style={cardStyles.label}>Hazard score</Text>
-        <Text style={cardStyles.value}>
-          {(selectedCluster.hazard_score * 100).toFixed(0)}%
-        </Text>
-      </View>
-
-      <View style={cardStyles.actions}>
-        <TouchableOpacity
-          style={[cardStyles.action, cardStyles.actionSecondary]}
-          onPress={onDismiss}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss hazard details"
-        >
-          <Text style={cardStyles.actionSecondaryText}>Dismiss</Text>
-        </TouchableOpacity>
-        {selectedCluster.status === 'active' && (
-          <TouchableOpacity
-            style={[cardStyles.action, cardStyles.actionPrimary]}
-            onPress={handleResolve}
-            accessibilityRole="button"
-            accessibilityLabel="Resolve hazard"
+    <FadeIn key={selectedCluster.cluster_id} style={cardStyles.cardWrap}>
+      <View style={cardStyles.cardBody}>
+        <View style={cardStyles.header}>
+          <View
+            style={[
+              cardStyles.dot,
+              {
+                backgroundColor: resolved
+                  ? WeRideColors.hazardResolved
+                  : hazardColor(selectedCluster.hazard_type),
+              },
+            ]}
+          />
+          <Text
+            style={[
+              cardStyles.title,
+              resolved && { color: WeRideColors.textSecondary },
+            ]}
+            numberOfLines={1}
           >
-            <Text style={cardStyles.actionText}>Resolve hazard</Text>
-          </TouchableOpacity>
-        )}
+            {title}
+            {resolved && ' (resolved)'}
+          </Text>
+        </View>
+
+        <View style={cardStyles.row}>
+          <Text style={cardStyles.label}>Reports</Text>
+          <Text style={cardStyles.value}>{selectedCluster.report_count}</Text>
+        </View>
+        <View style={cardStyles.row}>
+          <Text style={cardStyles.label}>Hazard score</Text>
+          <Text style={cardStyles.value}>
+            {(selectedCluster.hazard_score * 100).toFixed(0)}%
+          </Text>
+        </View>
+
+        <View style={cardStyles.actions}>
+          <Button
+            label="Dismiss"
+            variant="secondary"
+            accessibilityLabel="Dismiss hazard details"
+            onPress={onDismiss}
+            style={cardStyles.actionFlex}
+          />
+          {selectedCluster.status === 'active' && (
+            <Button
+              label="Resolve hazard"
+              accessibilityLabel="Resolve hazard"
+              onPress={handleResolve}
+              style={cardStyles.actionFlex}
+            />
+          )}
+        </View>
       </View>
-    </View>
+    </FadeIn>
   );
 }
 

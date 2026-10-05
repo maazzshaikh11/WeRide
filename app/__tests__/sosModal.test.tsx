@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { Text } from 'react-native';
+import { Platform, Text, Vibration } from 'react-native';
 
 const mockTriggerSos = jest.fn();
 jest.mock('@hazard/services/sosService', () => ({
@@ -31,6 +31,10 @@ function allText(tree: ReturnType<typeof create>): string {
     .map((n) => [n.props.children].flat().join(''))
     .join('|');
 }
+
+/** The real pressable (findByProps returns the outer wrapper component). */
+const pressable = (tree: ReturnType<typeof create>, label: string) =>
+  tree.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
 
 const press = (tree: ReturnType<typeof create>, label: string) =>
   act(() => {
@@ -60,8 +64,11 @@ describe('SosModal', () => {
     const onSent = jest.fn();
     const tree = render(<SosModal {...base} onSent={onSent} riderCount={2} location={{ lat: 18.5, lng: 73.8 }} />);
 
+    // Confirm is the red (danger) Button; the danger fill is the Button's own variant style.
     const send = tree.root.findByProps({ accessibilityLabel: 'Send SOS to group' });
-    const flat = ([] as any[]).concat(send.props.style).flat().filter(Boolean);
+    expect(send.props.variant).toBe('danger');
+    const realSend = pressable(tree, 'Send SOS to group');
+    const flat = ([] as any[]).concat(realSend.props.style).flat(3).filter(Boolean);
     expect(flat.some((s: any) => s.backgroundColor === WeRideColors.red)).toBe(true);
 
     await act(async () => {
@@ -86,5 +93,64 @@ describe('SosModal', () => {
     press(tree, 'Cancel, do not send SOS');
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(mockTriggerSos).not.toHaveBeenCalled();
+  });
+
+  it('Cancel is a secondary Button and Send is a danger Button', () => {
+    const tree = render(<SosModal {...base} riderCount={2} location={{ lat: 1, lng: 2 }} />);
+    expect(tree.root.findByProps({ accessibilityLabel: 'Cancel, do not send SOS' }).props.variant).toBe('secondary');
+    expect(tree.root.findByProps({ accessibilityLabel: 'Send SOS to group' }).props.variant).toBe('danger');
+  });
+
+  it('sending shows the loading state, calls triggerSos once, and gives one heavy haptic when sent', async () => {
+    (Platform as any).OS = 'android';
+    const vibrate = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
+    vibrate.mockClear(); // RN's jest setup already mocks Vibration: drop earlier tests' calls
+    let resolveSend!: (id: string) => void;
+    mockTriggerSos.mockReturnValue(new Promise<string>((r) => { resolveSend = r; }));
+    const onSent = jest.fn();
+    const tree = render(<SosModal {...base} onSent={onSent} riderCount={2} location={{ lat: 18.5, lng: 73.8 }} />);
+
+    const send = () => tree.root.findByProps({ accessibilityLabel: 'Send SOS to group' });
+    expect(send().props.loading).toBe(false);
+
+    await act(async () => {
+      send().props.onPress();
+      send().props.onPress(); // a second tap while sending must not send again
+    });
+    expect(send().props.loading).toBe(true);
+    expect(pressable(tree, 'Send SOS to group').props.disabled).toBe(true);
+    expect(mockTriggerSos).toHaveBeenCalledTimes(1);
+    expect(vibrate).not.toHaveBeenCalled(); // no haptic until it actually went out
+
+    await act(async () => {
+      resolveSend('sos-9');
+    });
+    expect(onSent).toHaveBeenCalledWith('sos-9');
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate).toHaveBeenCalledWith(45); // haptic('heavy'), never the error pattern
+    expect(send().props.loading).toBe(false);
+
+    vibrate.mockRestore();
+    (Platform as any).OS = 'ios';
+  });
+
+  it('a failed send gives no heavy haptic and re-enables the button', async () => {
+    (Platform as any).OS = 'android';
+    const vibrate = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
+    vibrate.mockClear();
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockTriggerSos.mockRejectedValue(new Error('offline'));
+    const onSent = jest.fn();
+    const tree = render(<SosModal {...base} onSent={onSent} riderCount={2} location={{ lat: 1, lng: 2 }} />);
+    await act(async () => {
+      tree.root.findByProps({ accessibilityLabel: 'Send SOS to group' }).props.onPress();
+    });
+    expect(onSent).not.toHaveBeenCalled();
+    expect(vibrate).not.toHaveBeenCalledWith(45);
+    expect(useToastStore.getState().toasts.map((t: any) => t.message)).toEqual(['Failed to send SOS']);
+    expect(tree.root.findByProps({ accessibilityLabel: 'Send SOS to group' }).props.loading).toBe(false);
+    errSpy.mockRestore();
+    vibrate.mockRestore();
+    (Platform as any).OS = 'ios';
   });
 });

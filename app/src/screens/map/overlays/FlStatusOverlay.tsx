@@ -3,13 +3,15 @@
  * One-line caption rendered INSIDE the map header (under the ride name), not a
  * floating pill over the map. Default: privacy message.
  * FL round completed: "FL round {N} done · {Y} clients" from FlRoundLogger.
- * Information-only, no interaction.
+ * Information-only, no interaction. A changed message cross-fades in (opacity
+ * only, so the header never shifts).
  */
-import React, { useEffect, useState } from 'react';
-import { Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, StyleSheet } from 'react-native';
 import { type } from '../../../theme/typography';
 import { getFlData } from '../../../services/localStorage';
 import { FlRoundLogger } from '@flvoice/fl/flRoundLogger';
+import { Motion, useReducedMotion } from '../../../ui';
 
 interface FlBadgeState {
   message: string;
@@ -34,10 +36,25 @@ export default function FlStatusOverlay() {
     }
   }, []);
 
+  const reduced = useReducedMotion();
+  const fade = useRef(new Animated.Value(1)).current;
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (reduced) return;
+    fade.setValue(0);
+    const anim = Animated.timing(fade, { toValue: 1, duration: Motion.enter.durationMs, useNativeDriver: true });
+    anim.start();
+    return () => anim.stop();
+  }, [state.message, fade, reduced]);
+
   return (
-    <Text style={styles.text} numberOfLines={1}>
+    <Animated.Text style={[styles.text, { opacity: fade }]} numberOfLines={1}>
       {state.message}
-    </Text>
+    </Animated.Text>
   );
 }
 

@@ -1,0 +1,6 @@
+{
+  "name": "weride-screenshots",
+  "private": true,
+  "description": "Renders the app's real screens in a browser (react-native-web) to produce ../../../screenshots",
+  "dependencies": { "esbuild": "^0.25.0", "react": "18.2.0", "react-dom": "18.2.0", "react-native-web": "0.19.12" }
+}

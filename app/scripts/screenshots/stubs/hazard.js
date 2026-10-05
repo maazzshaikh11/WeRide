@@ -1,0 +1,12 @@
+export const subscribeToHazardClusters = (_g, cb) => { setTimeout(() => cb(globalThis.__CLUSTERS__ || []), 0); return () => {}; };
+export const submitHazardReport = async () => ({ queued: false });
+export const triggerClustering = async () => {};
+export const resolveHazard = async () => {};
+export const triggerSos = async () => 'sos1';
+export const resolveSos = async () => {};
+export const subscribeToSosEvents = () => () => {};
+export const startSyncWorker = () => () => {};
+export const syncHazardReports = async () => {};
+export const syncSosEvents = async () => {};
+export const mergeSosOnSync = async () => {};
+export const isOnline = async () => true;

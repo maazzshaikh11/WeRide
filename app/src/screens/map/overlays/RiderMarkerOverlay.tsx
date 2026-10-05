@@ -6,12 +6,12 @@
  * Reads from ridersStore (single source of truth); stale sweep every 1s.
  */
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useRidersStore } from '@app/store/ridersStore';
 import { markerColorForState } from './riderMarkerState';
-import { WeRideColors, WeRideFonts } from '../../../theme/theme';
 import StatusBadge from '../../../components/StatusBadge';
+import { infoCardStyles as styles } from './infoCardStyles';
 
 const CIRCLE_RADIUS = 16; // 32px diameter per master spec §4.1
 const STALE_SWEEP_INTERVAL_MS = 1000;
@@ -166,7 +166,7 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
 /**
  * Rider info card component (spec §4.1).
  * Rendered as a sibling of MapView in MapScreen (not inside MapView).
- * Dark-themed: #161616f7 bg, #2A2A2A border, 12px radius.
+ * Shared info-card style (infoCardStyles).
  * Shows rider short ID, speed/heading/accuracy, status badge.
  */
 export function RiderInfoCard() {
@@ -189,53 +189,30 @@ export function RiderInfoCard() {
       onPress={() => selectRider(null)}
       accessibilityLabel={`Rider ${selectedRiderId.slice(0, 8)} details. Tap to dismiss.`}
     >
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>Rider {selectedRiderId.slice(0, 8)}</Text>
+      <View style={styles.header}>
+        <Text style={styles.title} numberOfLines={1}>Rider {selectedRiderId.slice(0, 8)}</Text>
         <StatusBadge label={status.label} variant={status.variant} />
       </View>
-      <Text style={styles.cardRow}>Speed: {formatSpeed(loc.speed_mps)}</Text>
-      <Text style={styles.cardRow}>Heading: {formatHeading(loc.heading_deg)}</Text>
-      <Text style={styles.cardRow}>Accuracy: {formatAccuracy(loc.accuracy_m)}</Text>
+      <View style={styles.row}>
+        <Text style={styles.label}>Speed</Text>
+        <Text style={styles.value}>{formatSpeed(loc.speed_mps)}</Text>
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.label}>Heading</Text>
+        <Text style={styles.value}>{formatHeading(loc.heading_deg)}</Text>
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.label}>Accuracy</Text>
+        <Text style={styles.value}>{formatAccuracy(loc.accuracy_m)}</Text>
+      </View>
       {__DEV__ && (
-        <Text style={styles.cardRow}>
-          NIS: {Number.isFinite(loc.nis_score) ? loc.nis_score.toFixed(2) : '--'}
-        </Text>
+        <View style={styles.row}>
+          <Text style={styles.label}>NIS</Text>
+          <Text style={styles.value}>
+            {Number.isFinite(loc.nis_score) ? loc.nis_score.toFixed(2) : '--'}
+          </Text>
+        </View>
       )}
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#161616f7',
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  cardTitle: {
-    fontFamily: WeRideFonts.body,
-    fontSize: 12,
-    fontWeight: '700',
-    color: WeRideColors.white,
-  },
-  cardRow: {
-    fontFamily: WeRideFonts.body,
-    fontSize: 10,
-    color: WeRideColors.textSub,
-    marginTop: 2,
-  },
-});

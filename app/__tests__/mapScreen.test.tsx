@@ -12,6 +12,8 @@
  *  6.1  groupId and userId threaded correctly to LocationPublisher.
  *  6.1  getLocationSocket() called for the socket.
  *  6.1  No stop called when service was never started.
+ *  UI   "‹ Rides" back control: only with a navigation prop; goes to the parent
+ *       navigator's goBack(), falling back to navigation.goBack().
  *
  * Approach: mock the entire @tracking/* surface + new UI components so no
  * native module leaks in. appStore is mocked statefully (babel-jest forbids
@@ -142,11 +144,10 @@ jest.mock('../src/components/ToastContainer', () => ({ __esModule: true, default
 jest.mock('../src/components/LivePill', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/NetworkBanner', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/SignalMenu', () => ({ __esModule: true, default: () => null }));
-jest.mock('../src/components/NavHint', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/SosModal', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/Fab', () => {
   const React = require('react');
-  return { __esModule: true, default: (props: any) => React.createElement('View', props ?? null) };
+  return { __esModule: true, FAB_SIZE: 48, default: (props: any) => React.createElement('View', props ?? null) };
 });
 jest.mock('../src/store/toastStore', () => ({
   useToastStore: (selector?: (s: unknown) => unknown) =>
@@ -237,13 +238,26 @@ describe('MapScreen — Phase 6 TrackingService lifecycle', () => {
   const getLocationPublisher = () => require('@tracking/locationPublisher').LocationPublisher;
 
   /** Sets userId + groupId in the mock store and renders MapScreen. */
-  function renderWithUser(userId: string | null, groupId = 'group-1') {
+  const mounted: any[] = [];
+  afterEach(() => {
+    // Unmount so Animated timers (SosFab, Fab) don't outlive the test.
+    mounted.splice(0).forEach((r) => {
+      try {
+        act(() => r.unmount());
+      } catch {
+        // already unmounted by the test
+      }
+    });
+  });
+
+  function renderWithUser(userId: string | null, groupId = 'group-1', props: Record<string, unknown> = {}) {
     useAppStore.setState({ userId, groupId });
 
     let renderer: any;
     act(() => {
-      renderer = create(<MapScreen />);
+      renderer = create(<MapScreen {...props} />);
     });
+    mounted.push(renderer);
     return renderer;
   }
 
@@ -344,5 +358,48 @@ describe('MapScreen — Phase 6 TrackingService lifecycle', () => {
     const renderer = renderWithUser(null);
     act(() => { renderer.unmount(); });
     expect(getTrackingService()).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Back to the Groups list
+  // ---------------------------------------------------------------------------
+
+  const BACK = { accessibilityLabel: 'Back to rides' };
+
+  test('back control is not rendered without a navigation prop', () => {
+    const renderer = renderWithUser('user-abc');
+    expect(renderer.root.findAllByProps(BACK)).toHaveLength(0);
+  });
+
+  test('back control goes to the parent navigator\'s goBack()', () => {
+    const parentGoBack = jest.fn();
+    const goBack = jest.fn();
+    const navigation = { goBack, getParent: jest.fn(() => ({ goBack: parentGoBack })) };
+    const renderer = renderWithUser('user-abc', 'group-1', { navigation });
+
+    const back = renderer.root.findByProps(BACK);
+    act(() => back.props.onPress());
+
+    expect(parentGoBack).toHaveBeenCalledTimes(1);
+    expect(goBack).not.toHaveBeenCalled();
+  });
+
+  test('back control falls back to navigation.goBack() when there is no parent', () => {
+    const goBack = jest.fn();
+    const navigation = { goBack, getParent: jest.fn(() => undefined) };
+    const renderer = renderWithUser('user-abc', 'group-1', { navigation });
+
+    act(() => renderer.root.findByProps(BACK).props.onPress());
+
+    expect(goBack).toHaveBeenCalledTimes(1);
+  });
+
+  test('back control works when the navigation object has no getParent', () => {
+    const goBack = jest.fn();
+    const renderer = renderWithUser('user-abc', 'group-1', { navigation: { goBack } });
+
+    act(() => renderer.root.findByProps(BACK).props.onPress());
+
+    expect(goBack).toHaveBeenCalledTimes(1);
   });
 });

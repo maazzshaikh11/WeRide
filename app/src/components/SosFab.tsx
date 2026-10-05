@@ -4,8 +4,9 @@
  * On complete hold → opens the SOS confirmation modal (SosModal).
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Pressable, Easing } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
+import { WeRideColors } from '../theme/theme';
+import { type } from '../theme/typography';
 
 const HOLD_MS = 2000;
 
@@ -54,9 +55,9 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
     }, HOLD_MS);
   };
 
-  // Progress ring drawn as a border arc approximation: the outer ring
-  // brightens as the hold completes.
-  const ringOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] });
+  // Hold progress: a ring just outside the button that brightens as the hold
+  // completes (it sits outside the 48 px button so the button never hides it).
+  const ringOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   return (
     <Pressable
@@ -64,6 +65,7 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
       onPressOut={cancelHold}
       disabled={disabled}
       accessibilityLabel="Hold for 2 seconds to send SOS"
+      accessibilityHint="Press and hold to open the SOS confirmation"
       accessibilityRole="button"
     >
       <View style={styles.wrap}>
@@ -79,30 +81,34 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
   );
 }
 
+const SIZE = 48;
+const RING_GAP = 4;
+
 const styles = StyleSheet.create({
-  wrap: { width: 46, height: 46, position: 'relative' },
+  wrap: { width: SIZE, height: SIZE, position: 'relative' },
   ring: {
-    ...({} as object),
     position: 'absolute',
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 2,
+    top: -RING_GAP,
+    left: -RING_GAP,
+    width: SIZE + RING_GAP * 2,
+    height: SIZE + RING_GAP * 2,
+    borderRadius: (SIZE + RING_GAP * 2) / 2,
+    borderWidth: 3,
     borderColor: WeRideColors.white,
   },
   fab: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: SIZE,
+    height: SIZE,
+    borderRadius: SIZE / 2,
     backgroundColor: WeRideColors.red,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
     elevation: 4,
   },
   fabHolding: { transform: [{ scale: 0.92 }] },
-  fabText: { fontFamily: WeRideFonts.mono, fontSize: 10, fontWeight: '700', color: WeRideColors.white },
+  fabText: { ...type.labelStrong, letterSpacing: 0.5, color: WeRideColors.white },
 });

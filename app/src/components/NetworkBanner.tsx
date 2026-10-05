@@ -4,7 +4,8 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideRadius } from '../theme/theme';
+import { type } from '../theme/typography';
 
 interface Props {
   state: 'lost' | 'recovered';
@@ -28,37 +29,50 @@ export default function NetworkBanner({ state, riderName, onDismiss }: Props) {
     <Animated.View
       style={[
         styles.banner,
-        { borderColor: isLost ? '#FBBF2455' : '#22C55E55' },
+        { borderColor: isLost ? '#FBBF2466' : '#22C55E66' },
         {
           opacity: slide,
           transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [-40, 0] }) }],
         },
       ]}
     >
-      <Text style={styles.icon}>{isLost ? '📡' : '✅'}</Text>
-      <Text style={[styles.text, { color: isLost ? '#fde68a' : '#bbf7d0' }]}>
+      <View style={[styles.dot, { backgroundColor: isLost ? WeRideColors.gold : WeRideColors.green }]} />
+      <Text style={styles.text}>
         {isLost
           ? `${riderName} lost connection. Showing last known location.`
           : `${riderName} is active again. Position resynced.`}
       </Text>
-      {!isLost && <Pressable onPress={onDismiss} hitSlop={12} accessibilityLabel="Dismiss notification"><Text style={styles.close}>✕</Text></Pressable>}
+      {!isLost && (
+        <Pressable
+          style={styles.close}
+          onPress={onDismiss}
+          hitSlop={8}
+          accessibilityLabel="Dismiss notification"
+          accessibilityRole="button"
+        >
+          <Text style={styles.closeText}>✕</Text>
+        </Pressable>
+      )}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   banner: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#14140bf5',
+    gap: 12,
+    backgroundColor: '#111111F5',
     borderWidth: 1,
-    borderRadius: 13,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    marginHorizontal: 12,
+    borderRadius: WeRideRadius.xl,
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingVertical: 8,
+    marginHorizontal: 16,
   },
-  icon: { fontSize: 14 },
-  text: { flex: 1, fontFamily: WeRideFonts.body, fontSize: 10.5, fontWeight: '600' },
-  close: { color: '#888888', fontSize: 13 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  text: { ...type.caption, color: WeRideColors.text, flex: 1 },
+  close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  closeText: { ...type.body, color: WeRideColors.textSub },
 });

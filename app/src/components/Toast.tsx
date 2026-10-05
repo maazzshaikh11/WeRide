@@ -6,21 +6,16 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideRadius } from '../theme/theme';
+import { type } from '../theme/typography';
 import { ToastItem } from '../store/toastStore';
 
 const AUTO_DISMISS_MS = 2600;
 
-const ICONS: Record<ToastItem['variant'], string> = {
-  success: '✅',
-  error: '🆘',
-  warn: '📡',
-};
-
-const COLORS: Record<ToastItem['variant'], { border: string; text: string }> = {
-  success: { border: '#22C55E55', text: '#b9f0ce' },
-  error: { border: '#FF3B3B55', text: '#ffb4b4' },
-  warn: { border: '#FBBF2455', text: '#fde68a' },
+const COLORS: Record<ToastItem['variant'], { border: string; dot: string }> = {
+  success: { border: '#22C55E55', dot: WeRideColors.green },
+  error: { border: '#FF3B3B66', dot: WeRideColors.red },
+  warn: { border: '#FBBF2455', dot: WeRideColors.gold },
 };
 
 export default function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: number) => void }) {
@@ -51,25 +46,32 @@ export default function Toast({ toast, onDismiss }: { toast: ToastItem; onDismis
         },
       ]}
     >
-      <Pressable onPress={() => onDismiss(toast.id)} accessibilityLabel={`Dismiss notification: ${toast.message}`}>
-        <Text style={styles.icon}>{ICONS[toast.variant]}</Text>
+      <Pressable
+        style={styles.press}
+        onPress={() => onDismiss(toast.id)}
+        accessibilityLabel={`Dismiss notification: ${toast.message}`}
+      >
+        <View style={[styles.dot, { backgroundColor: c.dot }]} />
+        <Text style={styles.text}>{toast.message}</Text>
       </Pressable>
-      <Text style={[styles.text, { color: c.text }]}>{toast.message}</Text>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   toast: {
+    backgroundColor: '#111111F5',
+    borderWidth: 1,
+    borderRadius: WeRideRadius.xl,
+  },
+  press: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#161616f5',
-    borderWidth: 1,
-    borderRadius: 99,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  icon: { fontSize: 12 },
-  text: { flex: 1, fontFamily: WeRideFonts.body, fontSize: 11.5, fontWeight: '500' },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  text: { ...type.body, flex: 1 },
 });

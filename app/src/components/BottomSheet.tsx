@@ -1,6 +1,7 @@
 /**
  * BottomSheet — draggable collapsible/expandable sheet wrapper (spec §5.6).
- * Drag vertical gesture, snap to collapsed/expanded. Bg #0d0d0d, handle #333333.
+ * Drag vertical gesture, snap to collapsed/expanded. Surface dark2, top radius
+ * WeRideRadius.xxxl, 36×4 handle in the muted token.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -10,7 +11,7 @@ import {
   Animated,
   LayoutChangeEvent,
 } from 'react-native';
-import { WeRideColors } from '../theme/theme';
+import { WeRideColors, WeRideRadius } from '../theme/theme';
 
 const HANDLE_HEIGHT = 20;
 const SNAP_VELOCITY = 0.6;
@@ -96,16 +97,21 @@ export default function BottomSheet({ collapsedHeight, maxHeight, initialCollaps
 
 const styles = StyleSheet.create({
   sheet: {
-    backgroundColor: '#0d0d0d',
-    borderTopWidth: 1,
-    borderTopColor: WeRideColors.border,
+    backgroundColor: WeRideColors.dark2,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: WeRideColors.border,
+    borderTopLeftRadius: WeRideRadius.xxxl,
+    borderTopRightRadius: WeRideRadius.xxxl,
+    overflow: 'hidden',
   },
   content: { overflow: 'hidden' },
+  // 8 + 4 + 8 = HANDLE_HEIGHT
   handleWrap: { alignItems: 'center', paddingVertical: 8 },
   handle: {
-    width: 32,
-    height: 3,
-    borderRadius: 99,
-    backgroundColor: '#333333',
+    width: 36,
+    height: 4,
+    borderRadius: WeRideRadius.pill,
+    backgroundColor: WeRideColors.muted,
   },
 });

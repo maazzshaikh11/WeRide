@@ -8,7 +8,7 @@ import { useToastStore } from '../store/toastStore';
 import Toast from './Toast';
 
 interface Props {
-  /** Extra absolute-position offset from top (below headers/banners). */
+  /** Offset from the top of the screen; callers pass the bottom edge of the header (+ banner). */
   top?: number;
 }
 
@@ -30,9 +30,9 @@ export default function ToastContainer({ top = 14 }: Props) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: 16,
+    right: 16,
     zIndex: 60,
-    gap: 6,
+    gap: 8,
   },
 });

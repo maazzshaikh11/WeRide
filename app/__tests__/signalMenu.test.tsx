@@ -10,7 +10,7 @@ jest.mock('../src/services/socketService', () => ({
   getLocationSocket: () => mockSocket,
 }));
 
-import SignalMenu from '../src/components/SignalMenu';
+import SignalMenu, { SIGNAL_OPTIONS } from '../src/components/SignalMenu';
 import { useToastStore } from '../src/store/toastStore';
 
 const mounted: ReturnType<typeof create>[] = [];
@@ -64,5 +64,19 @@ describe('SignalMenu', () => {
     expect(onSend).not.toHaveBeenCalled();
     const msgs = useToastStore.getState().toasts.map((t: any) => t.message);
     expect(msgs).toEqual([expect.stringContaining('not sent')]);
+  });
+
+  it('keeps the server-allowlisted labels', () => {
+    expect(SIGNAL_OPTIONS.map((o) => o.label)).toEqual(['Wait for me', 'Pull over', 'All good', 'Need fuel']);
+  });
+
+  it('renders nothing when closed and one 48pt-min option per signal when open', () => {
+    const closed = render(<SignalMenu visible={false} groupId="g1" riderId="r1" onSend={jest.fn()} />);
+    expect(closed.toJSON()).toBeNull();
+
+    const open = render(<SignalMenu visible groupId="g1" riderId="r1" onSend={jest.fn()} />);
+    SIGNAL_OPTIONS.forEach((o) => {
+      expect(open.root.findAllByProps({ accessibilityLabel: `Send signal: ${o.label}` }).length).toBeGreaterThan(0);
+    });
   });
 });

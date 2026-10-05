@@ -5,8 +5,9 @@
  * signalMenuOpen animation: opacity + translateY + scale, 180ms.
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { Text, StyleSheet, Animated, Pressable } from 'react-native';
+import { WeRideColors, WeRideRadius } from '../theme/theme';
+import { type } from '../theme/typography';
 import { getLocationSocket } from '../services/socketService';
 import { useToastStore } from '../store/toastStore';
 
@@ -22,18 +23,24 @@ interface Props {
   groupId: string;
   riderId: string;
   onSend: (label: string) => void;
+  /** Distance from the screen's right / bottom edge (sits beside the FAB column). */
+  right?: number;
+  bottom?: number;
 }
 
-export default function SignalMenu({ visible, groupId, riderId, onSend }: Props) {
+export default function SignalMenu({ visible, groupId, riderId, onSend, right = 76, bottom = 72 }: Props) {
   const anim = useRef(new Animated.Value(0)).current;
   const push = useToastStore((s) => s.push);
 
   useEffect(() => {
-    Animated.timing(anim, {
+    const animation = Animated.timing(anim, {
       toValue: visible ? 1 : 0,
       duration: 180,
       useNativeDriver: true,
-    }).start();
+    });
+    animation.start();
+    // Stop on unmount / change so no timer outlives the component.
+    return () => animation.stop();
   }, [visible, anim]);
 
   if (!visible) return null;
@@ -46,7 +53,7 @@ export default function SignalMenu({ visible, groupId, riderId, onSend }: Props)
       return;
     }
     socket.emit('signal:send', { group_id: groupId, rider_id: riderId, label });
-    push(`📡 Signal sent: ${label}`);
+    push(`Signal sent: ${label}`);
     onSend(label);
   };
 
@@ -55,6 +62,8 @@ export default function SignalMenu({ visible, groupId, riderId, onSend }: Props)
       style={[
         styles.menu,
         {
+          right,
+          bottom,
           opacity: anim,
           transform: [
             { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
@@ -82,25 +91,23 @@ export default function SignalMenu({ visible, groupId, riderId, onSend }: Props)
 const styles = StyleSheet.create({
   menu: {
     position: 'absolute',
-    right: 12,
-    bottom: 72,
-    backgroundColor: '#161616f5',
+    backgroundColor: WeRideColors.dark2,
     borderWidth: 1,
     borderColor: WeRideColors.border,
-    borderRadius: 12,
-    padding: 6,
-    minWidth: 160,
+    borderRadius: WeRideRadius.xxl,
+    padding: 4,
+    minWidth: 184,
     zIndex: 40,
   },
   option: {
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
+    gap: 12,
+    paddingHorizontal: 12,
+    borderRadius: WeRideRadius.xl,
   },
   optionPressed: { backgroundColor: WeRideColors.primaryDim },
-  optionEmoji: { fontSize: 14 },
-  optionLabel: { fontFamily: WeRideFonts.body, fontSize: 13, color: WeRideColors.text },
+  optionEmoji: { fontSize: 18, lineHeight: 24 },
+  optionLabel: { ...type.bodyStrong },
 });

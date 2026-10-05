@@ -1,10 +1,11 @@
 /**
  * AvatarStack — overlapping mini-avatars (spec §3.3.8, §5.5).
- * 22×22 circles, -7px overlap, 2px #0d0d0d border, Space Mono 8px initials.
+ * 24×24 circles, -8px overlap, 2px sheet-coloured border, 11px mono initials.
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { WeRideColors, WeRideFonts, riderColor } from '../theme/theme';
+import { WeRideColors, riderColor } from '../theme/theme';
+import { type } from '../theme/typography';
 
 interface Props {
   names: string[];      // rider identifiers — initials derived
@@ -23,13 +24,13 @@ export default function AvatarStack({ names, max = 4 }: Props) {
       {shown.map((name, i) => (
         <View
           key={name}
-          style={[styles.avatar, { backgroundColor: riderColor(i), marginLeft: i === 0 ? 0 : -7 }]}
+          style={[styles.avatar, { backgroundColor: riderColor(i), marginLeft: i === 0 ? 0 : -8 }]}
         >
           <Text style={styles.initials}>{initials(name)}</Text>
         </View>
       ))}
       {names.length > max ? (
-        <View style={[styles.avatar, styles.overflow, { marginLeft: -7 }]}>
+        <View style={[styles.avatar, styles.overflow, { marginLeft: -8 }]}>
           <Text style={[styles.initials, { color: WeRideColors.textSub }]}>+{names.length - max}</Text>
         </View>
       ) : null}
@@ -40,14 +41,14 @@ export default function AvatarStack({ names, max = 4 }: Props) {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#0d0d0d',
+    borderColor: WeRideColors.dark2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   overflow: { backgroundColor: WeRideColors.dark3 },
-  initials: { fontFamily: WeRideFonts.mono, fontSize: 8, fontWeight: '700', color: WeRideColors.white },
+  initials: { ...type.labelStrong, letterSpacing: 0, color: WeRideColors.white },
 });

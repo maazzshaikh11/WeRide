@@ -13,6 +13,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, Linking } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { WeRideColors } from '../../../theme/theme';
+import { infoCardStyles as cardStyles } from './infoCardStyles';
 import { useAppStore } from '../../../store/appStore';
 import { subscribeToSosEvents, resolveSos, SOSElement } from '@hazard/services/sosService';
 
@@ -196,44 +197,57 @@ export function SosOverlayInfoCards({ sosEvents, userId, onResolve, onNavigate }
         <TouchableOpacity
           key={`info-${sos.sos_id}`}
           style={[
-            styles.infoCard,
+            cardStyles.card,
+            !sos.resolved && { borderColor: WeRideColors.red },
             { opacity: sos.resolved ? 0.8 : 1 },
           ]}
           onPress={() => onNavigate(sos.lat, sos.lng)}
+          accessibilityRole="button"
+          accessibilityLabel={`${sos.resolved ? 'Resolved SOS' : 'SOS'} from ${
+            sos.rider_id === userId ? 'you' : `rider ${sos.rider_id.slice(-4)}`
+          }. Tap for directions.`}
         >
-          <View style={styles.infoHeader}>
+          <View style={cardStyles.header}>
             <View
-              style={{
-                width: 12,
-                height: 12,
-                borderRadius: 6,
-                backgroundColor: sos.resolved ? WeRideColors.hazardResolved : WeRideColors.error,
-              }}
+              style={[
+                cardStyles.dot,
+                { backgroundColor: sos.resolved ? WeRideColors.hazardResolved : WeRideColors.error },
+              ]}
             />
-            <Text style={[
-              styles.infoTitle,
-              { color: sos.resolved ? WeRideColors.textSecondary : WeRideColors.error },
-            ]}>
-              {sos.resolved ? 'Resolved: ' : '🚨 Emergency: '}
+            <Text
+              style={[
+                cardStyles.title,
+                { color: sos.resolved ? WeRideColors.textSecondary : WeRideColors.error },
+              ]}
+              numberOfLines={1}
+            >
+              {sos.resolved ? 'Resolved: ' : 'Emergency: '}
               {sos.rider_id === userId ? 'You' : `Rider ${sos.rider_id.slice(-4)}`}
             </Text>
           </View>
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Location</Text>
-            <Text style={styles.infoValue}>
+          <View style={cardStyles.row}>
+            <Text style={cardStyles.label}>Location</Text>
+            <Text style={cardStyles.value}>
               {sos.lat.toFixed(5)}, {sos.lng.toFixed(5)}
             </Text>
           </View>
 
           {sos.isSender && !sos.resolved && (
-            <TouchableOpacity style={styles.cancelButton} onPress={() => onResolve(sos.sos_id)}>
-              <Text style={styles.cancelButtonText}>Cancel SOS</Text>
+            <TouchableOpacity
+              style={[cardStyles.action, cardStyles.actionDanger]}
+              onPress={() => onResolve(sos.sos_id)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel SOS"
+            >
+              <Text style={cardStyles.actionText}>Cancel SOS</Text>
             </TouchableOpacity>
           )}
 
-          {sos.resolved && (
-            <Text style={styles.resolvedText}>Resolved — will disappear in 5 min</Text>
+          {sos.resolved ? (
+            <Text style={cardStyles.hint}>Resolved — will disappear in 5 min</Text>
+          ) : (
+            <Text style={cardStyles.hint}>Tap the card for directions in Google Maps</Text>
           )}
         </TouchableOpacity>
       ))}
@@ -261,70 +275,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginTop: -2,
-  },
-  infoCard: {
-    position: 'absolute',
-    bottom: 0,
-    left: 16,
-    right: 16,
-    backgroundColor: '#161616f7',
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    borderRadius: 14,
-    padding: 16,
-    paddingBottom: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  infoTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: WeRideColors.white,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: WeRideColors.border,
-  },
-  infoLabel: {
-    fontSize: 10,
-    color: WeRideColors.textSub,
-  },
-  infoValue: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: WeRideColors.text,
-  },
-  cancelButton: {
-    backgroundColor: WeRideColors.red,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  cancelButtonText: {
-    color: '#fff',
-    fontSize: 12.5,
-    fontWeight: '700',
-  },
-  resolvedText: {
-    textAlign: 'center',
-    color: WeRideColors.textSub,
-    fontSize: 10,
-    marginTop: 8,
   },
 });

@@ -12,6 +12,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { WeRideColors, hazardColor } from '../../../theme/theme';
+import { infoCardStyles as cardStyles } from './infoCardStyles';
 import { subscribeToHazardClusters, HazardCluster, resolveHazard } from '@hazard/services/hazardService';
 
 const { ShapeSource, FillLayer, SymbolLayer, MarkerView } = MapboxGL;
@@ -256,64 +257,66 @@ export function HazardOverlayInfoCard({ selectedCluster, onDismiss, onResolve: _
 
   if (!selectedCluster) return null;
 
+  const resolved = selectedCluster.status === 'resolved';
+  const typeLabel = selectedCluster.hazard_type.replace(/_/g, ' ');
+  const title = typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1);
+
   return (
-    <View style={styles.infoCard}>
-      <View style={styles.infoHeader}>
+    <View style={cardStyles.card}>
+      <View style={cardStyles.header}>
         <View
-          style={{
-            width: 16,
-            height: 16,
-            borderRadius: 8,
-            backgroundColor: selectedCluster.status === 'resolved'
-              ? WeRideColors.hazardResolved
-              : hazardColor(selectedCluster.hazard_type),
-          }}
+          style={[
+            cardStyles.dot,
+            {
+              backgroundColor: resolved
+                ? WeRideColors.hazardResolved
+                : hazardColor(selectedCluster.hazard_type),
+            },
+          ]}
         />
-        <Text style={[
-          styles.infoTitle,
-          { color: selectedCluster.status === 'resolved' ? WeRideColors.textSecondary : WeRideColors.textPrimary }
-        ]}>
-          {selectedCluster.hazard_type.charAt(0).toUpperCase() + selectedCluster.hazard_type.slice(1)}
-          {selectedCluster.status === 'resolved' && ' (Resolved)'}
+        <Text
+          style={[
+            cardStyles.title,
+            resolved && { color: WeRideColors.textSecondary },
+          ]}
+          numberOfLines={1}
+        >
+          {title}
+          {resolved && ' (resolved)'}
         </Text>
       </View>
 
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>Reports</Text>
-        <Text style={styles.infoValue}>{selectedCluster.report_count}</Text>
+      <View style={cardStyles.row}>
+        <Text style={cardStyles.label}>Reports</Text>
+        <Text style={cardStyles.value}>{selectedCluster.report_count}</Text>
       </View>
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>Hazard Score</Text>
-        <Text style={styles.infoValue}>
+      <View style={cardStyles.row}>
+        <Text style={cardStyles.label}>Hazard score</Text>
+        <Text style={cardStyles.value}>
           {(selectedCluster.hazard_score * 100).toFixed(0)}%
         </Text>
       </View>
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>Status</Text>
-        <Text style={[
-          styles.infoValue,
-          {
-            color: selectedCluster.status === 'resolved'
-              ? WeRideColors.textSecondary
-              : WeRideColors.hazardAccident,
-          },
-        ]}>
-          {selectedCluster.status}
-        </Text>
-      </View>
 
-      {selectedCluster.status === 'active' && (
+      <View style={cardStyles.actions}>
         <TouchableOpacity
-          style={styles.resolveButton}
-          onPress={handleResolve}
+          style={[cardStyles.action, cardStyles.actionSecondary]}
+          onPress={onDismiss}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss hazard details"
         >
-          <Text style={styles.resolveButtonText}>Resolve Hazard</Text>
+          <Text style={cardStyles.actionSecondaryText}>Dismiss</Text>
         </TouchableOpacity>
-      )}
-
-      <TouchableOpacity style={styles.dismissButton} onPress={onDismiss}>
-        <Text style={styles.dismissButtonText}>Dismiss</Text>
-      </TouchableOpacity>
+        {selectedCluster.status === 'active' && (
+          <TouchableOpacity
+            style={[cardStyles.action, cardStyles.actionPrimary]}
+            onPress={handleResolve}
+            accessibilityRole="button"
+            accessibilityLabel="Resolve hazard"
+          >
+            <Text style={cardStyles.actionText}>Resolve hazard</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -335,72 +338,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',
-  },
-  infoCard: {
-    backgroundColor: '#161616f7',
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: 14,
-    padding: 14,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  infoTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: WeRideColors.white,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: WeRideColors.border,
-  },
-  infoLabel: {
-    fontSize: 10,
-    color: WeRideColors.textSub,
-  },
-  infoValue: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: WeRideColors.text,
-  },
-  resolveButton: {
-    backgroundColor: WeRideColors.red,
-    paddingVertical: 11,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 14,
-  },
-  resolveButtonText: {
-    color: '#fff',
-    fontSize: 12.5,
-    fontWeight: '700',
-  },
-  dismissButton: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    paddingVertical: 11,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  dismissButtonText: {
-    color: WeRideColors.textSub,
-    fontSize: 12.5,
-    fontWeight: '700',
   },
 });

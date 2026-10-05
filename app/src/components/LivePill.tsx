@@ -5,7 +5,8 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideRadius } from '../theme/theme';
+import { type } from '../theme/typography';
 
 export type LivePillVariant = 'live' | 'green' | 'gold' | 'grey';
 
@@ -72,12 +73,12 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 8,
     borderWidth: 1,
-    borderRadius: 99,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    borderRadius: WeRideRadius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
-  dot: { width: 6, height: 6, borderRadius: 3 },
-  label: { fontFamily: WeRideFonts.mono, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  label: { ...type.labelStrong, letterSpacing: 0.5 },
 });

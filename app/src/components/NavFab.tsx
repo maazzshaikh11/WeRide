@@ -1,9 +1,11 @@
 /**
  * NavFab — Google Maps navigation FAB (spec §3.3.6).
  * Deep link handled by caller via @routing/client/deepLink or direct URL.
+ * Glyph is a plain-View arrow (triangle drawn with borders, rotated 45°), so
+ * it needs no icon font or emoji.
  */
 import React from 'react';
-import { Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { WeRideColors } from '../theme/theme';
 import Fab from './Fab';
 
@@ -20,12 +22,21 @@ export default function NavFab({ onPress, disabled }: Props) {
       accessibilityLabel="Navigate in Google Maps"
       accessibilityRole="button"
     >
-      <Text>🧭</Text>
+      <View style={styles.arrow} />
     </Fab>
   );
 }
 
-// bg applied via Fab style prop in MapScreen FAB column; kept here for reuse.
-export const navFabStyle = StyleSheet.create({
-  fab: { backgroundColor: WeRideColors.blue },
+const styles = StyleSheet.create({
+  arrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderBottomWidth: 16,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: WeRideColors.text,
+    transform: [{ rotate: '45deg' }],
+  },
 });

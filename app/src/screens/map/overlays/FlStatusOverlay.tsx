@@ -1,12 +1,13 @@
 /**
- * Privacy / FL status badge — owned by Person D (spec §4.5).
- * Dark pill, Space Mono 10px. Default: privacy message.
+ * Privacy / FL status line — owned by Person D (spec §4.5).
+ * One-line caption rendered INSIDE the map header (under the ride name), not a
+ * floating pill over the map. Default: privacy message.
  * FL round completed: "FL round {N} done · {Y} clients" from FlRoundLogger.
  * Information-only, no interaction.
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../../../theme/theme';
+import { Text, StyleSheet } from 'react-native';
+import { type } from '../../../theme/typography';
 import { getFlData } from '../../../services/localStorage';
 import { FlRoundLogger } from '@flvoice/fl/flRoundLogger';
 
@@ -16,7 +17,7 @@ interface FlBadgeState {
 
 export default function FlStatusOverlay() {
   const [state, setState] = useState<FlBadgeState>({
-    message: 'Your ride data stays on your device',
+    message: 'Ride data stays on-device',
   });
 
   useEffect(() => {
@@ -34,25 +35,12 @@ export default function FlStatusOverlay() {
   }, []);
 
   return (
-    <View style={styles.badge}>
-      <Text style={styles.text}>{state.message}</Text>
-    </View>
+    <Text style={styles.text} numberOfLines={1}>
+      {state.message}
+    </Text>
   );
 }
 
 const styles = StyleSheet.create({
-  badge: {
-    position: 'absolute',
-    top: 80,
-    left: 16,
-    backgroundColor: '#00000099',
-    borderRadius: 99,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  text: {
-    fontFamily: WeRideFonts.mono,
-    fontSize: 10,
-    color: WeRideColors.text,
-  },
+  text: { ...type.caption },
 });

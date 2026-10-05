@@ -2,9 +2,9 @@
  * Live Map (core screen) — redesigned per master spec §3.3.
  * Layer 0: Mapbox map (dark style)
  * Layer 1: map overlays (riders, hazards, SOS, route line)
- * Layer 2: floating UI — header w/ live pill, FL badge, toasts, banners,
- *          FAB column (nav / signal / SOS), signal menu, bottom sheet,
- *          nav hint, info cards, SOS modal.
+ * Layer 2: floating UI — one header bar (back, ride name, live pill), toasts,
+ *          banners, FAB column (recenter / nav / signal / SOS), signal menu,
+ *          bottom sheet, info cards, SOS modal.
  *
  * Person A/B/C/D functionality fully preserved:
  *  - TrackingService lifecycle (Person A)
@@ -27,16 +27,18 @@ import { useAppStore } from '../../store/appStore';
 import { useRidersStore } from '../../store/ridersStore';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useToastStore } from '../../store/toastStore';
-import { WeRideColors, WeRideFonts } from '../../theme/theme';
+import { WeRideColors, WeRideRadius } from '../../theme/theme';
+import { type } from '../../theme/typography';
 import { getToggleAvoidHazards } from './overlays/routeControls';
 import LivePill from '../../components/LivePill';
 import ToastContainer from '../../components/ToastContainer';
 import NetworkBanner from '../../components/NetworkBanner';
 import SignalMenu from '../../components/SignalMenu';
-import NavHint from '../../components/NavHint';
 import RoutePanel from '../../components/RoutePanel';
+import { COLLAPSED_HEIGHT as ROUTE_PANEL_COLLAPSED_H } from '../../components/routePanelState';
 import SosModal from '../../components/SosModal';
-import Fab from '../../components/Fab';
+import Fab, { FAB_SIZE } from '../../components/Fab';
+import NavFab from '../../components/NavFab';
 import SosFab from '../../components/SosFab';
 import { googleMapsDeepLink } from '@routing/client/deepLink';
 import { GroupService } from '@routing/group/groupService';
@@ -60,12 +62,30 @@ import { getLocationSocket } from '../../services/socketService';
 MapboxGL.setAccessToken(MAPBOX_TOKEN ?? '');
 
 // Floating-UI footprint the route must stay clear of when the camera frames it.
-const HEADER_CONTENT_H = 52;   // eyebrow + ride title row (below the status bar inset)
-const FAB_COLUMN_W = 58;       // 46 px FAB + 12 px right margin
-const SHEET_COLLAPSED_H = 208; // RoutePanel COLLAPSED_HEIGHT
+// Single source of truth: the header, FAB column and sheet below are all laid
+// out from these numbers.
+const GUTTER = 16;                                    // screen side gutter
+const HEADER_PAD = 8;                                 // gap above / below the header bar
+const HEADER_BAR_H = 52;                              // header bar (back chip, ride name, live pill)
+const HEADER_CONTENT_H = HEADER_PAD + HEADER_BAR_H + HEADER_PAD; // below the status-bar inset
+const FAB_GAP = 12;
+const FAB_COLUMN_W = FAB_SIZE + GUTTER;               // FAB + right gutter
+const SHEET_COLLAPSED_H = ROUTE_PANEL_COLLAPSED_H;    // RoutePanel collapsed height
+const FAB_COLUMN_BOTTOM = SHEET_COLLAPSED_H + GUTTER; // FAB column sits above the collapsed sheet
+const NETWORK_BANNER_H = 64;                          // reserved height of the banner (toasts stack below it)
 const FOLLOW_ZOOM = 16;
 
-export default function MapScreen() {
+/** Minimal slice of the tab navigator's `navigation` prop that MapScreen uses. */
+export interface MapScreenNavigation {
+  goBack: () => void;
+  getParent?: () => { goBack: () => void } | undefined;
+}
+
+interface MapScreenProps {
+  navigation?: MapScreenNavigation;
+}
+
+export default function MapScreen({ navigation }: MapScreenProps = {}) {
   // No demo fallback: without a real group there is nothing to track.
   // The component renders a "no group selected" placeholder instead.
   const groupId = useAppStore((s) => s.groupId);
@@ -297,6 +317,16 @@ export default function MapScreen() {
     setSosEvents(events);
   }, []);
 
+  // "‹ Rides": return to the Groups list (the tab navigator's parent stack).
+  const goToRides = useCallback(() => {
+    const parent = navigation?.getParent?.();
+    if (parent) {
+      parent.goBack();
+    } else {
+      navigation?.goBack();
+    }
+  }, [navigation]);
+
   // Explicit empty state: no demo-group fallback. All hooks above run
   // unconditionally, so this early return is hook-safe.
   if (!groupId) {
@@ -343,23 +373,35 @@ export default function MapScreen() {
 
       {/* Layer 2 — floating UI */}
 
-      {/* 3.3.1 Screen header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <View>
-          <Text style={styles.eyebrow}>RIDE OVERVIEW</Text>
-          <Text style={styles.title} numberOfLines={1}>
-            {rideName ?? groupId.slice(0, 8)}
-          </Text>
+      {/* 3.3.1 Screen header: one bar — back, ride name + FL/privacy line, live pill */}
+      <View
+        style={[styles.header, { paddingTop: insets.top + HEADER_PAD, paddingBottom: HEADER_PAD }]}
+        pointerEvents="box-none"
+      >
+        <View style={[styles.headerBar, navigation ? styles.headerBarWithBack : null]}>
+          {navigation ? (
+            <Pressable
+              style={styles.backBtn}
+              onPress={goToRides}
+              accessibilityLabel="Back to rides"
+              accessibilityRole="button"
+            >
+              <Text style={styles.backText}>‹ Rides</Text>
+            </Pressable>
+          ) : null}
+          <View style={styles.headerTitles}>
+            <Text style={styles.title} numberOfLines={1}>
+              {rideName ?? groupId.slice(0, 8)}
+            </Text>
+            <FlStatusOverlay />
+          </View>
+          <LivePill variant={connected ? 'live' : 'grey'} />
         </View>
-        <LivePill variant={connected ? 'live' : 'grey'} />
       </View>
-
-      {/* 4.5 FL status badge */}
-      <FlStatusOverlay />
 
       {/* 3.3.5 Network banner */}
       {networkBanner && (
-        <View style={styles.bannerWrap}>
+        <View style={[styles.bannerWrap, { top: insets.top + HEADER_CONTENT_H }]}>
           <NetworkBanner
             state={networkBanner}
             riderName={userId ? `Rider ${userId.slice(-4)}` : 'A rider'}
@@ -368,41 +410,44 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* 3.3.3 Toasts */}
-      <ToastContainer top={90} />
+      {/* 3.3.3 Toasts: below the header (and below the banner when it is up) */}
+      <ToastContainer
+        top={insets.top + HEADER_CONTENT_H + (networkBanner ? NETWORK_BANNER_H : 0)}
+      />
 
-      {/* 3.3.7 Signal menu */}
+      {/* 3.3.7 Signal menu: opens beside the signal FAB */}
       <SignalMenu
         visible={signalMenuOpen}
         groupId={groupId}
         riderId={userId ?? ''}
         onSend={() => setSignalMenuOpen(false)}
+        right={FAB_COLUMN_W + FAB_GAP}
+        bottom={FAB_COLUMN_BOTTOM + FAB_SIZE + FAB_GAP}
       />
 
       {/* 3.3.6 FAB column */}
       <View style={styles.fabColumn}>
         <Fab
           onPress={toggleFollow}
+          active={following}
           accessibilityLabel={following ? 'Show the whole route' : 'Follow my location'}
           accessibilityRole="button"
         >
-          <View style={[styles.fabSignal, following && styles.fabRecenterOn]}>
-            <View style={[styles.locateRing, following && styles.locateRingOn]}>
-              <View style={[styles.locateDot, following && styles.locateDotOn]} />
-            </View>
+          <View style={[styles.locateRing, following && styles.locateRingOn]}>
+            <View style={[styles.locateDot, following && styles.locateDotOn]} />
           </View>
         </Fab>
-        <Fab onPress={openGoogleMaps} accessibilityLabel="Navigate in Google Maps">
-          <View style={styles.fabNav}>
-            <Text style={styles.fabIcon}>🧭</Text>
-          </View>
-        </Fab>
+        <NavFab onPress={openGoogleMaps} />
         <Fab
           onPress={() => setSignalMenuOpen((v) => !v)}
+          active={signalMenuOpen}
           accessibilityLabel="Send a quick signal"
+          accessibilityRole="button"
         >
-          <View style={styles.fabSignal}>
-            <Text style={styles.fabIcon}>💬</Text>
+          <View style={styles.bubble}>
+            <View style={styles.bubbleDot} />
+            <View style={styles.bubbleDot} />
+            <View style={styles.bubbleDot} />
           </View>
         </Fab>
         <SosFab
@@ -411,7 +456,7 @@ export default function MapScreen() {
         />
       </View>
 
-      {/* Bottom stack: info cards, SOS info cards, nav hint, bottom sheet */}
+      {/* Bottom stack: info cards, SOS info cards, bottom sheet */}
       <View style={styles.bottomStack} pointerEvents="box-none">
         <ScrollView
           style={styles.infoCardsScroll}
@@ -447,7 +492,6 @@ export default function MapScreen() {
         </ScrollView>
 
         <View pointerEvents="box-none">
-          <NavHint />
           <RoutePanel
             avoidHazards={avoidHazardTypes.length > 0}
             onToggleAvoidHazards={() => {
@@ -486,71 +530,51 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingHorizontal: GUTTER,
     zIndex: 10,
   },
-  eyebrow: {
-    fontFamily: WeRideFonts.mono,
-    fontSize: 9,
-    letterSpacing: 1,
-    color: WeRideColors.primary,
+  headerBar: {
+    height: HEADER_BAR_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: GUTTER,
+    backgroundColor: '#111111F2',
+    borderWidth: 1,
+    borderColor: WeRideColors.border,
+    borderRadius: WeRideRadius.xxl,
   },
-  title: {
-    fontFamily: WeRideFonts.heading,
-    fontSize: 24,
-    color: WeRideColors.text,
-    marginTop: 2,
+  headerBarWithBack: { paddingLeft: 4 },
+  backBtn: {
+    minWidth: 44,
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: WeRideRadius.xl,
+    backgroundColor: WeRideColors.dark3,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  bannerWrap: { position: 'absolute', top: 96, left: 0, right: 0, zIndex: 20 },
+  backText: { ...type.bodyStrong },
+  headerTitles: { flex: 1, justifyContent: 'center' },
+  title: { ...type.titleSm },
+  bannerWrap: { position: 'absolute', left: 0, right: 0, zIndex: 20 },
   noGroup: {
     flex: 1,
     backgroundColor: WeRideColors.dark,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
+    gap: 8,
   },
-  noGroupTitle: {
-    fontFamily: WeRideFonts.heading,
-    fontSize: 20,
-    color: WeRideColors.text,
-    marginBottom: 8,
-  },
-  noGroupSub: {
-    fontFamily: WeRideFonts.body,
-    fontSize: 14,
-    color: WeRideColors.textSub,
-    textAlign: 'center',
-  },
+  noGroupTitle: { ...type.titleSm },
+  noGroupSub: { ...type.body, color: WeRideColors.textSub, textAlign: 'center' },
   fabColumn: {
     position: 'absolute',
-    right: 12,
-    bottom: SHEET_COLLAPSED_H + 16, // clear of the collapsed route sheet
-    gap: 10,
+    right: GUTTER,
+    bottom: FAB_COLUMN_BOTTOM, // clear of the collapsed route sheet
+    gap: FAB_GAP,
     zIndex: 30,
   },
-  fabNav: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: WeRideColors.blue,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fabSignal: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: WeRideColors.dark2,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fabRecenterOn: { borderColor: ROUTE_COLOR },
   locateRing: {
     width: 20,
     height: 20,
@@ -563,17 +587,18 @@ const styles = StyleSheet.create({
   locateRingOn: { borderColor: ROUTE_COLOR },
   locateDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: WeRideColors.text },
   locateDotOn: { backgroundColor: ROUTE_COLOR },
-  fabSos: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: WeRideColors.red,
-    justifyContent: 'center',
+  bubble: {
+    width: 24,
+    height: 18,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: WeRideColors.text,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
   },
-  fabSosActive: { opacity: 0.5 },
-  fabIcon: { fontSize: 19, color: WeRideColors.white },
-  fabSosText: { fontFamily: WeRideFonts.mono, fontSize: 10, fontWeight: '700', color: WeRideColors.white },
+  bubbleDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: WeRideColors.text },
   bottomStack: {
     position: 'absolute',
     bottom: 0,
@@ -581,6 +606,8 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 25,
   },
-  infoCardsScroll: { maxHeight: 200 },
-  infoCardsContent: { paddingBottom: 4 },
+  infoCardsScroll: { maxHeight: 220 },
+  // Cards keep their own 16 px side margin; the extra right padding keeps them
+  // clear of the FAB column (FAB width + gap, minus the card's own margin).
+  infoCardsContent: { paddingRight: FAB_COLUMN_W + FAB_GAP - GUTTER },
 });

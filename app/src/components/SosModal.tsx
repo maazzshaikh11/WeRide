@@ -5,7 +5,8 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, Animated, Pressable, ActivityIndicator } from 'react-native';
-import { WeRideColors, WeRideFonts } from '../theme/theme';
+import { WeRideColors, WeRideRadius } from '../theme/theme';
+import { type } from '../theme/typography';
 import { triggerSos } from '@hazard/services/sosService';
 import { useToastStore } from '../store/toastStore';
 
@@ -37,7 +38,7 @@ export default function SosModal({ visible, riderId, groupId, riderCount, locati
     setSending(true);
     try {
       const sosId = await triggerSos(riderId, groupId, location.lat, location.lng);
-      push('🆘 SOS sent — your location is live to the whole group', 'error');
+      push('SOS sent — your location is live to the whole group', 'error');
       onSent(sosId);
     } catch (e) {
       console.error('[SosModal] triggerSos failed:', e);
@@ -52,11 +53,14 @@ export default function SosModal({ visible, riderId, groupId, riderCount, locati
       <Animated.View style={[styles.overlay, { opacity: fade }]}>
         <Pressable style={styles.overlayPress} onPress={onCancel} accessibilityLabel="Cancel SOS" />
         <View style={styles.box}>
-          <Text style={styles.icon}>🆘</Text>
+          <Text style={styles.eyebrow}>SOS</Text>
           <Text style={styles.title}>Send SOS to group?</Text>
           <Text style={styles.body}>
             Your live location, speed and last known point will be shared instantly with all {riderCount} rider{riderCount !== 1 ? 's' : ''}.
           </Text>
+          {!location ? (
+            <Text style={styles.noFix}>Waiting for your location. SOS can't be sent without a fix.</Text>
+          ) : null}
           <View style={styles.actions}>
             <Pressable
               style={styles.cancelBtn}
@@ -68,7 +72,7 @@ export default function SosModal({ visible, riderId, groupId, riderCount, locati
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
             <Pressable
-              style={styles.sendBtn}
+              style={[styles.sendBtn, !location && styles.sendBtnDisabled]}
               onPress={confirm}
               disabled={sending || !location}
               accessibilityLabel="Send SOS to group"
@@ -93,48 +97,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000b0',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 30,
+    padding: 24,
   },
   overlayPress: { ...StyleSheet.absoluteFillObject },
   box: {
-    backgroundColor: '#111111',
+    backgroundColor: WeRideColors.dark2,
     borderWidth: 1,
     borderColor: WeRideColors.border,
-    borderRadius: 18,
-    padding: 22,
+    borderRadius: WeRideRadius.xxxl,
+    padding: 20,
     width: '100%',
+    gap: 12,
   },
-  icon: { fontSize: 32, textAlign: 'center' },
-  title: {
-    fontFamily: WeRideFonts.heading,
-    fontSize: 22,
-    color: WeRideColors.text,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  body: {
-    fontFamily: WeRideFonts.body,
-    fontSize: 12,
-    color: WeRideColors.textSub,
-    lineHeight: 19,
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  actions: { flexDirection: 'row', gap: 8, marginTop: 18 },
+  eyebrow: { ...type.labelStrong, color: WeRideColors.red },
+  title: { ...type.titleSm },
+  body: { ...type.body, color: WeRideColors.textSub },
+  noFix: { ...type.caption, color: WeRideColors.gold },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
   cancelBtn: {
     flex: 1,
+    minHeight: 52,
     backgroundColor: WeRideColors.dark3,
-    borderRadius: 10,
-    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: WeRideColors.border,
+    borderRadius: WeRideRadius.xl,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  cancelText: { fontFamily: WeRideFonts.body, fontSize: 12.5, fontWeight: '700', color: WeRideColors.textSub },
+  cancelText: { ...type.button, color: WeRideColors.text },
   sendBtn: {
     flex: 1,
+    minHeight: 52,
     backgroundColor: WeRideColors.red,
-    borderRadius: 10,
-    paddingVertical: 11,
+    borderRadius: WeRideRadius.xl,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  sendText: { fontFamily: WeRideFonts.body, fontSize: 12.5, fontWeight: '700', color: WeRideColors.white },
+  sendBtnDisabled: { opacity: 0.4 },
+  sendText: { ...type.button, color: WeRideColors.white },
 });

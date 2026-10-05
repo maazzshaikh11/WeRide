@@ -24,8 +24,15 @@ function makeRoute(etaMinutes: number, distanceKm: number, safetyScore: number):
   };
 }
 
+// Track mounted trees so Animated timers (BottomSheet) never outlive a test.
+const mounted: renderer.ReactTestRenderer[] = [];
 function renderPanel() {
-  return renderer.create(<RoutePanel />);
+  let tree!: renderer.ReactTestRenderer;
+  act(() => {
+    tree = renderer.create(<RoutePanel />);
+  });
+  mounted.push(tree);
+  return tree;
 }
 
 describe('RoutePanel Updates (eta_panel_updates)', () => {
@@ -35,6 +42,7 @@ describe('RoutePanel Updates (eta_panel_updates)', () => {
   });
 
   afterEach(() => {
+    mounted.splice(0).forEach((t) => act(() => t.unmount()));
     jest.useFakeTimers();
     jest.runAllTimers();
     jest.useRealTimers();

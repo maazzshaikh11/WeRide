@@ -1,23 +1,27 @@
 # Brand assets
 
+**The app's logo is `logo.jpeg` in the repository root** (a byte-identical copy ships at
+`app/assets/images/logo.jpeg`; `__tests__/logo.test.tsx` keeps them in sync). Everything the app
+shows or installs is cut from that file:
+
+| Where | How |
+|---|---|
+| Sign-in / splash inside the app | `src/components/Logo.tsx` crops `logo.jpeg` to its rounded tile |
+| Android launcher icons (legacy, round, adaptive) and the Android launch screen | `scripts/generate-brand-assets.py` |
+| iOS app icon set and the iOS launch screen logo | `scripts/generate-brand-assets.py` |
+
+```
+python3 scripts/generate-brand-assets.py      # needs Pillow + numpy; no browser
+```
+
+## The SVG files in this folder
+
 | File | What it is |
 |---|---|
-| `logo-mark.svg` | The WR + road + pin mark, transparent background. **Source of truth.** |
-| `logo.svg` | The mark on the rounded dark tile (the original artwork's look). |
-| `app-icon.svg` | Full-bleed square used to produce the iOS / Android icons (generated). |
-| `logo-original.jpeg` | The raster artwork the SVGs were traced from. |
+| `logo-mark.svg` | A vector trace of the WR + road + pin mark, transparent background. |
+| `logo.svg` | The trace on the rounded dark tile. |
+| `app-icon.svg` | Full-bleed square version of the trace. |
+| `logo-original.jpeg` | The raster the traces were made from. |
 
-The SVGs were vectorised from `logo-original.jpeg` and cleaned by hand-tuned post-processing
-(stray tile-edge glows removed, orange rebuilt as a real gradient, translations baked into
-paths). They are 36 paths / ~48 KB.
-
-`react-native-svg` is not a dependency, so the app displays PNGs rasterised from these SVGs.
-To regenerate every icon and the in-app logo after editing an SVG:
-
-```
-CHROME=/path/to/chrome python3 scripts/generate-brand-assets.py   # needs Pillow
-```
-
-Outputs: `assets/images/logo-mark.png`, Android legacy + adaptive launcher icons
-(`mipmap-*`, `mipmap-anydpi-v26`, `values/ic_launcher_background.xml`) and the iOS
-`AppIcon.appiconset` (all iPhone sizes + 1024 marketing icon).
+They are kept as the vector version of the logo for places that need one (print, web), but the
+**app does not use them** — it uses `logo.jpeg`.

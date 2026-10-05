@@ -4,6 +4,8 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Splash: black window with the WeRide logo (drawable/launch_screen.xml), replaced by the first React frame. -->
+        <item name="android:windowBackground">@drawable/launch_screen</item>
     </style>
 
 </resources>

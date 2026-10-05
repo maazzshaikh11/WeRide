@@ -6,14 +6,14 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, TextInput, Text, StyleSheet, ActivityIndicator, Image,
+  View, TextInput, Text, ActivityIndicator,
   KeyboardAvoidingView, Platform, ScrollView, LayoutAnimation, UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { firebaseAuth, saveFcmToken } from '../services/firebaseService';
 import { useAppStore } from '../store/appStore';
-import { WeRideColors, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
+import Logo from '../components/Logo';
 import { authErrorMessage } from '../utils/authErrors';
 import { Button, FadeIn, PressableScale, TextField, haptic, useReducedMotion } from '../ui';
 
@@ -65,26 +65,33 @@ export function validateAuthForm(mode: Mode, email: string, password: string, co
   return errors;
 }
 
-// Brand mark (assets/brand/logo-mark.svg rasterised by scripts/generate-brand-assets.py).
-// 720x505 source; drawn at 3x density for the widths below.
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- RN static asset import
-const LOGO_SOURCE = require('../../assets/images/logo-mark.png');
-const LOGO_ASPECT = 720 / 505;
-
-function Wordmark({ width = 200 }: { width?: number }) {
-  return (
-    <View accessible accessibilityRole="header" accessibilityLabel="WeRide">
-      <Image
-        source={LOGO_SOURCE}
-        style={{ width, height: width / LOGO_ASPECT }}
-        resizeMode="contain"
-        accessibilityIgnoresInvertColors
-      />
-    </View>
-  );
+/** The real logo (logo.jpeg), as the page's heading. */
+function Wordmark({ width = 96 }: { width?: number }) {
+  return <Logo size={width} />;
 }
 
 export default function LoginScreen({ navigation }: any) {
+  const { colors, type } = useTheme();
+  const styles = useStyles(({ colors: c, type: t }) => ({
+    safe: { flex: 1, backgroundColor: c.bg },
+    flex: { flex: 1 },
+    scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 32 },
+    splash: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    splashSpinner: { marginTop: 24 },
+    logoWrap: { alignItems: 'center', marginBottom: 32 },
+    modeTitle: { ...t.h1, marginTop: 12 },
+    fieldLabel: { ...t.fieldLabel, marginTop: 24, marginBottom: 8, marginLeft: 2 },
+    hint: { ...t.sm, color: c.ink3, marginTop: 8, marginLeft: 2 },
+    formError: { ...t.body, color: c.bad, marginTop: 16 },
+    submit: { marginTop: 32 },
+    toggle: { minHeight: 44, justifyContent: 'center', alignItems: 'center', marginTop: 12 },
+    toggleLink: {
+      ...t.bodyStrong,
+      textDecorationLine: 'underline',
+      textDecorationColor: c.pri,
+      textDecorationStyle: 'solid',
+    },
+  }));
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -182,7 +189,7 @@ export default function LoginScreen({ navigation }: any) {
           <FadeIn>
             <Wordmark width={168} />
           </FadeIn>
-          <ActivityIndicator color={WeRideColors.primary} style={styles.splashSpinner} />
+          <ActivityIndicator color={colors.pri} style={styles.splashSpinner} />
         </View>
       </SafeAreaView>
     );
@@ -203,17 +210,19 @@ export default function LoginScreen({ navigation }: any) {
           keyboardDismissMode="on-drag"
         >
           <FadeIn index={0} style={styles.logoWrap}>
-            <Wordmark />
+            <Wordmark width={96} />
           </FadeIn>
 
           <FadeIn index={1}>
             {/* Re-keyed so the heading gives a small fade/rise when the mode flips. */}
             <FadeIn key={mode}>
-              <Text style={[type.heading, styles.modeTitle]}>{submitLabel}</Text>
+              <Text style={type.label}>{isCreate ? 'NEW RIDER' : 'WELCOME BACK'}</Text>
+              <Text style={styles.modeTitle} accessibilityRole="header">{submitLabel}</Text>
             </FadeIn>
 
+            <Text style={styles.fieldLabel}>EMAIL</Text>
+
             <TextField
-              containerStyle={styles.field}
               error={fieldErrors.email}
               placeholder="Email"
               value={email}
@@ -230,9 +239,9 @@ export default function LoginScreen({ navigation }: any) {
               accessibilityLabel="Email input"
             />
 
+            <Text style={styles.fieldLabel}>PASSWORD</Text>
             <TextField
               ref={passwordRef}
-              containerStyle={styles.field}
               error={fieldErrors.password}
               placeholder="Password"
               value={password}
@@ -254,10 +263,10 @@ export default function LoginScreen({ navigation }: any) {
 
             {isCreate ? (
               <FadeIn>
+                <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
                 <TextField
                   ref={confirmRef}
-                  containerStyle={styles.field}
-                  error={fieldErrors.confirm}
+                      error={fieldErrors.confirm}
                   placeholder="Confirm password"
                   value={confirm}
                   onChangeText={(v) => { setConfirm(v); clearField('confirm'); }}
@@ -301,9 +310,9 @@ export default function LoginScreen({ navigation }: any) {
               accessibilityRole="button"
               accessibilityLabel={isCreate ? 'Switch to sign in' : 'Switch to create account'}
             >
-              <Text style={[type.body, { color: WeRideColors.textSub }]}>
+              <Text style={type.body}>
                 {isCreate ? 'Have an account? ' : 'New to WeRide? '}
-                <Text style={[type.bodyStrong, { color: WeRideColors.primary }]}>
+                <Text style={styles.toggleLink}>
                   {isCreate ? 'Sign in' : 'Create account'}
                 </Text>
               </Text>
@@ -314,32 +323,3 @@ export default function LoginScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: WeRideColors.dark },
-  flex: { flex: 1 },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: WeRideSpacing.lg,
-    paddingVertical: WeRideSpacing.xxl,
-  },
-  splash: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  splashSpinner: { marginTop: WeRideSpacing.lg },
-  logoWrap: { alignItems: 'center', marginBottom: WeRideSpacing.xxl },
-  modeTitle: { marginBottom: WeRideSpacing.xs },
-  field: { marginTop: WeRideSpacing.md },
-  hint: { ...type.caption, marginTop: WeRideSpacing.xs },
-  formError: {
-    ...type.body,
-    color: WeRideColors.error,
-    marginTop: WeRideSpacing.md,
-  },
-  submit: { marginTop: WeRideSpacing.lg },
-  toggle: {
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: WeRideSpacing.sm,
-  },
-});

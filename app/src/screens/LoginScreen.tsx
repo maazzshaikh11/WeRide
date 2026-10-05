@@ -6,15 +6,42 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, TextInput, Text, StyleSheet, Pressable, ActivityIndicator, Image,
-  KeyboardAvoidingView, Platform, ScrollView,
+  View, TextInput, Text, StyleSheet, ActivityIndicator, Image,
+  KeyboardAvoidingView, Platform, ScrollView, LayoutAnimation, UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { firebaseAuth, saveFcmToken } from '../services/firebaseService';
 import { useAppStore } from '../store/appStore';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
+import { WeRideColors, WeRideSpacing } from '../theme/theme';
 import { type } from '../theme/typography';
 import { authErrorMessage } from '../utils/authErrors';
+import { Button, FadeIn, PressableScale, TextField, haptic, useReducedMotion } from '../ui';
+
+// Android needs layout animations switched on once (no-op elsewhere / in jest).
+if (Platform.OS === 'android' && typeof UIManager?.setLayoutAnimationEnabledExperimental === 'function') {
+  try {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  } catch {
+    // Optional nicety.
+  }
+}
+
+/**
+ * Smooth the NEXT layout change (fields appearing/disappearing, content below
+ * sliding). Entering views are animated by FadeIn, so only update + delete
+ * (fade) are configured here.
+ */
+function animateLayout(): void {
+  try {
+    LayoutAnimation.configureNext({
+      duration: 220,
+      update: { type: LayoutAnimation.Types.easeInEaseOut },
+      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+    });
+  } catch {
+    // Layout animation is a nicety; never block the state change.
+  }
+}
 
 type Mode = 'signIn' | 'create';
 type Field = 'email' | 'password' | 'confirm';
@@ -68,6 +95,7 @@ export default function LoginScreen({ navigation }: any) {
   // false until Firebase reports the first auth state (restored session or none).
   const [authKnown, setAuthKnown] = useState(false);
   const setUserId = useAppStore((s) => s.setUserId);
+  const reduced = useReducedMotion();
 
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
@@ -107,6 +135,7 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   const switchMode = () => {
+    if (!reduced) animateLayout();
     setMode((m) => (m === 'signIn' ? 'create' : 'signIn'));
     setFieldErrors({});
     setFormError(null);
@@ -118,7 +147,10 @@ export default function LoginScreen({ navigation }: any) {
     const errors = validateAuthForm(mode, email, password, confirm);
     setFieldErrors(errors);
     setFormError(null);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      haptic('error');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -127,9 +159,11 @@ export default function LoginScreen({ navigation }: any) {
         mode === 'create'
           ? await firebaseAuth.createUserWithEmailAndPassword(addr, password)
           : await firebaseAuth.signInWithEmailAndPassword(addr, password);
+      haptic('success');
       enterApp(cred.user.uid);
     } catch (e: any) {
       if (!mounted.current) return;
+      haptic('error');
       const code = e?.code;
       const message = authErrorMessage(e);
       if (code === 'auth/invalid-email') setFieldErrors({ email: message });
@@ -145,7 +179,9 @@ export default function LoginScreen({ navigation }: any) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.splash} accessibilityLabel="Checking sign-in" accessibilityLiveRegion="polite">
-          <Wordmark width={168} />
+          <FadeIn>
+            <Wordmark width={168} />
+          </FadeIn>
           <ActivityIndicator color={WeRideColors.primary} style={styles.splashSpinner} />
         </View>
       </SafeAreaView>
@@ -166,120 +202,113 @@ export default function LoginScreen({ navigation }: any) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <View style={styles.logoWrap}>
+          <FadeIn index={0} style={styles.logoWrap}>
             <Wordmark />
-          </View>
+          </FadeIn>
 
-          <Text style={[type.heading, styles.modeTitle]}>{submitLabel}</Text>
+          <FadeIn index={1}>
+            {/* Re-keyed so the heading gives a small fade/rise when the mode flips. */}
+            <FadeIn key={mode}>
+              <Text style={[type.heading, styles.modeTitle]}>{submitLabel}</Text>
+            </FadeIn>
 
-          <TextInput
-            style={[styles.input, fieldErrors.email ? styles.inputError : null]}
-            placeholder="Email"
-            placeholderTextColor={WeRideColors.textSub}
-            value={email}
-            onChangeText={(v) => { setEmail(v); clearField('email'); }}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="email"
-            textContentType="emailAddress"
-            keyboardType="email-address"
-            returnKeyType="next"
-            blurOnSubmit={false}
-            onSubmitEditing={() => passwordRef.current?.focus()}
-            editable={!loading}
-            accessibilityLabel="Email input"
-          />
-          {fieldErrors.email ? (
-            <Text style={styles.fieldError} accessibilityLiveRegion="polite">{fieldErrors.email}</Text>
-          ) : null}
+            <TextField
+              containerStyle={styles.field}
+              error={fieldErrors.email}
+              placeholder="Email"
+              value={email}
+              onChangeText={(v) => { setEmail(v); clearField('email'); }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              keyboardType="email-address"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              editable={!loading}
+              accessibilityLabel="Email input"
+            />
 
-          <TextInput
-            ref={passwordRef}
-            style={[styles.input, fieldErrors.password ? styles.inputError : null]}
-            placeholder="Password"
-            placeholderTextColor={WeRideColors.textSub}
-            value={password}
-            onChangeText={(v) => { setPassword(v); clearField('password'); }}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete={isCreate ? 'password-new' : 'password'}
-            textContentType={isCreate ? 'newPassword' : 'password'}
-            returnKeyType={isCreate ? 'next' : 'go'}
-            blurOnSubmit={!isCreate}
-            onSubmitEditing={() => (isCreate ? confirmRef.current?.focus() : submit())}
-            editable={!loading}
-            accessibilityLabel="Password input"
-          />
-          {fieldErrors.password ? (
-            <Text style={styles.fieldError} accessibilityLiveRegion="polite">{fieldErrors.password}</Text>
-          ) : isCreate ? (
-            <Text style={styles.hint}>At least {MIN_PASSWORD} characters.</Text>
-          ) : null}
+            <TextField
+              ref={passwordRef}
+              containerStyle={styles.field}
+              error={fieldErrors.password}
+              placeholder="Password"
+              value={password}
+              onChangeText={(v) => { setPassword(v); clearField('password'); }}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete={isCreate ? 'password-new' : 'password'}
+              textContentType={isCreate ? 'newPassword' : 'password'}
+              returnKeyType={isCreate ? 'next' : 'go'}
+              blurOnSubmit={!isCreate}
+              onSubmitEditing={() => (isCreate ? confirmRef.current?.focus() : submit())}
+              editable={!loading}
+              accessibilityLabel="Password input"
+            />
+            {!fieldErrors.password && isCreate ? (
+              <Text style={styles.hint}>At least {MIN_PASSWORD} characters.</Text>
+            ) : null}
 
-          {isCreate ? (
-            <>
-              <TextInput
-                ref={confirmRef}
-                style={[styles.input, fieldErrors.confirm ? styles.inputError : null]}
-                placeholder="Confirm password"
-                placeholderTextColor={WeRideColors.textSub}
-                value={confirm}
-                onChangeText={(v) => { setConfirm(v); clearField('confirm'); }}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="password-new"
-                textContentType="newPassword"
-                returnKeyType="go"
-                onSubmitEditing={submit}
-                editable={!loading}
-                accessibilityLabel="Confirm password input"
-              />
-              {fieldErrors.confirm ? (
-                <Text style={styles.fieldError} accessibilityLiveRegion="polite">{fieldErrors.confirm}</Text>
-              ) : null}
-            </>
-          ) : null}
+            {isCreate ? (
+              <FadeIn>
+                <TextField
+                  ref={confirmRef}
+                  containerStyle={styles.field}
+                  error={fieldErrors.confirm}
+                  placeholder="Confirm password"
+                  value={confirm}
+                  onChangeText={(v) => { setConfirm(v); clearField('confirm'); }}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="password-new"
+                  textContentType="newPassword"
+                  returnKeyType="go"
+                  onSubmitEditing={submit}
+                  editable={!loading}
+                  accessibilityLabel="Confirm password input"
+                />
+              </FadeIn>
+            ) : null}
 
-          {formError ? (
-            <Text style={styles.formError} accessibilityLiveRegion="polite" accessibilityRole="alert">
-              {formError}
-            </Text>
-          ) : null}
+            {formError ? (
+              <FadeIn>
+                <Text style={styles.formError} accessibilityLiveRegion="polite" accessibilityRole="alert">
+                  {formError}
+                </Text>
+              </FadeIn>
+            ) : null}
+          </FadeIn>
 
-          <Pressable
-            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, loading && styles.buttonLoading]}
-            onPress={submit}
-            disabled={loading}
-            accessibilityLabel={submitLabel}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: loading, busy: loading }}
-          >
-            {loading ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator color={WeRideColors.onPrimary} size="small" />
-                <Text style={type.button}>{isCreate ? 'Creating account…' : 'Signing in…'}</Text>
-              </View>
-            ) : (
-              <Text style={type.button}>{submitLabel}</Text>
-            )}
-          </Pressable>
+          <FadeIn index={2}>
+            <Button
+              label={submitLabel}
+              onPress={submit}
+              loading={loading}
+              disabled={loading}
+              style={styles.submit}
+              haptic="select"
+            />
 
-          <Pressable
-            style={styles.toggle}
-            onPress={switchMode}
-            disabled={loading}
-            accessibilityRole="button"
-            accessibilityLabel={isCreate ? 'Switch to sign in' : 'Switch to create account'}
-          >
-            <Text style={[type.body, { color: WeRideColors.textSub }]}>
-              {isCreate ? 'Have an account? ' : 'New to WeRide? '}
-              <Text style={[type.bodyStrong, { color: WeRideColors.primary }]}>
-                {isCreate ? 'Sign in' : 'Create account'}
+            <PressableScale
+              style={styles.toggle}
+              onPress={switchMode}
+              disabled={loading}
+              haptic="tap"
+              accessibilityRole="button"
+              accessibilityLabel={isCreate ? 'Switch to sign in' : 'Switch to create account'}
+            >
+              <Text style={[type.body, { color: WeRideColors.textSub }]}>
+                {isCreate ? 'Have an account? ' : 'New to WeRide? '}
+                <Text style={[type.bodyStrong, { color: WeRideColors.primary }]}>
+                  {isCreate ? 'Sign in' : 'Create account'}
+                </Text>
               </Text>
-            </Text>
-          </Pressable>
+            </PressableScale>
+          </FadeIn>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -299,35 +328,14 @@ const styles = StyleSheet.create({
   splashSpinner: { marginTop: WeRideSpacing.lg },
   logoWrap: { alignItems: 'center', marginBottom: WeRideSpacing.xxl },
   modeTitle: { marginBottom: WeRideSpacing.xs },
-  input: {
-    ...type.input,
-    height: 48,
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.md,
-    paddingHorizontal: WeRideSpacing.md,
-    marginTop: WeRideSpacing.md,
-  },
-  inputError: { borderColor: WeRideColors.error },
-  fieldError: { ...type.caption, color: WeRideColors.error, marginTop: WeRideSpacing.xs },
+  field: { marginTop: WeRideSpacing.md },
   hint: { ...type.caption, marginTop: WeRideSpacing.xs },
   formError: {
     ...type.body,
     color: WeRideColors.error,
     marginTop: WeRideSpacing.md,
   },
-  button: {
-    minHeight: 48,
-    backgroundColor: WeRideColors.primary,
-    borderRadius: WeRideRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: WeRideSpacing.lg,
-  },
-  buttonPressed: { opacity: 0.85 },
-  buttonLoading: { opacity: 0.6 },
-  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.sm },
+  submit: { marginTop: WeRideSpacing.lg },
   toggle: {
     minHeight: 44,
     justifyContent: 'center',

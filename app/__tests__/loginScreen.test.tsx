@@ -2,6 +2,7 @@
  * LoginScreen: session restore, sign in, create account, validation, friendly errors.
  */
 import React from 'react';
+import { LayoutAnimation } from 'react-native';
 import { act, create, ReactTestInstance } from 'react-test-renderer';
 
 const mockAuth = {
@@ -19,6 +20,7 @@ jest.mock('../src/services/firebaseService', () => ({
 
 import LoginScreen from '../src/screens/LoginScreen';
 import { useAppStore } from '../src/store/appStore';
+import { Button, TextField } from '../src/ui';
 
 const mounted: ReturnType<typeof create>[] = [];
 let authCb: ((u: { uid: string } | null) => void) | null = null;
@@ -212,6 +214,36 @@ describe('LoginScreen sign in', () => {
     });
   });
 
+  test('validation errors are handed to the fields (shake + error text) and clear on edit', async () => {
+    const tree = render({ replace: jest.fn() });
+    await signedOut(tree);
+    const errors = () => tree.root.findAllByType(TextField).map((f) => f.props.error);
+    expect(errors()).toEqual([undefined, undefined]);
+    await press(tree, 'Sign in');
+    expect(errors()).toEqual(['Enter your email.', 'Enter your password.']);
+    type(tree, 'Email input', 'a');
+    expect(errors()).toEqual([undefined, 'Enter your password.']);
+  });
+
+  test('the submit button shows loading while signing in', async () => {
+    let resolve!: (v: unknown) => void;
+    mockAuth.signInWithEmailAndPassword.mockReturnValue(new Promise((r) => { resolve = r; }));
+    const tree = render({ replace: jest.fn() });
+    await signedOut(tree);
+    type(tree, 'Email input', 'a@b.co');
+    type(tree, 'Password input', 'secret1');
+    expect(tree.root.findByType(Button).props.loading).toBe(false);
+    let pending: Promise<void> = Promise.resolve();
+    act(() => {
+      pending = byLabel(tree, 'Sign in').props.onPress();
+    });
+    expect(tree.root.findByType(Button).props.loading).toBe(true);
+    await act(async () => {
+      resolve({ user: { uid: 'u1' } });
+      await pending;
+    });
+  });
+
   test('password field is secure and fields carry autofill hints', async () => {
     const tree = render({ replace: jest.fn() });
     await signedOut(tree);
@@ -237,6 +269,24 @@ describe('LoginScreen create account', () => {
     expect(byLabel(tree, 'Create account')).toBeDefined();
     await press(tree, 'Switch to sign in');
     expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'Confirm password input')).toHaveLength(0);
+  });
+
+  test('real toggle pressable swaps the confirm field in and out with a layout animation', async () => {
+    const configure = jest.spyOn(LayoutAnimation, 'configureNext').mockImplementation(() => undefined);
+    const tree = render({ replace: jest.fn() });
+    await signedOut(tree);
+    const confirmField = () =>
+      tree.root.findAll((n) => n.props.accessibilityLabel === 'Confirm password input');
+    const toggle = (label: string) =>
+      tree.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
+    expect(confirmField()).toHaveLength(0);
+    await act(async () => toggle('Switch to create account').props.onPress({ nativeEvent: {} }));
+    expect(confirmField().length).toBeGreaterThan(0);
+    expect(tree.root.findAllByType(TextField)).toHaveLength(3);
+    await act(async () => toggle('Switch to sign in').props.onPress({ nativeEvent: {} }));
+    expect(confirmField()).toHaveLength(0);
+    expect(tree.root.findAllByType(TextField)).toHaveLength(2);
+    expect(configure).toHaveBeenCalledTimes(2);
   });
 
   test('validates length and confirmation before calling Firebase', async () => {

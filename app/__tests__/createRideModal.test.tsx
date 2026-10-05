@@ -3,6 +3,7 @@
  */
 import React from 'react';
 import { act, create, ReactTestInstance } from 'react-test-renderer';
+import * as haptics from '../src/ui/haptics';
 
 const mockGeocode = jest.fn();
 jest.mock('../src/utils/geocode', () => ({
@@ -97,6 +98,17 @@ describe('CreateRideModal disabled reason', () => {
     expect(byLabel(tree, 'Create ride').props.disabled).toBe(true);
   });
 
+  test('the reason fades out (then unmounts) when a destination gets chosen', () => {
+    const { tree } = render();
+    expect(hasText(tree, 'Choose a destination to continue')).toBe(true);
+    act(() => useRidePlanStore.getState().setDestination(DEST));
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    expect(hasText(tree, 'Choose a destination to continue')).toBe(false);
+    expect(byLabel(tree, 'Create ride').props.disabled).toBe(false);
+  });
+
   test('reason disappears and Create enables once a destination exists', () => {
     act(() => useRidePlanStore.getState().setDestination(DEST));
     const { tree } = render();
@@ -162,6 +174,21 @@ describe('CreateRideModal ride meta', () => {
     expect(mockSvc.createGroup.mock.calls[0][2]).toEqual({});
   });
 
+  test('selected state is exposed on the real chip pressable and moves with the selection', async () => {
+    const { tree } = render();
+    const chip = (label: string) =>
+      tree.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
+    expect(chip('Sport').props.accessibilityState).toMatchObject({ selected: false });
+    await act(async () => chip('Sport').props.onPress({ nativeEvent: {} }));
+    expect(chip('Sport').props.accessibilityState).toMatchObject({ selected: true });
+    expect(chip('Casual').props.accessibilityState).toMatchObject({ selected: false });
+    await act(async () => chip('In 1 hour').props.onPress({ nativeEvent: {} }));
+    expect(chip('In 1 hour').props.accessibilityState).toMatchObject({ selected: true });
+    // the duplicate "selected look" overlay is hidden from screen readers (no double announcement)
+    const hidden = chip('Sport').findAll((n) => n.props.importantForAccessibility === 'no-hide-descendants');
+    expect(hidden.length).toBeGreaterThan(0);
+  });
+
   test('selections reset when the modal is reopened', async () => {
     const { tree, onClose, onCreated } = render();
     await press(tree, 'Sport');
@@ -192,6 +219,43 @@ describe('CreateRideModal after create', () => {
     expect(lastToast()).toMatchObject({ message: 'Ride created — join code K7M2QX', variant: 'success' });
     expect(order).toEqual(['set:gid-1', 'created', 'close']);
     expect(onCreated).toHaveBeenCalledWith('gid-1');
+  });
+
+  test('plays the success haptic once creation completes, before navigating', async () => {
+    const order: string[] = [];
+    jest.spyOn(haptics, 'haptic').mockImplementation((k) => {
+      order.push(`haptic:${k}`);
+    });
+    const onCreated = jest.fn(() => order.push('created'));
+    const { tree } = render({ onCreated });
+    await press(tree, 'Create ride');
+    expect(order).toEqual(['haptic:success', 'created']);
+  });
+
+  test('a failed creation plays the error haptic instead', async () => {
+    mockSvc.createGroup.mockRejectedValue(new Error('boom'));
+    const spy = jest.spyOn(haptics, 'haptic').mockImplementation(() => undefined);
+    const { tree } = render();
+    await press(tree, 'Create ride');
+    expect(spy).toHaveBeenCalledWith('error');
+    expect(spy).not.toHaveBeenCalledWith('success');
+  });
+
+  test('Create shows its loading state while the ride is being created', async () => {
+    let resolve!: (v: string) => void;
+    mockSvc.createGroup.mockReturnValue(new Promise<string>((r) => { resolve = r; }));
+    const { tree } = render();
+    let pending: Promise<void> = Promise.resolve();
+    act(() => {
+      pending = byLabel(tree, 'Create ride').props.onPress();
+    });
+    const real = () =>
+      tree.root.findAll((n) => n.props.accessibilityLabel === 'Create ride' && typeof n.props.onPressIn === 'function')[0];
+    expect(real().props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+    await act(async () => {
+      resolve('gid-1');
+      await pending;
+    });
   });
 
   test('falls back to the generic message when the group read fails', async () => {
@@ -229,6 +293,22 @@ describe('CreateRideModal place search', () => {
     expect(mockGeocode).toHaveBeenCalledWith('pune');
     await press(tree, 'Select Pune, India');
     expect(useRidePlanStore.getState().destination).toMatchObject({ label: 'Pune, India' });
+  });
+
+  test('result rows are pressable cards that pick on press', async () => {
+    mockGeocode.mockResolvedValue([
+      { label: 'Pune, India', lat: 18.5, lng: 73.8 },
+      { label: 'Pune Airport', lat: 18.58, lng: 73.92 },
+    ]);
+    const { tree } = render();
+    await press(tree, 'Destination field');
+    await search(tree, 'pune');
+    const row = (label: string) =>
+      tree.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
+    expect(row('Select Pune, India')).toBeDefined();
+    const rows = [row('Select Pune, India'), row('Select Pune Airport')];
+    await act(async () => rows[1].props.onPress({ nativeEvent: {} }));
+    expect(useRidePlanStore.getState().destination).toMatchObject({ label: 'Pune Airport' });
   });
 
   test('no results shows "No places found" with the query', async () => {

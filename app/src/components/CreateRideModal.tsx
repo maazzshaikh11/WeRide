@@ -6,8 +6,8 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Modal, Pressable, TextInput,
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
+  View, Text, StyleSheet, Modal, Pressable, TextInput, Animated,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, LayoutAnimation, UIManager,
 } from 'react-native';
 import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
 import { type } from '../theme/typography';
@@ -17,6 +17,9 @@ import { useRidePlanStore, PlannedStop } from '../store/ridePlanStore';
 import { useToastStore } from '../store/toastStore';
 import { GroupService, RIDE_TYPES, RideType, RideMeta } from '@routing/group/groupService';
 import { useAppStore } from '../store/appStore';
+import {
+  Button, FadeIn, PressableCard, PressableScale, TextField, haptic, useReducedMotion,
+} from '../ui';
 
 type Field = 'start' | 'destination' | 'stop';
 type SearchState = { status: 'idle' | 'loading' | 'done' | 'error'; query: string };
@@ -40,18 +43,98 @@ const FIELD_PLACEHOLDER: Record<Field, string> = {
   stop: 'Search a stop',
 };
 
-function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+const FADE_MS = 160;
+
+// Android needs layout animations switched on once (no-op elsewhere / in jest).
+if (Platform.OS === 'android' && typeof UIManager?.setLayoutAnimationEnabledExperimental === 'function') {
+  try {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  } catch {
+    // Optional nicety.
+  }
+}
+
+/** Smooth the NEXT layout change (stop removed/reordered/added, content sliding). */
+function animateLayout(): void {
+  try {
+    LayoutAnimation.configureNext({
+      duration: 220,
+      update: { type: LayoutAnimation.Types.easeInEaseOut },
+      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+    });
+  } catch {
+    // Layout animation is a nicety; never block a state change.
+  }
+}
+
+/**
+ * Selectable chip. The selected look (accent border + tint + accent label) is an
+ * overlay that cross-fades with the idle label; opacity only, native driver.
+ * The overlay duplicate is hidden from screen readers; selection is exposed
+ * through accessibilityState.selected.
+ */
+function Chip({
+  label, selected, onPress, reduced,
+}: { label: string; selected: boolean; onPress: () => void; reduced: boolean }) {
+  const sel = useRef(new Animated.Value(selected ? 1 : 0)).current;
+  useEffect(() => {
+    if (reduced) sel.setValue(selected ? 1 : 0);
+    else Animated.timing(sel, { toValue: selected ? 1 : 0, duration: FADE_MS, useNativeDriver: true }).start();
+  }, [selected, reduced, sel]);
+
   return (
-    <Pressable
-      style={[styles.chip, selected && styles.chipSelected]}
+    <PressableScale
+      style={styles.chip}
       onPress={onPress}
+      haptic="select"
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
     >
-      <Text style={[type.bodyStrong, { color: selected ? WeRideColors.primary : WeRideColors.textSub }]}>{label}</Text>
-    </Pressable>
+      <Animated.Text
+        style={[type.bodyStrong, styles.chipIdle, { opacity: sel.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
+      >
+        {label}
+      </Animated.Text>
+      <Animated.View
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[styles.chipSelected, { opacity: sel }]}
+      >
+        <Text style={[type.bodyStrong, { color: WeRideColors.primary }]}>{label}</Text>
+      </Animated.View>
+    </PressableScale>
   );
+}
+
+/**
+ * Mounts its children with a fade-in and, when `visible` flips false, fades
+ * them out before unmounting (then lets the content below slide up).
+ */
+function PresenceFade({
+  visible, reduced, children,
+}: { visible: boolean; reduced: boolean; children: React.ReactNode }) {
+  const t = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const [mounted, setMounted] = useState(visible);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (visible) setMounted(true);
+    else if (mounted) {
+      timer = setTimeout(() => {
+        if (!reduced) animateLayout();
+        setMounted(false);
+      }, reduced ? 0 : FADE_MS);
+    }
+    if (reduced) t.setValue(visible ? 1 : 0);
+    else Animated.timing(t, { toValue: visible ? 1 : 0, duration: FADE_MS, useNativeDriver: true }).start();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `mounted` only gates the unmount timer
+  }, [visible, reduced, t]);
+  if (!mounted) return null;
+  return <Animated.View style={{ opacity: t }}>{children}</Animated.View>;
 }
 
 export default function CreateRideModal({ visible, onClose, onCreated }: Props) {
@@ -59,6 +142,7 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
     useRidePlanStore();
   const setGroupId = useAppStore((s) => s.setGroupId);
   const push = useToastStore((s) => s.push);
+  const reduced = useReducedMotion();
 
   const [field, setField] = useState<Field>('start');
   const [query, setQuery] = useState('');
@@ -111,12 +195,15 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
   }, [query, visible, retryNonce]);
 
   const pick = useCallback((r: GeoResult) => {
+    if (!reduced) animateLayout(); // results collapse / a stop row is added
     if (field === 'start') setStart(r);
     else if (field === 'destination') setDestination(r);
-    else addStop({ id: `${Date.now()}-${Math.random()}`, label: r.label, lat: r.lat, lng: r.lng, icon: stopIcon() });
+    else {
+      addStop({ id: `${Date.now()}-${Math.random()}`, label: r.label, lat: r.lat, lng: r.lng, icon: stopIcon() });
+    }
     setQuery('');
     setResults([]);
-  }, [field, setStart, setDestination, addStop]);
+  }, [field, reduced, setStart, setDestination, addStop]);
 
   const canCreate = destination != null && !creating;
 
@@ -147,9 +234,11 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
         // Keep the generic message; the code is still visible on the ride list.
       }
       push(message, 'success');
+      haptic('success');
       onCreated(groupId);
       onClose();
     } catch {
+      haptic('error');
       push('Could not create the ride. Try again.', 'error');
     } finally {
       setCreating(false);
@@ -157,8 +246,11 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
   }, [canCreate, start, destination, stops, rideType, startPreset, setGroupId, push, onCreated, onClose]);
 
   const renderLocationRow = (label: string, hint: string, value: GeoResult | null, f: Field) => (
-    <Pressable
-      style={[styles.locRow, field === f && styles.locRowActive]}
+    <PressableCard
+      radius={WeRideRadius.lg}
+      active={field === f}
+      style={styles.locRow}
+      haptic="select"
       onPress={() => { setField(f); setQuery(''); setResults([]); searchRef.current?.focus(); }}
       accessibilityRole="button"
       accessibilityLabel={`${label} field`}
@@ -175,7 +267,7 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
           <Text style={[type.caption, styles.locValue]}>{hint}</Text>
         )}
       </View>
-    </Pressable>
+    </PressableCard>
   );
 
   const searching = search.status === 'loading';
@@ -190,14 +282,15 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
               <Text style={type.eyebrow}>NEW RIDE</Text>
               <Text style={type.titleSm}>Plan your route</Text>
             </View>
-            <Pressable
+            <PressableScale
               onPress={onClose}
               style={styles.closeBtn}
+              haptic="tap"
               accessibilityRole="button"
               accessibilityLabel="Close"
             >
               <Text style={[type.body, { color: WeRideColors.textSub }]}>✕</Text>
-            </Pressable>
+            </PressableScale>
           </View>
 
           <ScrollView
@@ -209,11 +302,10 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
             {renderLocationRow('Destination', 'Required. Tap, then search', destination, 'destination')}
             {renderLocationRow('Add a stop', 'Optional. Tap, then search', null, 'stop')}
 
-            <TextInput
+            <TextField
               ref={searchRef}
-              style={styles.searchInput}
+              containerStyle={styles.searchField}
               placeholder={FIELD_PLACEHOLDER[field]}
-              placeholderTextColor={WeRideColors.textSub}
               value={query}
               onChangeText={setQuery}
               autoCorrect={false}
@@ -223,38 +315,46 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
             {searching ? <ActivityIndicator color={WeRideColors.primary} style={styles.searching} /> : null}
 
             {search.status === 'error' ? (
-              <View style={styles.searchMsgRow} accessibilityLiveRegion="polite">
-                <Text style={[type.caption, styles.searchMsg, { color: WeRideColors.error }]}>
-                  Search is unavailable — check your connection
-                </Text>
-                <Pressable
-                  style={styles.retryBtn}
-                  onPress={() => setRetryNonce((n) => n + 1)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Retry search"
-                >
-                  <Text style={[type.captionStrong, { color: WeRideColors.primary }]}>Retry</Text>
-                </Pressable>
-              </View>
+              <FadeIn>
+                <View style={styles.searchMsgRow} accessibilityLiveRegion="polite">
+                  <Text style={[type.caption, styles.searchMsg, { color: WeRideColors.error }]}>
+                    Search is unavailable — check your connection
+                  </Text>
+                  <PressableScale
+                    style={styles.retryBtn}
+                    onPress={() => setRetryNonce((n) => n + 1)}
+                    haptic="tap"
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry search"
+                  >
+                    <Text style={[type.captionStrong, { color: WeRideColors.primary }]}>Retry</Text>
+                  </PressableScale>
+                </View>
+              </FadeIn>
             ) : null}
             {search.status === 'done' && results.length === 0 ? (
-              <Text style={[type.caption, styles.searchMsgSolo]} accessibilityLiveRegion="polite">
-                {`No places found for "${search.query}"`}
-              </Text>
+              <FadeIn>
+                <Text style={[type.caption, styles.searchMsgSolo]} accessibilityLiveRegion="polite">
+                  {`No places found for "${search.query}"`}
+                </Text>
+              </FadeIn>
             ) : null}
 
             {results.length > 0 && (
-              <View style={styles.resultsBox}>
+              <View style={styles.results}>
                 {results.map((item, i) => (
-                  <Pressable
-                    key={`${item.lat},${item.lng},${i}`}
-                    style={[styles.resultRow, i === results.length - 1 && styles.resultRowLast]}
-                    onPress={() => pick(item)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Select ${item.label}`}
-                  >
-                    <Text style={type.body} numberOfLines={2}>{item.label}</Text>
-                  </Pressable>
+                  <FadeIn key={`${item.lat},${item.lng},${i}`} index={i} style={styles.resultWrap}>
+                    <PressableCard
+                      radius={WeRideRadius.lg}
+                      style={styles.resultRow}
+                      haptic="select"
+                      onPress={() => pick(item)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Select ${item.label}`}
+                    >
+                      <Text style={type.body} numberOfLines={2}>{item.label}</Text>
+                    </PressableCard>
+                  </FadeIn>
                 ))}
               </View>
             )}
@@ -263,36 +363,41 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
               <View style={styles.section}>
                 <Text style={[type.label, styles.sectionLabel]}>STOPS</Text>
                 {stops.map((s: PlannedStop, i) => (
-                  <View key={s.id} style={styles.stopRow}>
-                    <Text style={styles.stopIconText}>{s.icon}</Text>
-                    <Text style={[type.body, styles.stopLabel]} numberOfLines={1}>{s.label}</Text>
-                    <Pressable
-                      style={styles.stopBtnWrap}
-                      onPress={() => moveStop(s.id, -1)}
-                      disabled={i === 0}
-                      accessibilityRole="button"
-                      accessibilityLabel="Move stop up"
-                    >
-                      <Text style={[styles.stopBtn, i === 0 && styles.stopBtnDisabled]}>↑</Text>
-                    </Pressable>
-                    <Pressable
-                      style={styles.stopBtnWrap}
-                      onPress={() => moveStop(s.id, 1)}
-                      disabled={i === stops.length - 1}
-                      accessibilityRole="button"
-                      accessibilityLabel="Move stop down"
-                    >
-                      <Text style={[styles.stopBtn, i === stops.length - 1 && styles.stopBtnDisabled]}>↓</Text>
-                    </Pressable>
-                    <Pressable
-                      style={styles.stopBtnWrap}
-                      onPress={() => removeStop(s.id)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Remove stop"
-                    >
-                      <Text style={styles.stopRemove}>✕</Text>
-                    </Pressable>
-                  </View>
+                  <FadeIn key={s.id}>
+                    <View style={styles.stopRow}>
+                      <Text style={styles.stopIconText}>{s.icon}</Text>
+                      <Text style={[type.body, styles.stopLabel]} numberOfLines={1}>{s.label}</Text>
+                      <PressableScale
+                        style={styles.stopBtnWrap}
+                        onPress={() => { if (!reduced) animateLayout(); moveStop(s.id, -1); }}
+                        disabled={i === 0}
+                        haptic="select"
+                        accessibilityRole="button"
+                        accessibilityLabel="Move stop up"
+                      >
+                        <Text style={[styles.stopBtn, i === 0 && styles.stopBtnDisabled]}>↑</Text>
+                      </PressableScale>
+                      <PressableScale
+                        style={styles.stopBtnWrap}
+                        onPress={() => { if (!reduced) animateLayout(); moveStop(s.id, 1); }}
+                        disabled={i === stops.length - 1}
+                        haptic="select"
+                        accessibilityRole="button"
+                        accessibilityLabel="Move stop down"
+                      >
+                        <Text style={[styles.stopBtn, i === stops.length - 1 && styles.stopBtnDisabled]}>↓</Text>
+                      </PressableScale>
+                      <PressableScale
+                        style={styles.stopBtnWrap}
+                        onPress={() => { if (!reduced) animateLayout(); removeStop(s.id); }}
+                        haptic="tap"
+                        accessibilityRole="button"
+                        accessibilityLabel="Remove stop"
+                      >
+                        <Text style={styles.stopRemove}>✕</Text>
+                      </PressableScale>
+                    </View>
+                  </FadeIn>
                 ))}
               </View>
             )}
@@ -306,6 +411,7 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
                     label={t}
                     selected={rideType === t}
                     onPress={() => setRideType((cur) => (cur === t ? null : t))}
+                    reduced={reduced}
                   />
                 ))}
               </View>
@@ -320,34 +426,25 @@ export default function CreateRideModal({ visible, onClose, onCreated }: Props) 
                     label={p}
                     selected={startPreset === p}
                     onPress={() => setStartPreset((cur) => (cur === p ? null : p))}
+                    reduced={reduced}
                   />
                 ))}
               </View>
             </View>
           </ScrollView>
 
-          {destination == null ? (
+          <PresenceFade visible={destination == null} reduced={reduced}>
             <Text style={[type.caption, styles.reason]} accessibilityLiveRegion="polite">
               Choose a destination to continue
             </Text>
-          ) : null}
-          <Pressable
-            style={({ pressed }) => [styles.createBtn, pressed && styles.btnPressed, !canCreate && styles.btnDisabled]}
+          </PresenceFade>
+          <Button
+            label="Create ride"
             onPress={create}
+            loading={creating}
             disabled={!canCreate}
-            accessibilityLabel="Create ride"
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !canCreate, busy: creating }}
-          >
-            {creating ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator color={WeRideColors.onPrimary} size="small" />
-                <Text style={type.button}>Creating…</Text>
-              </View>
-            ) : (
-              <Text style={type.button}>Create ride</Text>
-            )}
-          </Pressable>
+            style={styles.createBtn}
+          />
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -377,10 +474,8 @@ const styles = StyleSheet.create({
   locRow: {
     flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.md,
     minHeight: 56,
-    backgroundColor: WeRideColors.dark3, borderWidth: 1, borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.lg, padding: WeRideSpacing.md, marginTop: WeRideSpacing.sm,
+    padding: WeRideSpacing.md, marginTop: WeRideSpacing.sm,
   },
-  locRowActive: { borderColor: WeRideColors.primary },
   dot: {
     width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: WeRideColors.textSub,
     alignItems: 'center', justifyContent: 'center',
@@ -389,34 +484,31 @@ const styles = StyleSheet.create({
   dotPlus: { borderWidth: 0 },
   locTextWrap: { flex: 1 },
   locValue: { marginTop: WeRideSpacing.xs },
-  searchInput: {
-    ...type.input,
-    height: 48, backgroundColor: WeRideColors.dark3, borderWidth: 1, borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.lg, paddingHorizontal: WeRideSpacing.md, marginTop: WeRideSpacing.md,
-  },
+  searchField: { marginTop: WeRideSpacing.md },
   searching: { marginTop: WeRideSpacing.sm, alignSelf: 'center' },
   searchMsgRow: { flexDirection: 'row', alignItems: 'center', marginTop: WeRideSpacing.sm, gap: WeRideSpacing.sm },
   searchMsg: { flex: 1 },
   searchMsgSolo: { marginTop: WeRideSpacing.sm },
   retryBtn: { minHeight: 44, minWidth: 44, paddingHorizontal: WeRideSpacing.md, alignItems: 'center', justifyContent: 'center' },
-  resultsBox: {
-    backgroundColor: WeRideColors.dark3, borderWidth: 1, borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.lg, marginTop: WeRideSpacing.sm,
-  },
-  resultRow: {
-    minHeight: 44, justifyContent: 'center', padding: WeRideSpacing.md,
-    borderBottomWidth: 1, borderBottomColor: WeRideColors.border,
-  },
-  resultRowLast: { borderBottomWidth: 0 },
+  results: { marginTop: WeRideSpacing.sm },
+  resultWrap: { marginBottom: WeRideSpacing.sm },
+  resultRow: { minHeight: 44, justifyContent: 'center', padding: WeRideSpacing.md },
   section: { marginTop: WeRideSpacing.lg },
   sectionLabel: { marginBottom: WeRideSpacing.sm },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: WeRideSpacing.sm },
   chip: {
-    minHeight: 44, paddingHorizontal: WeRideSpacing.lg, justifyContent: 'center',
+    minHeight: 44, paddingHorizontal: WeRideSpacing.lg, alignItems: 'center', justifyContent: 'center',
     backgroundColor: WeRideColors.dark3, borderWidth: 1, borderColor: WeRideColors.border,
     borderRadius: WeRideRadius.pill,
   },
-  chipSelected: { borderColor: WeRideColors.primary, backgroundColor: WeRideColors.primaryDim },
+  chipIdle: { color: WeRideColors.textSub },
+  // Overlay faded in when selected: covers the chip including its 1px border.
+  chipSelected: {
+    position: 'absolute', top: -1, left: -1, right: -1, bottom: -1,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: WeRideColors.primary, backgroundColor: WeRideColors.primaryDim,
+    borderRadius: WeRideRadius.pill,
+  },
   stopRow: {
     flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.xs,
     minHeight: 48,
@@ -427,15 +519,8 @@ const styles = StyleSheet.create({
   stopLabel: { flex: 1, marginLeft: WeRideSpacing.sm },
   stopBtnWrap: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   stopBtn: { ...type.body, color: WeRideColors.primary },
-  stopBtnDisabled: { color: WeRideColors.textSub, opacity: 0.4 },
+  stopBtnDisabled: { color: WeRideColors.textSub },
   stopRemove: { ...type.body, color: WeRideColors.error },
   reason: { marginHorizontal: WeRideSpacing.lg, marginTop: WeRideSpacing.md, textAlign: 'center' },
-  createBtn: {
-    minHeight: 50, backgroundColor: WeRideColors.primary, borderRadius: WeRideRadius.xl,
-    justifyContent: 'center', alignItems: 'center',
-    marginHorizontal: WeRideSpacing.lg, marginTop: WeRideSpacing.md,
-  },
-  btnPressed: { opacity: 0.85 },
-  btnDisabled: { opacity: 0.4 },
-  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.sm },
+  createBtn: { marginHorizontal: WeRideSpacing.lg, marginTop: WeRideSpacing.md },
 });

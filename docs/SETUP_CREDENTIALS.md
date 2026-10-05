@@ -9,7 +9,7 @@ end-to-end on a device.
 | Variable | Where it comes from | Notes |
 |---|---|---|
 | `MAPBOX_ACCESS_TOKEN` | Mapbox account → Tokens | Needs Directions + Maps SDK scopes. Public token is fine in the client; never use a secret token. |
-| `ROUTING_URL` | Your deployed routing server | e.g. `https://<host>/route`. Dev default `http://localhost:3000` works only on emulators via `10.0.2.2`. |
+| `ROUTING_URL` | Base URL of the routing server (the app appends `/route`) | e.g. `https://<host>` — do NOT include `/route`. Unset: Android emulator → `http://10.0.2.2:3000`, iOS simulator → `http://localhost:3000`. Physical devices need your machine's LAN address. |
 | `SOCKET_URL` | Same server (Socket.io) | Same host rules as above. |
 | `ETA_SIDECAR_URL` | ETA model sidecar | If unset, the app falls back to server-side ETA. |
 

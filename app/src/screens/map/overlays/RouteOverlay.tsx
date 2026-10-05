@@ -13,7 +13,7 @@
 import React, { useEffect, useMemo } from 'react';
 import MapboxGL from '@rnmapbox/maps';
 
-import { ROUTING_URL } from '@env';
+import { ROUTING_BASE_URL } from '@app/services/endpoints';
 import { RoutingClient } from '@routing/client/routingClient';
 import { useRouteStore } from '@routing/client/routeStore';
 import { routeToGeoJsonLine } from '@routing/client/routeLine';
@@ -64,9 +64,9 @@ export default function RouteOverlay({ groupId }: Props) {
   const clientRef = React.useRef<RoutingClient | null>(null);
   if (!clientRef.current) {
     clientRef.current = new RoutingClient({
-      // Physical devices cannot reach the dev machine's localhost.
-      // Set ROUTING_URL (e.g. http://<LAN-IP>:3000) in app/.env for real devices.
-      baseUrl: ROUTING_URL || 'http://10.0.2.2:3000',
+      // Platform-aware dev default (see endpoints.ts). Physical devices: set
+      // ROUTING_URL (e.g. http://<LAN-IP>:3000) in app/.env.
+      baseUrl: ROUTING_BASE_URL,
       onUpdate: (r) => setRoute(r),
     });
   }

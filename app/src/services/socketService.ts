@@ -2,15 +2,14 @@
  * Shared Socket.io client. Location updates use 'location:update' event.
  * VOX signaling uses '/vox' namespace (Person D owns that connection).
  *
- * URL from env: SOCKET_URL (default http://localhost:3000)
+ * URL from env: SOCKET_URL (platform-aware dev default, see endpoints.ts)
  */
 import { io, Socket } from 'socket.io-client';
-import { SOCKET_URL } from '@env';
+import { SOCKET_BASE_URL } from './endpoints';
 
-// Physical devices cannot reach the dev machine's localhost.
-// 10.0.2.2 is the Android emulator alias for the host machine.
-// For a physical device set SOCKET_URL in app/.env (e.g. http://<LAN-IP>:3000).
-const URL = SOCKET_URL || 'http://10.0.2.2:3000';
+// Dev default is platform-aware (see endpoints.ts). Physical devices: set
+// SOCKET_URL in app/.env (e.g. http://<LAN-IP>:3000).
+const URL = SOCKET_BASE_URL;
 
 let locationSocket: Socket | null = null;
 let voxSocket: Socket | null = null;

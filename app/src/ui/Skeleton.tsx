@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleProp, ViewStyle } from 'react-native';
-import { WeRideColors, WeRideRadius } from '../theme/theme';
+import { useTheme } from '../theme/ThemeProvider';
 import { useReducedMotion } from './motion';
 
 interface Props {
@@ -15,7 +15,8 @@ interface Props {
   style?: StyleProp<ViewStyle>;
 }
 
-export default function Skeleton({ width = '100%', height = 16, radius = WeRideRadius.md, style }: Props) {
+export default function Skeleton({ width = '100%', height = 16, radius = 8, style }: Props) {
+  const { colors } = useTheme();
   const reduced = useReducedMotion();
   const pulse = useRef(new Animated.Value(0.45)).current;
 
@@ -35,7 +36,7 @@ export default function Skeleton({ width = '100%', height = 16, radius = WeRideR
     <Animated.View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[{ width, height, borderRadius: radius, backgroundColor: WeRideColors.border, opacity: pulse }, style]}
+      style={[{ width, height, borderRadius: radius, backgroundColor: colors.line2, opacity: pulse }, style]}
     />
   );
 }

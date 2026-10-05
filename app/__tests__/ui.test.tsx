@@ -3,10 +3,11 @@
  * entrance animation, haptics.
  */
 import React from 'react';
-import { Platform, Text, Vibration } from 'react-native';
+import { Platform, Text, Vibration, View } from 'react-native';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { Button, FadeIn, PressableCard, PressableScale, Skeleton, TextField } from '../src/ui';
 import { haptic, setHapticsEnabled } from '../src/ui/haptics';
+import { THEMES } from '../src/theme/palettes';
 
 const mounted: ReactTestRenderer[] = [];
 function render(el: React.ReactElement) {
@@ -147,7 +148,35 @@ describe('PressableCard', () => {
     act(() => node.props.onPressOut({}));
     expect(onPress).toHaveBeenCalled();
     const flat = ([] as any[]).concat(node.props.style).flat(3).filter(Boolean);
-    expect(flat.some((s: any) => s.borderColor === '#FF5C00')).toBe(true);
+    expect(flat.some((s: any) => s.borderColor === THEMES.demo.dark.pri)).toBe(true);
+  });
+});
+
+describe('Button (theme)', () => {
+  const flat = (t: ReactTestRenderer, label: string) =>
+    ([] as any[]).concat(pressable(t, label).props.style).flat(3).filter(Boolean);
+  const bg = (t: ReactTestRenderer, label: string) =>
+    flat(t, label).map((s: any) => s.backgroundColor).filter(Boolean).pop();
+
+  it('variants take their colours from the palette and the demo sizes', () => {
+    const P = THEMES.demo.dark;
+    const t = render(
+      <View>
+        <Button label="Go" />
+        <Button label="Ink" variant="dark" />
+        <Button label="Soft" variant="soft" />
+        <Button label="Stop" variant="danger" />
+        <Button label="Ok" variant="ok" />
+        <Button label="Small" size="sm" />
+      </View>,
+    );
+    expect(bg(t, 'Go')).toBe(P.pri);
+    expect(bg(t, 'Ink')).toBe(P.ink);
+    expect(bg(t, 'Soft')).toBe(P.card2);
+    expect(bg(t, 'Stop')).toBe(P.bad);
+    expect(bg(t, 'Ok')).toBe(P.ok);
+    expect(flat(t, 'Go').some((s: any) => s.height === 58 && s.borderRadius === 18)).toBe(true);
+    expect(flat(t, 'Small').some((s: any) => s.height === 44 && s.borderRadius === 14)).toBe(true);
   });
 });
 

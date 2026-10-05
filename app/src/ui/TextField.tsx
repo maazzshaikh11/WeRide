@@ -6,9 +6,8 @@
  * screens can chain focus (returnKeyType="next").
  */
 import React, { forwardRef, useEffect, useRef, useState } from 'react';
-import { Animated, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import { Animated, StyleProp, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { Motion, useReducedMotion } from './motion';
 
 export interface TextFieldProps extends TextInputProps {
@@ -20,6 +19,12 @@ const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
   { error, containerStyle, onFocus, onBlur, style, ...rest },
   ref,
 ) {
+  const { colors } = useTheme();
+  const styles = useStyles(({ colors: c, type: t }) => ({
+    box: { height: 60, backgroundColor: c.card, borderWidth: 1.5, borderRadius: 18, justifyContent: 'center' },
+    input: { ...t.input, paddingHorizontal: 18, height: '100%' },
+    error: { ...t.sm, color: c.bad, marginTop: 4 },
+  }));
   const [focused, setFocused] = useState(false);
   const focus = useRef(new Animated.Value(0)).current;
   const shake = useRef(new Animated.Value(0)).current;
@@ -45,17 +50,19 @@ const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
     lastError.current = error;
   }, [error, shake, reduced]);
 
+  // Demo: 1.5 px rim in `line2`, a 3 px `ink` ring on focus.
   const borderColor = error
-    ? WeRideColors.error
-    : focus.interpolate({ inputRange: [0, 1], outputRange: [WeRideColors.border, WeRideColors.primary] });
+    ? colors.bad
+    : focus.interpolate({ inputRange: [0, 1], outputRange: [colors.line2, colors.ink] });
+  const borderWidth = focus.interpolate({ inputRange: [0, 1], outputRange: [1.5, 3] });
 
   return (
     <View style={containerStyle}>
-      <Animated.View style={[styles.box, { borderColor, transform: [{ translateX: shake }] }]}>
+      <Animated.View style={[styles.box, { borderColor, borderWidth: error ? 3 : borderWidth, transform: [{ translateX: shake }] }]}>
         <TextInput
           ref={ref}
-          placeholderTextColor={WeRideColors.textSub}
-          selectionColor={WeRideColors.primary}
+          placeholderTextColor={colors.ink3}
+          selectionColor={colors.pri}
           {...rest}
           style={[styles.input, style]}
           onFocus={(e) => {
@@ -78,15 +85,3 @@ const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
 });
 
 export default TextField;
-
-const styles = StyleSheet.create({
-  box: {
-    height: 48,
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderRadius: WeRideRadius.xl,
-    justifyContent: 'center',
-  },
-  input: { ...type.input, paddingHorizontal: WeRideSpacing.lg, height: '100%' },
-  error: { ...type.caption, color: WeRideColors.error, marginTop: WeRideSpacing.xs },
-});

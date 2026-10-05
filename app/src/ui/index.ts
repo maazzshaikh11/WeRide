@@ -11,3 +11,15 @@ export { default as Skeleton } from './Skeleton';
 export { haptic, setHapticsEnabled, hapticsEnabled } from './haptics';
 export type { HapticKind } from './haptics';
 export { Motion, useReducedMotion } from './motion';
+export { default as Icon } from './Icon';
+export type { IconProps } from './Icon';
+export type { IconName } from './iconData';
+export { default as Plate } from './Plate';
+export type { PlateProps } from './Plate';
+export { Card, List, ListItem, IconWell, SectionLabel, CenterLine } from './Surface';
+export type { ListItemProps } from './Surface';
+export { Pill, Segmented, Chip, Toggle, Avatar } from './Controls';
+export type { PillTone, SegmentedProps } from './Controls';
+
+export { default as Sheet } from './Sheet';
+export type { SheetProps } from './Sheet';

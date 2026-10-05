@@ -9,7 +9,7 @@
  */
 import React, { useCallback, useRef } from 'react';
 import { Animated, GestureResponderEvent, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { WeRideColors, WeRideRadius } from '../theme/theme';
+import { useStyles } from '../theme/ThemeProvider';
 import { Motion, useReducedMotion } from './motion';
 import PressableScale, { PressableScaleProps } from './PressableScale';
 
@@ -22,13 +22,19 @@ export interface PressableCardProps extends Omit<PressableScaleProps, 'style' | 
 
 export default function PressableCard({
   style,
-  radius = WeRideRadius.xxl,
+  radius = 22,
   active,
   onPressIn,
   onPressOut,
   children,
   ...rest
 }: PressableCardProps) {
+  const styles = useStyles(({ colors }) => ({
+    card: { backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.line, overflow: 'hidden' },
+    active: { borderColor: colors.pri },
+    tint: { backgroundColor: colors.pri, opacity: 0.07 },
+    ring: { borderWidth: 1.5, borderColor: colors.pri },
+  }));
   const glow = useRef(new Animated.Value(0)).current;
   const reduced = useReducedMotion();
 
@@ -62,7 +68,7 @@ export default function PressableCard({
       ]}
     >
       {children}
-      {/* Warm surface tint + accent border, fading in while pressed. */}
+      {/* Accent surface tint + border, fading in while pressed. */}
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, { opacity: reduced ? 0 : glow }]}
@@ -73,15 +79,3 @@ export default function PressableCard({
     </PressableScale>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    overflow: 'hidden',
-  },
-  active: { borderColor: WeRideColors.primary },
-  tint: { backgroundColor: WeRideColors.primary, opacity: 0.07 },
-  ring: { borderWidth: 1, borderColor: WeRideColors.primary },
-});

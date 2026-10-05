@@ -1,32 +1,33 @@
 /**
- * Button — the one button. Variants: primary (accent fill), secondary
- * (surface + border), ghost (text only), danger (red fill — SOS/leave/delete).
+ * Button — the one button, as in demo.html (.btn). Variants: primary (accent),
+ * dark (ink fill), ghost (outlined), soft (card2), danger (SOS/leave/delete),
+ * ok (confirm). `secondary` is an alias of `soft`.
  * Built on PressableScale so every button has the same press feel + haptic.
  * `loading` swaps the label for a spinner WITHOUT changing the button's size
  * (no layout jump) and blocks presses.
  */
 import React from 'react';
 import { ActivityIndicator, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
-import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
-import { type } from '../theme/typography';
+import { useTheme } from '../theme/ThemeProvider';
 import PressableScale, { PressableScaleProps } from './PressableScale';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'dark' | 'ghost' | 'soft' | 'secondary' | 'danger' | 'ok';
 
 export interface ButtonProps extends Omit<PressableScaleProps, 'style' | 'children'> {
   label: string;
   variant?: ButtonVariant;
-  /** 'md' = 48pt, 'sm' = 44pt (the minimum touch target). */
-  size?: 'md' | 'sm';
+  /** 'md' = 58pt (demo .btn), 'sm' = 44pt (minimum touch target), 'xs' = 36pt. */
+  size?: 'md' | 'sm' | 'xs';
   loading?: boolean;
+  /** Content before the label (an Icon). */
+  leading?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
-const LABEL_COLOR: Record<ButtonVariant, string> = {
-  primary: WeRideColors.onPrimary,
-  secondary: WeRideColors.text,
-  ghost: WeRideColors.primary,
-  danger: WeRideColors.white,
+const SIZE: Record<NonNullable<ButtonProps['size']>, ViewStyle> = {
+  md: { height: 58, borderRadius: 18, paddingHorizontal: 22 },
+  sm: { height: 44, borderRadius: 14, paddingHorizontal: 16 },
+  xs: { height: 36, borderRadius: 12, paddingHorizontal: 13 },
 };
 
 export default function Button({
@@ -35,16 +36,28 @@ export default function Button({
   size = 'md',
   loading = false,
   disabled,
+  leading,
   style,
   haptic = variant === 'danger' ? 'warning' : 'select',
   accessibilityLabel,
   ...rest
 }: ButtonProps) {
+  const { colors, type } = useTheme();
   const inactive = Boolean(disabled || loading);
-  const labelStyle: TextStyle = {
-    ...(size === 'md' ? type.button : type.buttonSm),
-    color: LABEL_COLOR[variant],
+
+  const look: Record<ButtonVariant, { bg: string; fg: string; border?: ViewStyle }> = {
+    primary: { bg: colors.pri, fg: colors.priInk, border: { borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.14)' } },
+    dark: { bg: colors.ink, fg: colors.bg },
+    ghost: { bg: 'transparent', fg: colors.ink, border: { borderWidth: 2, borderColor: colors.line2 } },
+    soft: { bg: colors.card2, fg: colors.ink },
+    secondary: { bg: colors.card2, fg: colors.ink },
+    danger: { bg: colors.bad, fg: '#FFFFFF' },
+    ok: { bg: colors.ok, fg: '#FFFFFF' },
   };
+  const v = look[variant];
+  const textBase = size === 'md' ? type.button : size === 'sm' ? type.buttonSm : type.buttonXs;
+  const labelStyle: TextStyle = { ...textBase, color: v.fg };
+
   return (
     <PressableScale
       {...rest}
@@ -53,16 +66,17 @@ export default function Button({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: inactive, busy: loading }}
-      style={[styles.base, size === 'md' ? styles.md : styles.sm, VARIANT_STYLE[variant], style]}
+      style={[styles.base, SIZE[size], { backgroundColor: v.bg }, v.border, style]}
     >
       {/* Label stays in layout (hidden while loading) so the width never changes. */}
-      <Text style={[labelStyle, loading && styles.hidden]} numberOfLines={1}>
-        {label}
-      </Text>
+      <View style={[styles.content, loading && styles.hidden]}>
+        {leading}
+        <Text style={labelStyle} numberOfLines={1}>{label}</Text>
+      </View>
       {loading ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <View style={styles.spinner}>
-            <ActivityIndicator size="small" color={LABEL_COLOR[variant]} />
+            <ActivityIndicator size="small" color={v.fg} />
           </View>
         </View>
       ) : null}
@@ -71,21 +85,8 @@ export default function Button({
 }
 
 const styles = StyleSheet.create({
-  base: {
-    borderRadius: WeRideRadius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: WeRideSpacing.xl,
-  },
-  md: { height: 48 },
-  sm: { height: 44, paddingHorizontal: WeRideSpacing.lg },
+  base: { alignItems: 'center', justifyContent: 'center' },
+  content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   hidden: { opacity: 0 },
   spinner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });
-
-const VARIANT_STYLE: Record<ButtonVariant, ViewStyle> = {
-  primary: { backgroundColor: WeRideColors.primary },
-  secondary: { backgroundColor: WeRideColors.dark3, borderWidth: 1, borderColor: WeRideColors.border },
-  ghost: { backgroundColor: 'transparent' },
-  danger: { backgroundColor: WeRideColors.red },
-};

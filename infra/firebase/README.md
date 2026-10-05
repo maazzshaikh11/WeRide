@@ -23,3 +23,7 @@ Use the Firebase emulator suite for local development to avoid hitting free-tier
 ```
 firebase emulators:start --only firestore,auth
 ```
+
+## Demo account
+
+`seed/` creates the `teamdsy@weride.app` demo login with a joined group and past rides — see `seed/README.md`.

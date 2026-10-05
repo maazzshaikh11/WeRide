@@ -1,0 +1,13 @@
+{
+  "name": "weride-seed",
+  "private": true,
+  "description": "Seeds the teamDSY demo account (user, joined group, past rides) into a Firebase project or the local emulators",
+  "scripts": {
+    "seed": "node seed-teamdsy.js",
+    "remove": "node seed-teamdsy.js --remove",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

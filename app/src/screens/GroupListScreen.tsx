@@ -7,6 +7,7 @@ import { View, TextInput, FlatList, TouchableOpacity, Text, StyleSheet, Pressabl
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { firebaseAuth } from '../services/firebaseService';
 import { useAppStore } from '../store/appStore';
+import { resetRideSession } from '../store/rideSession';
 import { WeRideColors, WeRideFonts } from '../theme/theme';
 import { GroupService, Group } from '@routing/group/groupService';
 import CreateRideModal from '../components/CreateRideModal';
@@ -82,6 +83,8 @@ export default function GroupListScreen({ navigation }: any) {
             <TouchableOpacity
               style={styles.groupItem}
               onPress={() => {
+                // Each ride starts from a clean slate (route/plan/stops/riders).
+                resetRideSession();
                 setGroupId(item.id);
                 navigation.navigate('MainApp', { groupId: item.id });
               }}
@@ -106,7 +109,11 @@ export default function GroupListScreen({ navigation }: any) {
 
         <Pressable
           style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-          onPress={() => setCreateModalOpen(true)}
+          onPress={() => {
+            // Fresh draft: don't pre-fill the form with the previous ride's plan.
+            resetRideSession();
+            setCreateModalOpen(true);
+          }}
           accessibilityLabel="Create new ride"
           accessibilityRole="button"
         >

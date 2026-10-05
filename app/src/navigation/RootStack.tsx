@@ -4,7 +4,7 @@
  * exactly; Map screen replaced by the tab navigator per master spec.
  */
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, TransitionPresets } from '@react-navigation/stack';
 
 import LoginScreen from '../screens/LoginScreen';
 import GroupListScreen from '../screens/GroupListScreen';
@@ -23,6 +23,10 @@ export function RootStack() {
     <Stack.Navigator
       initialRouteName="Login"
       screenOptions={{
+        // Same horizontal slide on both platforms (Android's default is a
+        // different, abrupt fade-up), with the swipe-back gesture enabled.
+        ...TransitionPresets.SlideFromRightIOS,
+        gestureEnabled: true,
         headerTitleAlign: 'center',
         headerStyle: { backgroundColor: '#0A0A0A' },
         headerTintColor: '#F0F0F0',
@@ -36,7 +40,14 @@ export function RootStack() {
       <Stack.Screen
         name="Groups"
         component={GroupListScreen}
-        options={{ title: '', headerShown: false }}
+        options={{
+          title: '',
+          headerShown: false,
+          // Arrived via replace() from Login: slide forward, not back.
+          animationTypeForReplace: 'push',
+          // No swipe-back to the login form once signed in.
+          gestureEnabled: false,
+        }}
       />
       <Stack.Screen
         name="MainApp"

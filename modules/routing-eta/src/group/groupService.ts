@@ -170,9 +170,10 @@ export class GroupService {
 
   /**
    * Subscribe to groups where current user is a member.
-   * Returns a function to unsubscribe.
+   * Returns a function to unsubscribe. When `onError` is given, a snapshot
+   * failure is reported there instead of being delivered as an empty list.
    */
-  myGroups(onGroups: (groups: Group[]) => void): () => void {
+  myGroups(onGroups: (groups: Group[]) => void, onError?: (e: unknown) => void): () => void {
     const uid = this._auth.currentUser!.uid;
     const unsubscribe = this._firestore
       .collection('groups')
@@ -186,6 +187,10 @@ export class GroupService {
           onGroups(groups);
         },
         (error: any) => {
+          if (onError) {
+            onError(error);
+            return;
+          }
           console.error('Error fetching groups:', error);
           onGroups([]);
         }

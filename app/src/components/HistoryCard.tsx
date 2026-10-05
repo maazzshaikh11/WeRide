@@ -1,13 +1,16 @@
 /**
  * HistoryCard — ride summary card (spec §3.8).
  * Shows only real figures passed in via `stats`; the share action sends the
- * same figures as plain text through the system share sheet.
+ * same figures as plain text through the system share sheet. With `onPress`
+ * the card itself is a PressableCard; Share is a separate Button that does not
+ * trigger it.
  */
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Share } from 'react-native';
+import { View, Text, StyleSheet, Share } from 'react-native';
 import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
 import { type } from '../theme/typography';
 import StatBox from './StatBox';
+import { Button, PressableCard } from '../ui';
 
 interface Stat {
   label: string;
@@ -19,6 +22,10 @@ interface Props {
   meta: string;           // "In progress" or "12 Aug · 6 riders"
   active?: boolean;
   stats: Stat[];
+  /** Makes the card tappable (sink + warm tint + lit border). Omit for a static card. */
+  onPress?: () => void;
+  /** Screen-reader hint for the card press, e.g. "Opens the live map". */
+  pressHint?: string;
 }
 
 export function rideShareMessage(name: string, stats: Stat[]): string {
@@ -26,15 +33,27 @@ export function rideShareMessage(name: string, stats: Stat[]): string {
   return figures ? `WeRide ride: ${name} (${figures})` : `WeRide ride: ${name}`;
 }
 
-export default function HistoryCard({ name, meta, active, stats }: Props) {
+export default function HistoryCard({ name, meta, active, stats, onPress, pressHint }: Props) {
   const share = () => {
     Share.share({ message: rideShareMessage(name, stats) }).catch(() => {
       // User dismissed or the share sheet is unavailable — nothing to recover.
     });
   };
 
-  return (
-    <View style={styles.card}>
+  const summary = `${name}, ${meta}. ${stats.map((st) => `${st.value} ${st.label}`).join(', ')}`;
+
+  // Summary is one accessible group; the Share action sits outside it so
+  // screen readers can reach it as its own button.
+  const summaryBlock = (
+    <View
+      accessible
+      accessibilityRole={onPress ? 'button' : 'summary'}
+      accessibilityLabel={summary}
+      accessibilityHint={onPress ? pressHint : undefined}
+      accessibilityActions={onPress ? [{ name: 'activate' }] : undefined}
+      onAccessibilityAction={onPress}
+      style={styles.summary}
+    >
       <View style={styles.headerRow}>
         <Text style={[type.heading, styles.name]} numberOfLines={1}>
           {name}
@@ -50,28 +69,57 @@ export default function HistoryCard({ name, meta, active, stats }: Props) {
           <StatBox key={s.label} value={s.value} label={s.label} style={styles.stat} />
         ))}
       </View>
-
-      <Pressable
-        style={({ pressed }) => [styles.shareBtn, pressed && styles.pressed]}
-        onPress={share}
-        accessibilityLabel={`Share ride card for ${name}`}
-        accessibilityRole="button"
-      >
-        <Text style={[type.buttonSm, { color: WeRideColors.primary }]}>Share ride</Text>
-      </Pressable>
     </View>
+  );
+
+  const shareButton = (
+    <Button
+      label="Share ride"
+      variant="secondary"
+      size="sm"
+      onPress={share}
+      accessibilityLabel={`Share ride card for ${name}`}
+    />
+  );
+
+  if (!onPress) {
+    return (
+      <View style={[styles.card, styles.staticCard]}>
+        {summaryBlock}
+        {shareButton}
+      </View>
+    );
+  }
+
+  return (
+    <PressableCard
+      radius={WeRideRadius.xl}
+      active={active}
+      onPress={onPress}
+      haptic="tap"
+      accessible={false}
+      accessibilityLabel={summary}
+      accessibilityHint={pressHint}
+      style={styles.card}
+    >
+      {summaryBlock}
+      {shareButton}
+    </PressableCard>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
+    padding: WeRideSpacing.lg,
+    gap: WeRideSpacing.md,
+  },
+  staticCard: {
     backgroundColor: WeRideColors.dark3,
     borderWidth: 1,
     borderColor: WeRideColors.border,
     borderRadius: WeRideRadius.xl,
-    padding: WeRideSpacing.lg,
-    gap: WeRideSpacing.md,
   },
+  summary: { gap: WeRideSpacing.md },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: WeRideSpacing.md },
   name: { flex: 1 },
   metaWrap: { flexDirection: 'row', alignItems: 'center', gap: WeRideSpacing.xs },
@@ -79,14 +127,4 @@ const styles = StyleSheet.create({
   metaActive: { color: WeRideColors.green },
   statsRow: { flexDirection: 'row', gap: WeRideSpacing.sm },
   stat: { backgroundColor: WeRideColors.dark2 },
-  shareBtn: {
-    minHeight: 44,
-    borderRadius: WeRideRadius.lg,
-    borderWidth: 1,
-    borderColor: WeRideColors.primary,
-    backgroundColor: WeRideColors.primaryDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pressed: { opacity: 0.85 },
 });

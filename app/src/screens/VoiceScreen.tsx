@@ -16,7 +16,7 @@
  *    light up if an id matches a listed rider.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Pressable, Linking } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WeRideColors, WeRideRadius, WeRideSpacing, riderColor } from '../theme/theme';
 import { type } from '../theme/typography';
@@ -25,6 +25,7 @@ import LivePill from '../components/LivePill';
 import VoiceAvatar from '../components/VoiceAvatar';
 import VoiceToolbar from '../components/VoiceToolbar';
 import VoxZone, { VoxState } from '../components/VoxZone';
+import { Button, FadeIn } from '../ui';
 import { useRidersStore } from '../store/ridersStore';
 import { useAppStore } from '../store/appStore';
 import { useToastStore } from '../store/toastStore';
@@ -164,34 +165,38 @@ export default function VoiceScreen() {
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.gridContent}>
           {micDenied && (
-            <View style={styles.micDeniedBox} accessibilityRole="alert">
-              <Text style={[type.heading, { color: WeRideColors.red }]}>Microphone access denied</Text>
-              <Text style={[type.body, styles.micDeniedText]}>
-                Group voice needs the microphone. Allow it in Settings, then come back to this tab.
-              </Text>
-              <Pressable
-                style={({ pressed }) => [styles.settingsBtn, pressed && styles.pressed]}
-                onPress={openSettings}
-                accessibilityRole="button"
-                accessibilityLabel="Open settings"
-              >
-                <Text style={[type.buttonSm, { color: WeRideColors.primary }]}>Open settings</Text>
-              </Pressable>
-            </View>
+            <FadeIn>
+              <View style={styles.micDeniedBox} accessibilityRole="alert">
+                <Text style={[type.heading, { color: WeRideColors.red }]}>Microphone access denied</Text>
+                <Text style={[type.body, styles.micDeniedText]}>
+                  Group voice needs the microphone. Allow it in Settings, then come back to this tab.
+                </Text>
+                <Button
+                  label="Open settings"
+                  variant="secondary"
+                  size="sm"
+                  onPress={openSettings}
+                  accessibilityLabel="Open settings"
+                  style={styles.settingsBtn}
+                />
+              </View>
+            </FadeIn>
           )}
 
           <Text style={[type.label, styles.sectionLabel]}>
             {`RIDERS IN THIS RIDE · ${allNames.length}`}
           </Text>
           {allNames.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={type.heading}>No riders yet</Text>
-              <Text style={[type.body, styles.micDeniedText]}>Riders appear here once they join the ride.</Text>
-            </View>
+            <FadeIn>
+              <View style={styles.emptyBox}>
+                <Text style={type.heading}>No riders yet</Text>
+                <Text style={[type.body, styles.micDeniedText]}>Riders appear here once they join the ride.</Text>
+              </View>
+            </FadeIn>
           ) : (
             <View style={styles.grid}>
               {allNames.map((riderId, i) => (
-                <View key={riderId} style={styles.cell}>
+                <FadeIn key={riderId} index={i} style={styles.cell}>
                   {/* No display names exist yet: initials and label come from the rider id. */}
                   <VoiceAvatar
                     initials={riderId.slice(0, 2).toUpperCase()}
@@ -200,7 +205,7 @@ export default function VoiceScreen() {
                     isYou={riderId === userId}
                     speaking={speakingId === riderId}
                   />
-                </View>
+                </FadeIn>
               ))}
             </View>
           )}
@@ -248,17 +253,7 @@ const styles = StyleSheet.create({
     marginBottom: WeRideSpacing.lg,
   },
   micDeniedText: { color: WeRideColors.textSub },
-  settingsBtn: {
-    minHeight: 44,
-    marginTop: WeRideSpacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: WeRideRadius.lg,
-    borderWidth: 1,
-    borderColor: WeRideColors.primary,
-    backgroundColor: WeRideColors.primaryDim,
-  },
-  pressed: { opacity: 0.85 },
+  settingsBtn: { marginTop: WeRideSpacing.md },
   emptyBox: {
     backgroundColor: WeRideColors.dark3,
     borderWidth: 1,

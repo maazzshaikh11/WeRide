@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
-import { Share } from 'react-native';
+import { Platform, Share, Vibration } from 'react-native';
 
 /** Renders a component inside act() so passive effects run synchronously. */
 const mountedTrees: renderer.ReactTestRenderer[] = [];
@@ -153,6 +153,7 @@ import VoiceScreen from '../src/screens/VoiceScreen';
 import FamilyScreen from '../src/screens/FamilyScreen';
 import AlertsScreen from '../src/screens/AlertsScreen';
 import HistoryScreen from '../src/screens/HistoryScreen';
+import StatBox from '../src/components/StatBox';
 
 // -----------------------------------------------------------------------------
 
@@ -254,6 +255,65 @@ describe('FamilyScreen', () => {
   });
 });
 
+describe('FamilyScreen share button', () => {
+  const real = (tree: renderer.ReactTestRenderer) =>
+    tree.root.findAll((n) => n.props.accessibilityLabel === 'Send my location' && typeof n.props.onPressIn === 'function')[0];
+
+  test('is a busy-aware button: loading while the share sheet opens, success haptic when completed', async () => {
+    const hapticSpy = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
+    const platform = Platform.OS;
+    (Platform as any).OS = 'android';
+    useRouteStore.setState({
+      currentLocation: {
+        rider_id: 'user-1', group_id: 'group-1', timestamp_hlc: '1:0',
+        lat: 18.5204, lng: 73.8567, speed_mps: 0, heading_deg: 0,
+        spoof_flag: false, nis_score: 0, accuracy_m: 5,
+      },
+    });
+    let finish!: (v: { action: string }) => void;
+    const shareSpy = jest.spyOn(Share, 'share').mockReturnValue(new Promise((r) => { finish = r as any; }) as any);
+    const tree = render(<FamilyScreen />);
+    expect(real(tree).props.accessibilityState).toMatchObject({ busy: false });
+
+    act(() => {
+      real(tree).props.onPress();
+    });
+    expect(real(tree).props.accessibilityState).toMatchObject({ busy: true });
+    expect(real(tree).props.disabled).toBe(true);
+    hapticSpy.mockClear();
+
+    await act(async () => {
+      finish({ action: 'sharedAction' });
+    });
+    expect(real(tree).props.accessibilityState).toMatchObject({ busy: false });
+    expect(hapticSpy).toHaveBeenCalledWith([0, 14, 60, 14]); // success pattern
+
+    (Platform as any).OS = platform;
+    shareSpy.mockRestore();
+    hapticSpy.mockRestore();
+  });
+
+  test('a dismissed share sheet is not a success; a share error toasts and re-enables the button', async () => {
+    useToastStore.setState({ toasts: [] });
+    useRouteStore.setState({
+      currentLocation: {
+        rider_id: 'user-1', group_id: 'group-1', timestamp_hlc: '1:0',
+        lat: 18.5, lng: 73.8, speed_mps: 0, heading_deg: 0, spoof_flag: false, nis_score: 0, accuracy_m: 5,
+      },
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const shareSpy = jest.spyOn(Share, 'share').mockRejectedValue(new Error('no sheet'));
+    const tree = render(<FamilyScreen />);
+    await act(async () => {
+      await real(tree).props.onPress();
+    });
+    expect(useToastStore.getState().toasts[0]).toMatchObject({ variant: 'error' });
+    expect(real(tree).props.disabled).toBe(false);
+    shareSpy.mockRestore();
+    warn.mockRestore();
+  });
+});
+
 describe('AlertsScreen', () => {
   test('renders report chips and alert cards from hazard subscription', () => {
     useAppStore.setState({ userId: 'user-1', groupId: 'group-1' });
@@ -276,5 +336,15 @@ describe('HistoryScreen', () => {
     expect(joined).toContain('No completed rides yet');
     expect(joined).not.toContain('TOTAL KM');
     expect(joined).not.toContain('—');
+  });
+});
+describe('StatBox', () => {
+  test('keeps its props API and shows the new value after a change', () => {
+    const tree = render(<StatBox value="12.4" label="km" />);
+    const shown = () =>
+      tree.root.findAll((n) => (n.type as unknown) === 'Text').map((n) => ([] as unknown[]).concat(n.props.children).join(''));
+    expect(shown()).toEqual(['12.4', 'km']);
+    act(() => tree.update(<StatBox value="13.0" label="km" />));
+    expect(shown()).toEqual(['13.0', 'km']);
   });
 });

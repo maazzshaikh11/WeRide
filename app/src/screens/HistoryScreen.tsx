@@ -17,8 +17,14 @@ import HistoryCard from '../components/HistoryCard';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useRidersStore } from '../store/ridersStore';
 import { useAppStore } from '../store/appStore';
+import { FadeIn } from '../ui';
 
-export default function HistoryScreen() {
+interface Props {
+  /** Provided by the tab navigator; absent when rendered standalone (tests). */
+  navigation?: { navigate: (...args: any[]) => void };
+}
+
+export default function HistoryScreen({ navigation }: Props = {}) {
   const route = useRouteStore((s) => s.route);
   const riders = useRidersStore((s) => s.riders);
   const groupId = useAppStore((s) => s.groupId);
@@ -30,23 +36,31 @@ export default function HistoryScreen() {
 
         {route != null ? (
           <View style={styles.stack}>
-          <HistoryCard
-            name={`Ride ${groupId?.slice(0, 8) ?? ''}`.trim()}
-            meta="In progress"
-            active
-            stats={[
-              { label: 'km', value: route.distance_km.toFixed(1) },
-              { label: 'min eta', value: String(Math.round(route.eta_minutes)) },
-              { label: 'riders', value: String(riders.size) },
-            ]}
-          />
-          <Text style={type.caption}>Completed rides are not saved yet, so only this ride is shown.</Text>
+            <FadeIn>
+              <HistoryCard
+                name={`Ride ${groupId?.slice(0, 8) ?? ''}`.trim()}
+                meta="In progress"
+                active
+                stats={[
+                  { label: 'km', value: route.distance_km.toFixed(1) },
+                  { label: 'min eta', value: String(Math.round(route.eta_minutes)) },
+                  { label: 'riders', value: String(riders.size) },
+                ]}
+                onPress={navigation ? () => navigation.navigate('Home') : undefined}
+                pressHint="Opens the live map"
+              />
+            </FadeIn>
+            <FadeIn index={1}>
+              <Text style={type.caption}>Completed rides are not saved yet, so only this ride is shown.</Text>
+            </FadeIn>
           </View>
         ) : (
-          <View style={styles.block}>
-            <Text style={type.heading}>No completed rides yet</Text>
-            <Text style={[type.body, styles.blockBody]}>Rides you finish will be listed here.</Text>
-          </View>
+          <FadeIn>
+            <View style={styles.block}>
+              <Text style={type.heading}>No completed rides yet</Text>
+              <Text style={[type.body, styles.blockBody]}>Rides you finish will be listed here.</Text>
+            </View>
+          </FadeIn>
         )}
       </ScrollView>
     </SafeAreaView>

@@ -48,7 +48,13 @@ jest.mock('../src/screens/HistoryScreen', () => {
   return { __esModule: true, default: () => <Text>screen-history</Text> };
 });
 
-import MainTabNavigator, { TABS, TAB_BAR_HEIGHT } from '../src/navigation/MainTabNavigator';
+jest.mock('../src/ui/haptics', () => ({
+  ...jest.requireActual('../src/ui/haptics'),
+  haptic: jest.fn(),
+}));
+
+import MainTabNavigator, { TABS, TAB_BAR_HEIGHT, TabIndicator, indicatorOffset } from '../src/navigation/MainTabNavigator';
+import { haptic } from '../src/ui/haptics';
 
 const mounted: renderer.ReactTestRenderer[] = [];
 function render() {
@@ -98,7 +104,7 @@ describe('MainTabNavigator', () => {
 
   test('bar height is 56 plus the bottom inset, padding is the inset, solid background', () => {
     const tree = render();
-    const bar = tabs(tree)[0].parent!.parent!;
+    const bar = tree.root.find((n) => n.props.testID === 'main-tab-bar' && (n.type as unknown) === 'View');
     const style = StyleSheet.flatten(bar.props.style);
     expect(style.height).toBe(TAB_BAR_HEIGHT + 34);
     expect(style.paddingBottom).toBe(34);
@@ -114,5 +120,75 @@ describe('MainTabNavigator', () => {
     expect(tabs(tree).map((n) => n.props.accessibilityState.selected)).toEqual([false, false, false, false, true, false]);
     const shown = tree.root.findAll((n) => (n.type as unknown) === 'Text').map((n) => n.props.children);
     expect(shown).toContain('screen-alerts');
+  });
+
+  /** The real pressable of a tab (the outer wrapper skips the press/haptic handlers). */
+  const pressTab = (tree: renderer.ReactTestRenderer, label: string) =>
+    tree.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
+  const indicator = (tree: renderer.ReactTestRenderer) => tree.root.findByType(TabIndicator);
+  const measureBar = (tree: renderer.ReactTestRenderer, width: number) => {
+    const bar = tree.root.find((n) => n.props.testID === 'main-tab-bar' && (n.type as unknown) === 'View');
+    act(() => {
+      bar.props.onLayout({ nativeEvent: { layout: { width, height: 90, x: 0, y: 0 } } });
+    });
+  };
+
+  describe('sliding indicator + press feedback', () => {
+    beforeEach(() => {
+      (haptic as jest.Mock).mockClear();
+    });
+
+    test('there is exactly one indicator; it starts on the first tab and is unmeasured until layout', () => {
+      const tree = render();
+      expect(tree.root.findAllByType(TabIndicator)).toHaveLength(1);
+      expect(indicator(tree).props).toMatchObject({ index: 0, tabWidth: 0 });
+    });
+
+    test('measuring the bar gives each of the six tabs an equal slot', () => {
+      const tree = render();
+      measureBar(tree, 360);
+      expect(indicator(tree).props).toMatchObject({ index: 0, tabWidth: 60 });
+      expect(indicatorOffset(4, 60)).toBe(240);
+    });
+
+    test('pressing a tab navigates and moves the indicator to that tab', () => {
+      const tree = render();
+      measureBar(tree, 360);
+      act(() => {
+        pressTab(tree, 'Alerts tab').props.onPress();
+      });
+      expect(tabs(tree).map((n) => n.props.accessibilityState.selected)).toEqual([false, false, false, false, true, false]);
+      expect(indicator(tree).props).toMatchObject({ index: 4, tabWidth: 60 });
+      act(() => {
+        pressTab(tree, 'Stops tab').props.onPress();
+      });
+      expect(indicator(tree).props.index).toBe(1);
+    });
+
+    test("switching tabs gives the 'select' haptic; re-pressing the active tab gives none", () => {
+      const tree = render();
+      act(() => {
+        pressTab(tree, 'Home tab').props.onPress();
+      });
+      expect(haptic).not.toHaveBeenCalled();
+      act(() => {
+        pressTab(tree, 'Voice tab').props.onPress();
+      });
+      expect(haptic).toHaveBeenCalledTimes(1);
+      expect(haptic).toHaveBeenCalledWith('select');
+      act(() => {
+        pressTab(tree, 'Voice tab').props.onPress();
+      });
+      expect(haptic).toHaveBeenCalledTimes(1);
+    });
+
+    test('every tab is a pressable with press-in feedback handlers', () => {
+      const tree = render();
+      for (const t of TABS) {
+        const p = pressTab(tree, `${t.label} tab`);
+        expect(typeof p.props.onPressIn).toBe('function');
+        expect(typeof p.props.onPressOut).toBe('function');
+      }
+    });
   });
 });

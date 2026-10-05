@@ -5,6 +5,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { WeRideColors, WeRideRadius } from '../theme/theme';
+import { useReducedMotion } from '../ui';
 
 interface Props {
   completed: number;
@@ -12,15 +13,20 @@ interface Props {
 }
 
 export default function Progressbar({ completed, total }: Props) {
+  const reduced = useReducedMotion();
   const width = useRef(new Animated.Value(total > 0 ? Math.min(1, completed / total) : 0)).current;
 
   useEffect(() => {
-    Animated.timing(width, {
-      toValue: total > 0 ? Math.min(1, completed / total) : 0,
-      duration: 500,
-      useNativeDriver: false,
-    }).start();
-  }, [completed, total, width]);
+    const target = total > 0 ? Math.min(1, completed / total) : 0;
+    if (reduced) {
+      width.setValue(target);
+      return;
+    }
+    // Width is a layout property, so this one cannot use the native driver.
+    const anim = Animated.timing(width, { toValue: target, duration: 500, useNativeDriver: false });
+    anim.start();
+    return () => anim.stop();
+  }, [completed, total, width, reduced]);
 
   return (
     <View

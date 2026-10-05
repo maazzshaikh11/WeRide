@@ -46,6 +46,13 @@ jest.mock('../src/store/ridersStore', () => {
   };
 });
 
+jest.mock('../src/ui/haptics', () => ({
+  ...jest.requireActual('../src/ui/haptics'),
+  haptic: jest.fn(),
+}));
+
+import { haptic } from '../src/ui/haptics';
+import StopNode from '../src/components/StopNode';
 import { useAppStore } from '../src/store/appStore';
 import { useStopsStore } from '../src/store/stopsStore';
 import { useRidePlanStore } from '../src/store/ridePlanStore';
@@ -123,6 +130,61 @@ describe('StopsScreen', () => {
   });
 });
 
+/** The real pressable (outer wrappers skip the press handlers). */
+function realPressable(tree: renderer.ReactTestRenderer, match: (n: any) => boolean) {
+  return tree.root.findAll((n) => match(n.props) && typeof n.props.onPressIn === 'function')[0];
+}
+
+describe('StopsScreen interactions', () => {
+  beforeEach(() => {
+    useRidePlanStore.getState().clearPlan();
+    useStopsStore.getState().reset();
+    useToastStore.setState({ toasts: [] });
+    (haptic as jest.Mock).mockClear();
+    useRidePlanStore.setState({
+      destination: { label: 'Lonavala, Maharashtra', lat: 18.75, lng: 73.4 },
+      stops: [{ id: 's1', label: 'Chai Point, Pune', lat: 18.6, lng: 73.7, icon: '☕' }],
+    });
+  });
+
+  test('only the current stop has press feedback; pressing it marks it reached with a success haptic', () => {
+    const tree = render(<StopsScreen />);
+    const current = realPressable(tree, (p) => typeof p.accessibilityLabel === 'string' && p.accessibilityLabel.startsWith('Stop Chai Point'));
+    expect(current).toBeDefined();
+    expect(typeof current.props.onPressOut).toBe('function');
+    // Upcoming stop is not a pressable at all (so it is never dimmed like a disabled button).
+    expect(realPressable(tree, (p) => typeof p.accessibilityLabel === 'string' && p.accessibilityLabel.startsWith('Stop Lonavala'))).toBeUndefined();
+
+    act(() => {
+      current.props.onPress();
+    });
+    const stops = useStopsStore.getState().stops;
+    expect(stops.map((x) => x.status)).toEqual(['done', 'current']);
+    expect(haptic).toHaveBeenCalledWith('success');
+    expect(texts(tree)).toContain('1 of 2 stops reached');
+
+    // The next stop is now the pressable one.
+    const next = realPressable(tree, (p) => typeof p.accessibilityLabel === 'string' && p.accessibilityLabel.startsWith('Stop Lonavala'));
+    expect(next).toBeDefined();
+    act(() => {
+      next.props.onPress();
+    });
+    expect(useStopsStore.getState().stops.map((x) => x.status)).toEqual(['done', 'done']);
+    expect(texts(tree)).toContain('All stops reached');
+  });
+
+  test('StopNode re-renders upcoming -> current -> done without throwing and keeps its state text', () => {
+    const base = { id: 'a', name: 'Stop A', icon: '☕' } as const;
+    const tree = render(<StopNode stop={{ ...base, status: 'upcoming' }} />);
+    expect(texts(tree)).toContain('Upcoming');
+    act(() => tree.update(<StopNode stop={{ ...base, status: 'current' }} onPress={() => undefined} />));
+    expect(texts(tree)).toContain('Up next');
+    act(() => tree.update(<StopNode stop={{ ...base, status: 'done' }} />));
+    expect(texts(tree)).toContain('Reached');
+    expect(texts(tree)).toContain('✓');
+  });
+});
+
 describe('HistoryScreen', () => {
   beforeEach(() => {
     useAppStore.setState({ userId: 'user-1', groupId: 'group-12345678' });
@@ -157,5 +219,51 @@ describe('HistoryScreen', () => {
     });
     expect(shareSpy).toHaveBeenCalledWith({ message: expect.stringContaining('12.5 km') });
     shareSpy.mockRestore();
+  });
+
+  describe('ride card press', () => {
+    beforeEach(() => {
+      useRouteStore.setState({ route: { distance_km: 12.46, eta_minutes: 31.6 } as never });
+    });
+    const card = (tree: renderer.ReactTestRenderer) =>
+      realPressable(tree, (p) => p.accessibilityHint === 'Opens the live map');
+    const share = (tree: renderer.ReactTestRenderer) =>
+      realPressable(tree, (p) => typeof p.accessibilityLabel === 'string' && p.accessibilityLabel.startsWith('Share ride card'));
+
+    test('pressing the in-progress card switches to the Home (map) tab', () => {
+      const navigate = jest.fn();
+      const tree = render(<HistoryScreen navigation={{ navigate }} />);
+      expect(card(tree)).toBeDefined();
+      act(() => {
+        card(tree).props.onPress();
+      });
+      expect(navigate).toHaveBeenCalledTimes(1);
+      expect(navigate).toHaveBeenCalledWith('Home');
+    });
+
+    test('the Share button shares and does not navigate', () => {
+      const navigate = jest.fn();
+      const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as any);
+      const tree = render(<HistoryScreen navigation={{ navigate }} />);
+      expect(share(tree)).not.toBe(card(tree));
+      act(() => {
+        share(tree).props.onPress();
+      });
+      expect(shareSpy).toHaveBeenCalledTimes(1);
+      expect(navigate).not.toHaveBeenCalled();
+      shareSpy.mockRestore();
+    });
+
+    test('without a navigation prop the card is static (no dead press target) and Share still works', () => {
+      const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as any);
+      const tree = render(<HistoryScreen />);
+      expect(card(tree)).toBeUndefined();
+      expect(share(tree)).toBeDefined();
+      act(() => {
+        share(tree).props.onPress();
+      });
+      expect(shareSpy).toHaveBeenCalled();
+      shareSpy.mockRestore();
+    });
   });
 });

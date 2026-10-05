@@ -10,19 +10,20 @@
  *    snapshot stream.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View, StyleSheet, Text, Pressable } from 'react-native';
+import { ScrollView, View, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WeRideColors, WeRideRadius, WeRideSpacing } from '../theme/theme';
 import { type } from '../theme/typography';
 import ScreenHeader from '../components/ScreenHeader';
 import LivePill from '../components/LivePill';
 import AlertCard from '../components/AlertCard';
-import HazardChip from '../components/HazardChip';
+import HazardChip, { HazardChipFeedback } from '../components/HazardChip';
+import { Button, FadeIn, Skeleton, haptic } from '../ui';
 import { useAppStore } from '../store/appStore';
 import { useRidersStore } from '../store/ridersStore';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useToastStore } from '../store/toastStore';
-import { subscribeToHazardClusters, submitHazardReport, triggerClustering } from '@hazard/services/hazardService';
+import { subscribeToHazardClusters, submitHazardReport, triggerClustering, resolveHazard } from '@hazard/services/hazardService';
 import { HazardCluster, HazardType } from '@app/models/hazardCluster';
 import { haversineMeters } from '../utils/geoUtils';
 
@@ -72,6 +73,8 @@ export function sortClusters(list: HazardCluster[]): HazardCluster[] {
   });
 }
 
+const SKELETON_HEIGHT = 74;
+
 export default function AlertsScreen() {
   const groupId = useAppStore((s) => s.groupId);
   const userId = useAppStore((s) => s.userId);
@@ -85,6 +88,8 @@ export default function AlertsScreen() {
   const [loadError, setLoadError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [submittingType, setSubmittingType] = useState<HazardType | null>(null);
+  const [chipFeedback, setChipFeedback] = useState<{ type: HazardType; feedback: HazardChipFeedback } | null>(null);
+  const feedbackSeq = useRef(0);
   const knownIds = useRef<Set<string> | null>(null);
   const inFlight = useRef(false);
 
@@ -133,9 +138,14 @@ export default function AlertsScreen() {
         const { queued } = await submitHazardReport(hazardType, lat, lng, userId, groupId, loc?.timestamp_hlc ?? '');
         await triggerClustering(groupId);
         push(queued ? 'Hazard queued — will sync when online' : 'Hazard reported', queued ? 'warn' : undefined);
+        // A queued report is still accepted (it syncs later), so it confirms too.
+        haptic('success');
+        setChipFeedback({ type: hazardType, feedback: { kind: 'success', id: ++feedbackSeq.current } });
       } catch (e) {
         console.warn('[AlertsScreen] submitHazardReport failed:', e);
         push('Could not submit hazard — please try again', 'error');
+        haptic('error');
+        setChipFeedback({ type: hazardType, feedback: { kind: 'error', id: ++feedbackSeq.current } });
       } finally {
         inFlight.current = false;
         setSubmittingType(null);
@@ -165,6 +175,7 @@ export default function AlertsScreen() {
               label={opt.label}
               disabled={submitting || !groupId}
               busy={submittingType === opt.type}
+              feedback={chipFeedback?.type === opt.type ? chipFeedback.feedback : null}
               onPress={() => submitReport(opt.type)}
             />
           ))}
@@ -179,22 +190,26 @@ export default function AlertsScreen() {
         {!groupId ? (
           <EmptyBlock title="No ride selected" body="Open a ride to report and see hazards." />
         ) : loadError ? (
-          <View style={styles.block} accessibilityRole="alert">
-            <Text style={type.heading}>Could not load hazards</Text>
-            <Text style={[type.body, styles.blockBody]}>Check your connection and try again.</Text>
-            <Pressable
-              style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}
-              onPress={() => setAttempt((n) => n + 1)}
-              accessibilityRole="button"
-              accessibilityLabel="Retry loading hazards"
-            >
-              <Text style={[type.buttonSm, { color: WeRideColors.primary }]}>Retry</Text>
-            </Pressable>
-          </View>
+          <FadeIn>
+            <View style={styles.block} accessibilityRole="alert">
+              <Text style={type.heading}>Could not load hazards</Text>
+              <Text style={[type.body, styles.blockBody]}>Check your connection and try again.</Text>
+              <Button
+                label="Retry"
+                variant="secondary"
+                size="sm"
+                onPress={() => setAttempt((n) => n + 1)}
+                accessibilityLabel="Retry loading hazards"
+                style={styles.retryBtn}
+              />
+            </View>
+          </FadeIn>
         ) : sorted === null ? (
           <View style={styles.cardList} accessibilityLabel="Loading hazards" accessibilityState={{ busy: true }}>
             {[0, 1, 2].map((i) => (
-              <View key={i} style={styles.skeleton} testID="alerts-skeleton" />
+              <View key={i} testID="alerts-skeleton">
+                <Skeleton height={SKELETON_HEIGHT} radius={WeRideRadius.xl} />
+              </View>
             ))}
           </View>
         ) : sorted.length === 0 ? (
@@ -204,15 +219,21 @@ export default function AlertsScreen() {
           />
         ) : (
           <View style={styles.cardList}>
-            {sorted.map((c) => {
+            {sorted.map((c, i) => {
               const ago = timeAgo(c.created_at_hlc);
-              const dist =
+              const distKm =
                 currentLocation != null
-                  ? `${(haversineMeters(currentLocation.lat, currentLocation.lng, c.centroid_lat, c.centroid_lng) / 1000).toFixed(1)} km away`
+                  ? (haversineMeters(currentLocation.lat, currentLocation.lng, c.centroid_lat, c.centroid_lng) / 1000).toFixed(1)
                   : null;
+              const dist = distKm != null ? `${distKm} km away` : null;
               const reports = `${c.report_count} report${c.report_count !== 1 ? 's' : ''}`;
               const meta = [reports, dist, ago].filter(Boolean).join(' · ');
               const label = HAZARD_LABEL[c.hazard_type] ?? 'Hazard';
+              const details = [
+                { label: 'Reports', value: String(c.report_count) },
+                { label: 'Hazard score', value: Number(c.hazard_score).toFixed(2) },
+                ...(distKm != null ? [{ label: 'Distance', value: `${distKm} km` }] : []),
+              ];
               return (
                 <AlertCard
                   key={c.cluster_id}
@@ -220,6 +241,9 @@ export default function AlertsScreen() {
                   title={`${label}${c.status === 'resolved' ? ' (resolved)' : ''}`}
                   meta={meta}
                   isNew={newIds.has(c.cluster_id)}
+                  index={i}
+                  details={details}
+                  onResolve={c.status === 'active' ? () => resolveHazard(c.cluster_id) : undefined}
                 />
               );
             })}
@@ -232,10 +256,12 @@ export default function AlertsScreen() {
 
 function EmptyBlock({ title, body }: { title: string; body: string }) {
   return (
-    <View style={styles.block}>
-      <Text style={type.heading}>{title}</Text>
-      <Text style={[type.body, styles.blockBody]}>{body}</Text>
-    </View>
+    <FadeIn>
+      <View style={styles.block}>
+        <Text style={type.heading}>{title}</Text>
+        <Text style={[type.body, styles.blockBody]}>{body}</Text>
+      </View>
+    </FadeIn>
   );
 }
 
@@ -246,13 +272,6 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: WeRideSpacing.sm },
   hint: { marginTop: WeRideSpacing.md, marginBottom: WeRideSpacing.xxl },
   cardList: { gap: WeRideSpacing.md },
-  skeleton: {
-    height: 74,
-    borderRadius: WeRideRadius.xl,
-    backgroundColor: WeRideColors.dark3,
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-  },
   block: {
     backgroundColor: WeRideColors.dark3,
     borderWidth: 1,
@@ -262,15 +281,5 @@ const styles = StyleSheet.create({
     gap: WeRideSpacing.xs,
   },
   blockBody: { color: WeRideColors.textSub },
-  retryBtn: {
-    minHeight: 44,
-    marginTop: WeRideSpacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: WeRideRadius.lg,
-    borderWidth: 1,
-    borderColor: WeRideColors.primary,
-    backgroundColor: WeRideColors.primaryDim,
-  },
-  pressed: { opacity: 0.85 },
+  retryBtn: { marginTop: WeRideSpacing.md },
 });

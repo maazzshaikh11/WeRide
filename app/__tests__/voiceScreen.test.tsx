@@ -53,6 +53,13 @@ jest.mock('../src/store/ridersStore', () => {
   };
 });
 
+jest.mock('../src/ui/haptics', () => ({
+  ...jest.requireActual('../src/ui/haptics'),
+  haptic: jest.fn(),
+}));
+
+import { haptic } from '../src/ui/haptics';
+import VoiceAvatar from '../src/components/VoiceAvatar';
 import { useAppStore } from '../src/store/appStore';
 import { useToastStore } from '../src/store/toastStore';
 import VoiceScreen from '../src/screens/VoiceScreen';
@@ -83,6 +90,7 @@ beforeEach(() => {
   mockVox.setVoiceActive.mockReset();
   mockVox.ctor.mockReset();
   mockVox.mic.mockReset().mockResolvedValue(true);
+  (haptic as jest.Mock).mockClear();
   useAppStore.setState({ userId: 'user-1', groupId: 'group-1' });
   useToastStore.setState({ toasts: [] });
 });
@@ -161,5 +169,45 @@ describe('VoiceScreen', () => {
     expect(mockVox.stop).toHaveBeenCalled();
     expect(useToastStore.getState().toasts[0].message).toBe('You left the voice channel');
     expect(texts(tree)).toContain('Not connected');
+  });
+
+  const real = (tree: renderer.ReactTestRenderer, label: string) =>
+    tree.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
+
+  test('mute and leave are pressables with press feedback; muting gives a select haptic and swaps the label', async () => {
+    const tree = await renderAsync();
+    expect(typeof real(tree, 'Mute microphone').props.onPressIn).toBe('function');
+    expect(typeof real(tree, 'Leave voice channel').props.onPressOut).toBe('function');
+    act(() => real(tree, 'Mute microphone').props.onPress());
+    expect(haptic).toHaveBeenCalledWith('select');
+    expect(texts(tree)).toContain('Unmute');
+    act(() => real(tree, 'Unmute microphone').props.onPress());
+    expect(texts(tree)).toContain('Mute');
+    expect(haptic).toHaveBeenCalledTimes(2);
+  });
+
+  test('connecting shows a pulsing indicator that is gone once connected', async () => {
+    mockVox.start.mockReturnValue(new Promise(() => undefined));
+    const connecting = await renderAsync();
+    const pulses = (t: renderer.ReactTestRenderer) =>
+      t.root.findAll((n) => n.props.testID === 'vox-connecting-pulse' && (n.type as unknown) === 'View');
+    expect(pulses(connecting)).toHaveLength(1);
+
+    mockVox.start.mockReset().mockResolvedValue(undefined);
+    const connected = await renderAsync();
+    expect(pulses(connected)).toHaveLength(0);
+  });
+
+  test('speaking avatar shows its ring; a quiet one does not', () => {
+    const find = (tree: renderer.ReactTestRenderer) => tree.root.findAll((n) => n.props.accessibilityLabel === 'You, speaking');
+    let tree!: renderer.ReactTestRenderer;
+    act(() => {
+      tree = renderer.create(<VoiceAvatar initials="YO" color="#fff" name="Rider" isYou speaking />);
+    });
+    mounted.push(tree);
+    expect(find(tree).length).toBeGreaterThan(0);
+    act(() => tree.update(<VoiceAvatar initials="YO" color="#fff" name="Rider" isYou speaking={false} />));
+    expect(find(tree)).toHaveLength(0);
+    expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'You').length).toBeGreaterThan(0);
   });
 });

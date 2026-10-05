@@ -34,11 +34,18 @@ const mockHazard = {
   subscribe: jest.fn(),
   submit: jest.fn(),
   cluster: jest.fn(),
+  resolve: jest.fn(),
 };
 jest.mock('@hazard/services/hazardService', () => ({
   subscribeToHazardClusters: (g: string, cb: (c: unknown[]) => void) => mockHazard.subscribe(g, cb),
   submitHazardReport: (...args: unknown[]) => mockHazard.submit(...args),
   triggerClustering: (...args: unknown[]) => mockHazard.cluster(...args),
+  resolveHazard: (...args: unknown[]) => mockHazard.resolve(...args),
+}));
+
+jest.mock('../src/ui/haptics', () => ({
+  ...jest.requireActual('../src/ui/haptics'),
+  haptic: jest.fn(),
 }));
 
 jest.mock('@routing/client/routeStore', () => {
@@ -61,6 +68,8 @@ import { useAppStore } from '../src/store/appStore';
 import { useToastStore } from '../src/store/toastStore';
 import { useRouteStore } from '@routing/client/routeStore';
 import AlertsScreen, { sortClusters, HAZARD_OPTIONS } from '../src/screens/AlertsScreen';
+import HazardChip from '../src/components/HazardChip';
+import { haptic } from '../src/ui/haptics';
 
 const LOCATION = {
   rider_id: 'user-1', group_id: 'group-1', timestamp_hlc: '1700000000000:0',
@@ -101,6 +110,8 @@ beforeEach(() => {
   });
   mockHazard.submit.mockReset().mockResolvedValue({ queued: false });
   mockHazard.cluster.mockReset().mockResolvedValue(undefined);
+  mockHazard.resolve.mockReset().mockResolvedValue(undefined);
+  (haptic as jest.Mock).mockClear();
   useAppStore.setState({ userId: 'user-1', groupId: 'group-1' });
   useRouteStore.setState({ currentLocation: LOCATION });
   useToastStore.setState({ toasts: [] });
@@ -250,5 +261,169 @@ describe('AlertsScreen list states', () => {
     const newCards = tree.root.findAll((n) => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.startsWith('New. '));
     expect(newCards.length).toBeGreaterThan(0);
     expect(newCards.every((n) => n.props.accessibilityLabel.includes('Debris'))).toBe(true);
+  });
+});
+
+/** The real pressable (outer wrappers skip the press/haptic handlers). */
+function pressable(tree: renderer.ReactTestRenderer, label: string) {
+  return tree.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
+}
+const hasDetails = (tree: renderer.ReactTestRenderer) => tree.root.findAllByProps({ testID: 'alert-details' }).length > 0;
+
+describe('AlertsScreen chip feedback', () => {
+  const feedbackOf = (tree: renderer.ReactTestRenderer, label: string) =>
+    tree.root.findAllByType(HazardChip).find((c) => c.props.label === label)!.props.feedback;
+
+  test('chips are pressables with press-in feedback and a select haptic', async () => {
+    const tree = render(<AlertsScreen />);
+    const p = pressable(tree, 'Report hazard: Pothole');
+    expect(typeof p.props.onPressIn).toBe('function');
+    await act(async () => {
+      p.props.onPress();
+    });
+    expect(haptic).toHaveBeenCalledWith('select');
+  });
+
+  test('success confirms only the tapped chip and gives the success haptic', async () => {
+    const tree = render(<AlertsScreen />);
+    expect(feedbackOf(tree, 'Pothole')).toBeNull();
+    await act(async () => {
+      await chip(tree, 'Pothole').props.onPress();
+    });
+    expect(feedbackOf(tree, 'Pothole')).toMatchObject({ kind: 'success' });
+    expect(feedbackOf(tree, 'Debris')).toBeNull();
+    expect(haptic).toHaveBeenCalledWith('success');
+    expect(haptic).not.toHaveBeenCalledWith('error');
+  });
+
+  test('queued (offline) reports still confirm', async () => {
+    mockHazard.submit.mockResolvedValueOnce({ queued: true });
+    const tree = render(<AlertsScreen />);
+    await act(async () => {
+      await chip(tree, 'Debris').props.onPress();
+    });
+    expect(feedbackOf(tree, 'Debris')).toMatchObject({ kind: 'success' });
+  });
+
+  test('failure flashes an error on the chip and gives the error haptic', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockHazard.submit.mockRejectedValueOnce(new Error('boom'));
+    const tree = render(<AlertsScreen />);
+    await act(async () => {
+      await chip(tree, 'Accident').props.onPress();
+    });
+    expect(feedbackOf(tree, 'Accident')).toMatchObject({ kind: 'error' });
+    expect(haptic).toHaveBeenCalledWith('error');
+    expect(haptic).not.toHaveBeenCalledWith('success');
+    warn.mockRestore();
+  });
+
+  test('each new result gets a new feedback id so it can replay', async () => {
+    const tree = render(<AlertsScreen />);
+    await act(async () => {
+      await chip(tree, 'Pothole').props.onPress();
+    });
+    const first = feedbackOf(tree, 'Pothole').id;
+    await act(async () => {
+      await chip(tree, 'Pothole').props.onPress();
+    });
+    expect(feedbackOf(tree, 'Pothole').id).not.toBe(first);
+  });
+});
+
+describe('AlertsScreen card expand + resolve', () => {
+  const CARD = 'Oil spill. 2 reports · 4.2 km away · just now';
+
+  function withCluster(status: 'active' | 'resolved' = 'active') {
+    const tree = render(<AlertsScreen />);
+    pushSnapshot([{ ...cluster('c1', 'oil_spill', status, Date.now()), report_count: 3, hazard_score: 0.456 }]);
+    return tree;
+  }
+  const card = (tree: renderer.ReactTestRenderer) =>
+    tree.root.findAll(
+      (n) => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.startsWith('Oil spill') && typeof n.props.onPressIn === 'function',
+    )[0];
+
+  test('cards are pressable, collapsed by default, and expose expanded state', () => {
+    const tree = withCluster();
+    expect(card(tree)).toBeDefined();
+    expect(hasDetails(tree)).toBe(false);
+    expect(tree.root.findAll((n) => n.props.accessibilityState?.expanded === false).length).toBeGreaterThan(0);
+    expect(CARD).toContain('Oil spill');
+  });
+
+  test('tapping expands to real fields (reports, score, distance) and tapping again collapses', () => {
+    const tree = withCluster();
+    act(() => card(tree).props.onPress());
+    expect(hasDetails(tree)).toBe(true);
+    const t = texts(tree);
+    expect(t).toContain('Reports | 3');
+    expect(t).toContain('Hazard score | 0.46');
+    expect(t).toMatch(/Distance \| \d+\.\d km/);
+    expect(tree.root.findAll((n) => n.props.accessibilityState?.expanded === true).length).toBeGreaterThan(0);
+
+    act(() => card(tree).props.onPress());
+    expect(hasDetails(tree)).toBe(false);
+  });
+
+  test('distance row is omitted when there is no location fix', () => {
+    useRouteStore.setState({ currentLocation: null });
+    const tree = withCluster();
+    act(() => card(tree).props.onPress());
+    expect(texts(tree)).not.toContain('Distance');
+    expect(texts(tree)).toContain('Hazard score');
+  });
+
+  test('Mark resolved calls resolveHazard with the cluster id and confirms inline', async () => {
+    const tree = withCluster();
+    act(() => card(tree).props.onPress());
+    await act(async () => {
+      await pressable(tree, 'Mark Oil spill resolved').props.onPress();
+    });
+    expect(mockHazard.resolve).toHaveBeenCalledTimes(1);
+    expect(mockHazard.resolve).toHaveBeenCalledWith('c1');
+    expect(texts(tree)).toContain('Marked resolved');
+    expect(haptic).toHaveBeenCalledWith('success');
+    // Action is gone once done.
+    expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'Mark Oil spill resolved').length).toBe(0);
+  });
+
+  test('Mark resolved shows loading, blocks double taps, and a failure shows inline error + retry', async () => {
+    let reject!: (e: Error) => void;
+    mockHazard.resolve.mockReturnValueOnce(new Promise((_r, rej) => { reject = rej; }));
+    const tree = withCluster();
+    act(() => card(tree).props.onPress());
+    act(() => {
+      pressable(tree, 'Mark Oil spill resolved').props.onPress();
+    });
+    expect(pressable(tree, 'Mark Oil spill resolved').props.accessibilityState).toMatchObject({ busy: true });
+    expect(pressable(tree, 'Mark Oil spill resolved').props.disabled).toBe(true);
+    await act(async () => {
+      reject(new Error('offline'));
+    });
+    expect(texts(tree)).toContain('Could not mark resolved');
+    expect(haptic).toHaveBeenCalledWith('error');
+    expect(pressable(tree, 'Mark Oil spill resolved').props.disabled).toBe(false);
+
+    await act(async () => {
+      await pressable(tree, 'Mark Oil spill resolved').props.onPress();
+    });
+    expect(mockHazard.resolve).toHaveBeenCalledTimes(2);
+    expect(texts(tree)).toContain('Marked resolved');
+  });
+
+  test('resolved hazards expand but offer no resolve action', () => {
+    const tree = withCluster('resolved');
+    act(() => card(tree).props.onPress());
+    expect(hasDetails(tree)).toBe(true);
+    expect(tree.root.findAll((n) => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.startsWith('Mark ')).length).toBe(0);
+  });
+
+  test('loading shows skeleton cards that are replaced by the cards', () => {
+    const tree = render(<AlertsScreen />);
+    const skeletons = () => tree.root.findAll((n) => n.props.testID === 'alerts-skeleton' && (n.type as unknown) === 'View');
+    expect(skeletons()).toHaveLength(3);
+    pushSnapshot([cluster('c1', 'pothole', 'active', Date.now())]);
+    expect(skeletons()).toHaveLength(0);
   });
 });

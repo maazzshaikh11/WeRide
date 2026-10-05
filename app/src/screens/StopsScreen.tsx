@@ -18,6 +18,7 @@ import StopNode from '../components/StopNode';
 import { useStopsStore } from '../store/stopsStore';
 import { useRidePlanStore } from '../store/ridePlanStore';
 import { useToastStore } from '../store/toastStore';
+import { FadeIn, haptic } from '../ui';
 import { useRouteStore } from '@routing/client/routeStore';
 import { haversineMeters } from '../utils/geoUtils';
 
@@ -41,6 +42,7 @@ export default function StopsScreen() {
 
   const onStopPress = (name: string) => {
     markCurrentDone();
+    haptic('success');
     push(`Marked "${name}" as reached`);
   };
 
@@ -50,20 +52,22 @@ export default function StopsScreen() {
         <ScreenHeader title="Planned Stops" />
 
         {shownStops.length === 0 ? (
-          <View style={styles.block}>
-            <Text style={type.heading}>This ride has no planned stops</Text>
-            <Text style={[type.body, styles.blockBody]}>
-              Set a destination and stops when you create a ride and they will be listed here.
-            </Text>
-          </View>
+          <FadeIn>
+            <View style={styles.block}>
+              <Text style={type.heading}>This ride has no planned stops</Text>
+              <Text style={[type.body, styles.blockBody]}>
+                Set a destination and stops when you create a ride and they will be listed here.
+              </Text>
+            </View>
+          </FadeIn>
         ) : (
           <>
-            <View style={styles.progress}>
+            <FadeIn style={styles.progress}>
               <Text style={type.caption}>
                 {doneCount} of {shownStops.length} {shownStops.length === 1 ? 'stop' : 'stops'} reached
               </Text>
               <Progressbar completed={doneCount} total={shownStops.length} />
-            </View>
+            </FadeIn>
 
             {currentStop ? (
               <Text style={[type.caption, styles.hint]}>
@@ -79,17 +83,22 @@ export default function StopsScreen() {
                   : null;
               const distText = distKm != null ? `${distKm < 10 ? distKm.toFixed(1) : Math.round(distKm)} km away` : undefined;
               return (
-                <StopNode
-                  key={stop.id}
-                  stop={stop}
-                  isLast={i === shownStops.length - 1}
-                  info={stop.status === 'done' ? undefined : distText}
-                  onPress={stop.status === 'current' ? () => onStopPress(stop.name) : undefined}
-                />
+                <FadeIn key={stop.id} index={i + 1}>
+                  <StopNode
+                    stop={stop}
+                    isLast={i === shownStops.length - 1}
+                    info={stop.status === 'done' ? undefined : distText}
+                    onPress={stop.status === 'current' ? () => onStopPress(stop.name) : undefined}
+                  />
+                </FadeIn>
               );
             })}
 
-            {!currentStop ? <Text style={[type.bodyStrong, styles.allDone]}>All stops reached</Text> : null}
+            {!currentStop ? (
+              <FadeIn>
+                <Text style={[type.bodyStrong, styles.allDone]}>All stops reached</Text>
+              </FadeIn>
+            ) : null}
           </>
         )}
       </ScrollView>

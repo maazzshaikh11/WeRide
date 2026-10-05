@@ -21,6 +21,7 @@ module.exports = {
     '^@env$': '<rootDir>/env.d.ts',
     // Share the app's react/zustand across module node_modules to avoid
     // duplicate React instances (hooks "useRef of null" errors in tests).
+    '^@babel/runtime/(.*)$': '<rootDir>/node_modules/@babel/runtime/$1',
     '^react$': '<rootDir>/node_modules/react',
     '^react-native$': '<rootDir>/node_modules/react-native',
     '^zustand$': '<rootDir>/node_modules/zustand',

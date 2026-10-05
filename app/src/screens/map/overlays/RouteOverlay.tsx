@@ -6,7 +6,7 @@
  * "Avoid hazards" toggle.
  *
  * Phase 6: Integrates real Person A (verified_location) and Person B (hazard_cluster) streams.
- * - Origin: Real EKF-verified location from Person A (Socket.io location:update)
+ * - Origin: the rider's own EKF-verified fix from Person A (via OwnLocationPublisher)
  * - Hazards: Real active clusters from Person B (Firestore listener)
  * - Prevents origin churn: Only recalcs when moved > 100m
  */
@@ -19,9 +19,7 @@ import { ROUTING_URL } from '@env';
 import { RoutingClient } from '@routing/client/routingClient';
 import { useRouteStore } from '@routing/client/routeStore';
 import { routeToGeoJsonLine } from '@routing/client/routeLine';
-import { VerifiedLocation, verifiedLocationFromJson } from '@app/models/verifiedLocation';
 import { HazardCluster } from '@app/models/hazardCluster';
-import { getLocationSocket } from '@app/services/socketService';
 import { subscribeToHazardClusters } from '@hazard/services/hazardService';
 import { useRidePlanStore } from '@app/store/ridePlanStore';
 import { registerToggleAvoidHazards } from './routeControls';
@@ -30,15 +28,12 @@ interface Props {
   groupId: string;
 }
 
-// Accuracy threshold: only use locations with accuracy < 50m (Phase 6 T-16)
-const ACCEPTABLE_ACCURACY_M = 50;
 // Distance threshold: only trigger recalc if moved > 100m (Phase 6 T-16)
 const RECALC_DISTANCE_THRESHOLD_M = 100;
 
 export default function RouteOverlay({ groupId }: Props) {
   // Store subscriptions
   const route = useRouteStore((state) => state.route);
-  const currentLocation = useRouteStore((state) => state.currentLocation);
   const lastValidLocation = useRouteStore((state) => state.lastValidLocation);
   const activeClusters = useRouteStore((state) => state.activeClusters);
   const avoidHazardTypes = useRouteStore((state) => state.avoidHazardTypes);
@@ -49,8 +44,6 @@ export default function RouteOverlay({ groupId }: Props) {
   const planStops = useRidePlanStore((s) => s.stops);
 
   const setRoute = useRouteStore((state) => state.setRoute);
-  const setCurrentLocation = useRouteStore((state) => state.setCurrentLocation);
-  const setLastValidLocation = useRouteStore((state) => state.setLastValidLocation);
   const setActiveClusters = useRouteStore((state) => state.setActiveClusters);
   const setAvoidHazardTypes = useRouteStore((state) => state.setAvoidHazardTypes);
   const setIsLoading = useRouteStore((state) => state.setIsLoading);
@@ -79,78 +72,68 @@ export default function RouteOverlay({ groupId }: Props) {
   }
   const client = clientRef.current;
 
-  // Phase 6 T-16: Listen to real verified_location stream (Person A)
+  // Latest route inputs for callbacks that must not re-subscribe on every fix.
+  const latestRef = React.useRef({
+    origin: null as { lat: number; lng: number } | null,
+    destination,
+    avoidHazardTypes,
+  });
+  latestRef.current = {
+    origin: lastValidLocation ? { lat: lastValidLocation.lat, lng: lastValidLocation.lng } : null,
+    destination,
+    avoidHazardTypes,
+  };
+
+  // Route origin = the rider's OWN verified fix. MapScreen's OwnLocationPublisher
+  // writes it to the route store (the socket never echoes our own fix back, and
+  // other riders' fixes must never become our origin).
+  const lastDestKey = React.useRef<string | null>(null);
   useEffect(() => {
-    const socket = getLocationSocket();
+    // No fix yet, or no destination chosen in the Create Ride modal.
+    if (!lastValidLocation || !destination) return;
+    const origin = { lat: lastValidLocation.lat, lng: lastValidLocation.lng };
 
-    const handleLocationUpdate = (payload: any) => {
-      try {
-        const location = verifiedLocationFromJson(payload);
+    // New/changed destination → always recompute; the origin-moved gate below
+    // would otherwise keep serving a route to the previous destination.
+    const destKey = `${destination.lat},${destination.lng}`;
+    if (lastDestKey.current !== destKey) {
+      lastDestKey.current = destKey;
+      client.scheduleRecalculation({
+        group_id: groupId,
+        origin,
+        destination,
+        avoid_hazard_types: avoidHazardTypes,
+        active_hazards: activeHazards,
+      });
+      return;
+    }
 
-        // Only accept non-spoofed locations with acceptable accuracy
-        if (location.spoof_flag) {
-          console.warn('Location spoofed, skipping origin update');
-          return;
-        }
+    // Same destination: only recalc once the rider has moved > 100m (jitter guard).
+    client.scheduleOriginRecalcIfMoved(
+      origin,
+      destination,
+      groupId,
+      avoidHazardTypes,
+      RECALC_DISTANCE_THRESHOLD_M,
+      activeHazards
+    );
+  }, [groupId, client, avoidHazardTypes, activeHazards, lastValidLocation, destination]);
 
-        if (location.accuracy_m > ACCEPTABLE_ACCURACY_M) {
-          console.warn(`Location accuracy too poor (${location.accuracy_m}m > ${ACCEPTABLE_ACCURACY_M}m), skipping`);
-          return;
-        }
-
-        // Update current location
-        setCurrentLocation(location);
-        setLastValidLocation(location);
-
-        // No destination chosen yet (Create Ride modal) — nothing to route to.
-        if (!destination) return;
-
-        // Trigger recalculation if moved > 100m (prevent jitter storms)
-        if (lastValidLocation) {
-          client.scheduleOriginRecalcIfMoved(
-            { lat: location.lat, lng: location.lng },
-            destination,
-            groupId,
-            avoidHazardTypes,
-            RECALC_DISTANCE_THRESHOLD_M,
-            activeHazards
-          );
-        } else {
-          // First valid location, trigger initial route
-          client.scheduleRecalculation({
-            group_id: groupId,
-            origin: { lat: location.lat, lng: location.lng },
-            destination,
-            avoid_hazard_types: avoidHazardTypes,
-            active_hazards: activeHazards,
-          });
-        }
-      } catch (e) {
-        console.error('Failed to process location update:', e);
-      }
-    };
-
-    socket.on('location:update', handleLocationUpdate);
-
-    return () => {
-      socket.off('location:update', handleLocationUpdate);
-    };
-  }, [groupId, client, avoidHazardTypes, activeHazards, lastValidLocation, destination, setCurrentLocation, setLastValidLocation]);
-
-  // Phase 6 T-17: Listen to real hazard_cluster stream (Person B)
+  // Phase 6 T-17: Listen to real hazard_cluster stream (Person B).
+  // Subscribes once per group; reads current origin/destination from latestRef
+  // so a 1 Hz location stream does not tear down the Firestore listener.
   useEffect(() => {
     const unsubscribe = subscribeToHazardClusters(groupId, (clusters: HazardCluster[]) => {
       setActiveClusters(clusters);
 
       // Trigger recalculation on hazard changes (Phase 6 T-17 marquee test)
-      if (lastValidLocation && destination) {
+      const { origin, destination: dest, avoidHazardTypes: avoid } = latestRef.current;
+      if (origin && dest) {
         client.scheduleRecalculation({
           group_id: groupId,
-          origin: { lat: lastValidLocation.lat, lng: lastValidLocation.lng },
-          destination,
-          avoid_hazard_types: avoidHazardTypes,
-          // Map here (not the memoized activeHazards) — keeps this effect
-          // from resubscribing on every cluster snapshot.
+          origin,
+          destination: dest,
+          avoid_hazard_types: avoid,
           active_hazards: clusters.map((c) => ({
             centroid_lat: c.centroid_lat,
             centroid_lng: c.centroid_lng,
@@ -164,7 +147,7 @@ export default function RouteOverlay({ groupId }: Props) {
     return () => {
       unsubscribe();
     };
-  }, [groupId, client, avoidHazardTypes, lastValidLocation, destination, setActiveClusters]);
+  }, [groupId, client, setActiveClusters]);
 
   // Handle toggle avoid hazards (invoked from MapScreen's RoutePanel via routeControls)
   const handleToggleAvoidHazards = async () => {

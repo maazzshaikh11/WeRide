@@ -48,7 +48,7 @@ import { useStopsStore } from '../../store/stopsStore';
 // Phase 6 — tracking service wiring (Person A, unchanged)
 import { Ekf } from '@tracking/ekf';
 import { SensorStream } from '@tracking/sensorStream';
-import { LocationPublisher } from '@tracking/locationPublisher';
+import { OwnLocationPublisher, isUsableOwnFix } from '../../services/ownLocationPublisher';
 import { TrackingService } from '@tracking/trackingService';
 import { loadHlc } from '@tracking/hlcStore';
 import { getLocationSocket } from '../../services/socketService';
@@ -97,11 +97,17 @@ export default function MapScreen() {
     const socket   = getLocationSocket();
     const hlc      = loadHlc();
 
-    const publisher = new LocationPublisher({
-      socket,
-      riderId: userId,
-      groupId,
-    });
+    // Own fixes never come back over the socket (server excludes the sender),
+    // so the publisher feeds the route/alerts/stops stores directly.
+    const publisher = new OwnLocationPublisher(
+      { socket, riderId: userId, groupId },
+      (fix) => {
+        if (!isUsableOwnFix(fix)) return;
+        const routeState = useRouteStore.getState();
+        routeState.setCurrentLocation(fix);
+        routeState.setLastValidLocation(fix);
+      },
+    );
 
     const service = new TrackingService({ ekf, sensors, publisher, hlc });
     serviceRef.current = service;

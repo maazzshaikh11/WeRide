@@ -20,6 +20,11 @@ function render(el: React.ReactElement) {
 afterEach(() => {
   mounted.splice(0).forEach((t) => act(() => t.unmount()));
   setHapticsEnabled(true);
+  act(() => {
+    jest.runOnlyPendingTimers();
+  });
+  jest.clearAllTimers();
+  jest.useRealTimers();
 });
 
 /** The actual pressable (findByProps would return the outer wrapper component). */
@@ -28,6 +33,9 @@ const pressable = (t: ReactTestRenderer, label: string) =>
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Fake timers from the start so animations started in a test can be flushed
+  // (and cannot fire after the environment is torn down).
+  jest.useFakeTimers();
 });
 
 const texts = (t: ReactTestRenderer) =>

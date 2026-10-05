@@ -1,12 +1,12 @@
 /**
- * RoutePanel component tests — updated for master-spec redesign.
- * RoutePanel now reads ETA/distance/safety from useRouteStore (spec §3.3.8)
- * and rider count from useRidersStore, instead of props.
+ * RouteSheet component tests: ETA/distance/safety come from useRouteStore
+ * (spec §3.3.8) and the rider count from useRidersStore, never from props.
+ * The sheet replaces the always-on bottom panel; it opens from the live screen.
  */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { Platform, Text, Vibration } from 'react-native';
-import RoutePanel, { COLLAPSED_HEIGHT } from '../src/components/RoutePanel';
+import RouteSheet from '../src/components/RouteSheet';
 import { EMPTY_STATE_COPY, routePanelMode } from '../src/components/routePanelState';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useRidePlanStore } from '../src/store/ridePlanStore';
@@ -43,7 +43,12 @@ const FIX: VerifiedLocation = {
   accuracy_m: 5,
 };
 
-// Track mounted trees so Animated timers (BottomSheet) never outlive a test.
+/** RouteSheet, open. */
+function Sheeted(props: Partial<React.ComponentProps<typeof RouteSheet>>) {
+  return <RouteSheet visible onClose={jest.fn()} {...props} />;
+}
+
+// Track mounted trees so Animated timers never outlive a test.
 const mounted: renderer.ReactTestRenderer[] = [];
 function mount(el: React.ReactElement) {
   let tree!: renderer.ReactTestRenderer;
@@ -73,11 +78,9 @@ function pressableByLabel(tree: renderer.ReactTestInstance, label: string) {
   return tree.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
 }
 
-/** Expand the sheet through the panel body's toggle. */
-function expand(tree: renderer.ReactTestInstance) {
-  act(() => {
-    pressableByLabel(tree, 'Expand ride details').props.onPress({});
-  });
+/** The sheet is already open; kept so the flow reads the same as before. */
+function expand(_tree: renderer.ReactTestInstance) {
+  /* no-op */
 }
 
 function findTextNodes(
@@ -89,7 +92,7 @@ function findTextNodes(
   );
 }
 
-describe('RoutePanel (master-spec redesign, store-driven)', () => {
+describe('RouteSheet (store-driven)', () => {
   beforeEach(() => {
     useRouteStore.getState().setRoute(makeRoute(15, 10, 0.85));
     useRouteStore.getState().setIsLoading(false);
@@ -105,7 +108,7 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
   });
 
   test('renders collapsed stat row with ETA and distance values', () => {
-    const tree = mount(<RoutePanel />).root;
+    const tree = mount(<Sheeted />).root;
 
     const etaText = findTextNodes(tree, (t) => t.trim() === '15');
     expect(etaText.length).toBeGreaterThan(0);
@@ -114,9 +117,9 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
     expect(distanceText.length).toBeGreaterThan(0);
   });
 
-  test('no route: shows no "—" placeholder numbers', () => {
+  test('no route: shows no placeholder numbers', () => {
     useRouteStore.getState().setRoute(null);
-    const tree = mount(<RoutePanel />).root;
+    const tree = mount(<Sheeted />).root;
 
     expect(findTextNodes(tree, (t) => t.trim() === '—')).toHaveLength(0);
     expect(findTextNodes(tree, (t) => t.includes('MIN LEFT'))).toHaveLength(0);
@@ -125,7 +128,7 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
   test('empty state: "Waiting for your location" when there is no fix', () => {
     useRouteStore.getState().setRoute(null);
     useRidePlanStore.getState().setDestination({ label: 'Lonavala, Maharashtra', lat: 18.75, lng: 73.4 });
-    const tree = mount(<RoutePanel />).root;
+    const tree = mount(<Sheeted />).root;
 
     expect(findTextNodes(tree, (t) => t === 'Waiting for your location')).toHaveLength(1);
     expect(findTextNodes(tree, (t) => t === 'Pick a destination')).toHaveLength(0);
@@ -134,7 +137,7 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
   test('empty state: "Pick a destination" when the ride has none', () => {
     useRouteStore.getState().setRoute(null);
     useRouteStore.getState().setLastValidLocation(FIX);
-    const tree = mount(<RoutePanel />).root;
+    const tree = mount(<Sheeted />).root;
 
     expect(findTextNodes(tree, (t) => t === 'Pick a destination')).toHaveLength(1);
     expect(findTextNodes(tree, (t) => t === 'Waiting for your location')).toHaveLength(0);
@@ -142,7 +145,7 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
 
   test('populated: shows ETA and distance, no empty-state copy', () => {
     useRouteStore.getState().setLastValidLocation(FIX);
-    const tree = mount(<RoutePanel />).root;
+    const tree = mount(<Sheeted />).root;
 
     expect(findTextNodes(tree, (t) => t === '15')).toHaveLength(1);
     expect(findTextNodes(tree, (t) => t === '10.0')).toHaveLength(1);
@@ -152,25 +155,25 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
 
   test('riders row is always shown (this device counts as one live rider)', () => {
     useRouteStore.getState().setRoute(null);
-    const tree = mount(<RoutePanel />).root;
+    const tree = mount(<Sheeted />).root;
     expect(findTextNodes(tree, (t) => t.includes('rider') && t.includes('live'))).not.toHaveLength(0);
   });
 
   test('shows "Recalculating" state while loading', () => {
     useRouteStore.getState().setIsLoading(true);
-    const tree = mount(<RoutePanel />).root;
+    const tree = mount(<Sheeted />).root;
 
     const recalcing = findTextNodes(tree, (t) => t.includes('Recalculating'));
     expect(recalcing.length).toBeGreaterThan(0);
   });
 
   test('expanded view shows safety score, toggle and Google Maps button', () => {
-    const tree = mount(<RoutePanel avoidHazards={true} />).root;
+    const tree = mount(<Sheeted avoidHazards={true} />).root;
 
     // Expand the panel by pressing the sheet toggle
     expand(tree);
 
-    const safetyText = findTextNodes(tree, (t) => t.includes('Safety score'));
+    const safetyText = findTextNodes(tree, (t) => t.toUpperCase().includes('SAFETY SCORE'));
     expect(safetyText.length).toBeGreaterThan(0);
 
     const gmapsText = findTextNodes(tree, (t) => t.includes('Open in Google Maps'));
@@ -183,19 +186,19 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
   });
 
   test('respects avoidHazards prop for toggle text', () => {
-    const treeAvoiding = mount(<RoutePanel avoidHazards={true} />).root;
+    const treeAvoiding = mount(<Sheeted avoidHazards={true} />).root;
     expand(treeAvoiding);
     const avoidingText = findTextNodes(treeAvoiding, (t) => t.includes('Avoiding hazards'));
     expect(avoidingText.length).toBeGreaterThan(0);
 
-    const treeIgnoring = mount(<RoutePanel avoidHazards={false} />).root;
+    const treeIgnoring = mount(<Sheeted avoidHazards={false} />).root;
     expand(treeIgnoring);
     const ignoringText = findTextNodes(treeIgnoring, (t) => t.includes('Hazards ignored'));
     expect(ignoringText.length).toBeGreaterThan(0);
   });
 
   test('expanded view hands turn-by-turn off to Google Maps (no invented turns)', () => {
-    const tree = mount(<RoutePanel />).root;
+    const tree = mount(<Sheeted />).root;
     expand(tree);
     const tbt = findTextNodes(tree, (t) => t.includes("Turn-by-turn isn't built in"));
     expect(tbt.length).toBeGreaterThan(0);
@@ -205,7 +208,7 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
     const onToggle = jest.fn();
     const onGmaps = jest.fn();
     const tree = mount(
-      <RoutePanel avoidHazards={false} onToggleAvoidHazards={onToggle} onOpenInGoogleMaps={onGmaps} />,
+      <Sheeted avoidHazards={false} onToggleAvoidHazards={onToggle} onOpenInGoogleMaps={onGmaps} />,
     ).root;
 
     expand(tree);
@@ -223,7 +226,7 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
   test('avoid-hazards toggle gives the select haptic on press', () => {
     (Platform as any).OS = 'android';
     const spy = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
-    const tree = mount(<RoutePanel avoidHazards={false} onToggleAvoidHazards={jest.fn()} />).root;
+    const tree = mount(<Sheeted avoidHazards={false} onToggleAvoidHazards={jest.fn()} />).root;
     expand(tree);
     spy.mockClear();
     act(() => pressableByLabel(tree, 'Avoiding hazards: off. Tap to enable').props.onPress({}));
@@ -233,16 +236,16 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
   });
 
   test('toggling avoid-hazards re-renders with the new state without throwing', () => {
-    const t = mount(<RoutePanel avoidHazards={false} />);
+    const t = mount(<Sheeted avoidHazards={false} />);
     expand(t.root);
-    act(() => t.update(<RoutePanel avoidHazards />));
+    act(() => t.update(<Sheeted avoidHazards />));
     expect(findTextNodes(t.root, (x) => x.includes('Avoiding hazards')).length).toBeGreaterThan(0);
     expect(pressableByLabel(t.root, 'Avoiding hazards: on. Tap to disable')).toBeDefined();
   });
 
   test('numbers update in place when the route changes (pop animation keeps the row)', () => {
     useRouteStore.getState().setLastValidLocation(FIX);
-    const t = mount(<RoutePanel />);
+    const t = mount(<Sheeted />);
     expect(findTextNodes(t.root, (x) => x === '15')).toHaveLength(1);
     act(() => {
       useRouteStore.getState().setRoute(makeRoute(22, 18.4, 0.8));
@@ -255,7 +258,7 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
   test('recalculating with a route keeps the numbers on screen (pulsing, not replaced)', () => {
     useRouteStore.getState().setLastValidLocation(FIX);
     useRouteStore.getState().setIsLoading(true);
-    const t = mount(<RoutePanel />);
+    const t = mount(<Sheeted />);
     expect(findTextNodes(t.root, (x) => x.includes('Recalculating')).length).toBeGreaterThan(0);
     expect(findTextNodes(t.root, (x) => x === '15')).toHaveLength(1);
     expect(findTextNodes(t.root, (x) => x === '10.0')).toHaveLength(1);
@@ -265,18 +268,23 @@ describe('RoutePanel (master-spec redesign, store-driven)', () => {
   test('recalculating with no route yet shows skeleton blocks, no numbers', () => {
     useRouteStore.getState().setRoute(null);
     useRouteStore.getState().setIsLoading(true);
-    const t = mount(<RoutePanel />);
+    const t = mount(<Sheeted />);
     expect(findTextNodes(t.root, (x) => x.includes('Recalculating')).length).toBeGreaterThan(0);
     const skeletons = t.root.findAll((n) => n.props.accessibilityElementsHidden === true && (n.type as unknown) === 'View');
     expect(skeletons.length).toBeGreaterThanOrEqual(2);
   });
 
-  test('the handle toggles the sheet', () => {
-    const t = mount(<RoutePanel />);
-    expect(pressableByLabel(t.root, 'Expand sheet')).toBeDefined();
-    act(() => pressableByLabel(t.root, 'Expand sheet').props.onPress({}));
-    expect(pressableByLabel(t.root, 'Collapse sheet')).toBeDefined();
-    expect(findTextNodes(t.root, (x) => x.includes('Safety score')).length).toBeGreaterThan(0);
+  test('the scrim and the grab handle close the sheet', () => {
+    const onClose = jest.fn();
+    const t = mount(<RouteSheet visible onClose={onClose} />);
+    act(() => t.root.findByProps({ testID: 'sheet-scrim' }).props.onPress());
+    act(() => t.root.findAllByProps({ accessibilityLabel: 'Close sheet' })[0].props.onPress());
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  test('closed: renders nothing', () => {
+    const t = mount(<RouteSheet visible={false} onClose={jest.fn()} />);
+    expect(t.toJSON()).toBeNull();
   });
 });
 
@@ -303,10 +311,5 @@ describe('routePanelMode (pure)', () => {
   test('empty-state copy is the agreed wording', () => {
     expect(EMPTY_STATE_COPY['no-fix'].title).toBe('Waiting for your location');
     expect(EMPTY_STATE_COPY['no-destination'].title).toBe('Pick a destination');
-  });
-
-  test('collapsed height is a positive whole number (camera padding relies on it)', () => {
-    expect(Number.isInteger(COLLAPSED_HEIGHT)).toBe(true);
-    expect(COLLAPSED_HEIGHT).toBeGreaterThan(0);
   });
 });

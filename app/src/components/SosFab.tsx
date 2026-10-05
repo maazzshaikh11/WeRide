@@ -1,31 +1,26 @@
 /**
- * SosFab — SOS FAB with anti-accidental hold guard (spec §4.2).
- * Requires a 2-second press-and-hold; a progress ring just outside the button
- * fills clockwise during the hold. On a complete hold -> opens the SOS
- * confirmation modal (SosModal).
+ * SosFab — the SOS control of the live screen (demo.html `.ctl.sos`): a 96×88
+ * outlined-red key. It keeps the anti-accidental 2-second press-and-hold; while
+ * held, a red fill rises from the bottom and the key flips to solid red.
+ * On a complete hold -> opens the SOS confirmation modal (SosModal).
  *
  * Feel:
- *  - the button visibly depresses while held (PressableScale, scaleTo 0.88) and
- *    springs back on release;
+ *  - the key depresses while held (PressableScale) and springs back on release;
  *  - `haptic('warning')` once the hold registers (REGISTER_MS — a brush or tap
  *    never buzzes), `haptic('heavy')` when it completes;
  *  - releasing early cancels everything: no completion, no further haptic.
- *
- * The ring is SEGMENTS short bars laid out around the circle. Each bar's
- * opacity is interpolated from one native-driven progress value (0 -> 1 over
- * HOLD_MS), so the ring fills smoothly on the UI thread without SVG.
+ * The fill is a single transform driven natively (scaleY from the bottom edge).
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { WeRideColors } from '../theme/theme';
-import { type } from '../theme/typography';
+import { Text, Animated } from 'react-native';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { haptic, PressableScale } from '../ui';
 
 const HOLD_MS = 2000;
 /** The hold must persist this long before it "registers" (warning haptic). */
 const REGISTER_MS = 200;
-const SEGMENTS = 24;
-const SEGMENT_INDEXES = Array.from({ length: SEGMENTS }, (_, i) => i);
+export const SOS_KEY_W = 96;
+export const SOS_KEY_H = 88;
 
 interface Props {
   onHoldComplete: () => void;
@@ -33,6 +28,12 @@ interface Props {
 }
 
 export default function SosFab({ onHoldComplete, disabled }: Props) {
+  const { colors, type } = useTheme();
+  const [armed, setArmed] = React.useState(false);
+  const styles = useStyles(({ colors: c }) => ({
+    key: { width: SOS_KEY_W, height: SOS_KEY_H, borderRadius: 24, borderWidth: 3, borderColor: c.bad, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 4 },
+    fill: { position: 'absolute', left: 0, right: 0, bottom: 0, height: SOS_KEY_H, backgroundColor: c.bad },
+  }));
   const progress = useRef(new Animated.Value(0)).current;
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const registerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,6 +57,7 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
 
   const cancelHold = () => {
     holdingRef.current = false;
+    setArmed(false);
     clearTimers();
     resetRing(150);
   };
@@ -71,6 +73,7 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
   const startHold = () => {
     if (disabled || holdingRef.current) return;
     holdingRef.current = true;
+    setArmed(true);
     progress.stopAnimation();
     progress.setValue(0);
     Animated.timing(progress, {
@@ -86,6 +89,7 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
       holdingRef.current = false;
+      setArmed(false);
       if (registerTimer.current) {
         clearTimeout(registerTimer.current);
         registerTimer.current = null;
@@ -98,88 +102,35 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
     }, HOLD_MS);
   };
 
-  // Track appears as soon as the hold starts; bars light up one after another.
-  const trackOpacity = progress.interpolate({ inputRange: [0, 0.01], outputRange: [0, 0.18], extrapolate: 'clamp' });
+  const fg = armed ? '#FFFFFF' : colors.bad;
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.ring} pointerEvents="none">
-        {SEGMENT_INDEXES.map((i) => {
-          const from = i / SEGMENTS;
-          const to = (i + 1) / SEGMENTS;
-          const fill = progress.interpolate({
-            inputRange: [from, to],
-            outputRange: [0, 1],
-            extrapolate: 'clamp',
-          });
-          return (
-            <View key={i} style={[styles.segmentBox, { transform: [{ rotate: `${(360 / SEGMENTS) * i}deg` }] }]}>
-              <Animated.View style={[styles.bar, styles.track, { opacity: trackOpacity }]} />
-              <Animated.View style={[styles.bar, styles.fill, { opacity: fill }]} />
-            </View>
-          );
-        })}
-      </View>
-      <PressableScale
-        onPressIn={startHold}
-        onPressOut={cancelHold}
-        disabled={disabled}
-        haptic={false}
-        scaleTo={0.88}
-        style={styles.fab}
-        accessibilityLabel="Hold for 2 seconds to send SOS"
-        accessibilityHint="Press and hold to open the SOS confirmation"
-        accessibilityRole="button"
-      >
-        <Text style={styles.fabText}>SOS</Text>
-      </PressableScale>
-    </View>
+    <PressableScale
+      onPressIn={startHold}
+      onPressOut={cancelHold}
+      disabled={disabled}
+      haptic={false}
+      scaleTo={0.95}
+      style={styles.key}
+      testID="sos-key"
+      accessibilityLabel="Hold for 2 seconds to send SOS"
+      accessibilityHint="Press and hold to open the SOS confirmation"
+      accessibilityRole="button"
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.fill,
+          {
+            transform: [
+              { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [SOS_KEY_H / 2, 0] }) },
+              { scaleY: progress },
+            ],
+          },
+        ]}
+      />
+      <Text style={[type.h2, { color: fg, fontFamily: type.plateTitle.fontFamily, fontSize: 26, lineHeight: 26 }]}>SOS</Text>
+      <Text style={[type.tab, { color: fg, fontSize: 10, lineHeight: 12 }]}>HOLD</Text>
+    </PressableScale>
   );
 }
-
-const SIZE = 48;
-const RING_GAP = 4;
-const RING_SIZE = SIZE + RING_GAP * 2;
-
-const styles = StyleSheet.create({
-  wrap: { width: SIZE, height: SIZE },
-  // The ring sits just outside the 48 px button so the button never hides it.
-  ring: {
-    position: 'absolute',
-    top: -RING_GAP,
-    left: -RING_GAP,
-    width: RING_SIZE,
-    height: RING_SIZE,
-  },
-  segmentBox: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: RING_SIZE,
-    height: RING_SIZE,
-    alignItems: 'center',
-  },
-  bar: {
-    position: 'absolute',
-    top: 0,
-    width: 6,
-    height: 3,
-    borderRadius: 1,
-  },
-  track: { backgroundColor: WeRideColors.white },
-  fill: { backgroundColor: WeRideColors.white },
-  fab: {
-    width: SIZE,
-    height: SIZE,
-    borderRadius: SIZE / 2,
-    backgroundColor: WeRideColors.red,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  fabText: { ...type.labelStrong, letterSpacing: 0.5, color: WeRideColors.white },
-});

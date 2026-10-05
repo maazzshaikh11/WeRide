@@ -1,13 +1,6 @@
 /**
- * Pure layout constants + empty-state logic for RoutePanel.
- *
- * COLLAPSED_HEIGHT is the single source of truth for the collapsed sheet
- * height: MapScreen uses it for the camera padding and the FAB column offset,
- * so the route is framed clear of the sheet.
+ * Pure empty-state logic for the route details sheet (RouteSheet).
  */
-
-export const COLLAPSED_HEIGHT = 192;
-export const MAX_HEIGHT = 420;
 
 export type RoutePanelMode =
   | 'loading'

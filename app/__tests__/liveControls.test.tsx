@@ -1,14 +1,13 @@
 /**
- * Map floating controls: FABs call their handlers and give the agreed press
- * haptics, the recenter FAB's active state cross-fades (both glyph layers stay
- * mounted), the signal menu still emits only allowlisted labels and animates
- * out before unmounting, and AvatarStack pops only riders that join later.
+ * Live-screen controls: side buttons and control keys call their handlers and give
+ * the agreed press haptics, the signal sheet still emits only allowlisted labels and
+ * animates out before unmounting, AvatarStack pops only riders that join later, and
+ * NetworkBanner dismisses as agreed.
  */
 import React from 'react';
-import { Platform, Text, Vibration, View } from 'react-native';
+import { Platform, Text, Vibration } from 'react-native';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
-import Fab from '../src/components/Fab';
-import NavFab from '../src/components/NavFab';
+import { ControlKey, SideButton } from '../src/screens/map/live/LiveChrome';
 import AvatarStack from '../src/components/AvatarStack';
 import NetworkBanner from '../src/components/NetworkBanner';
 
@@ -16,7 +15,7 @@ const mockSocket = { connected: true, emit: jest.fn() };
 jest.mock('../src/services/socketService', () => ({
   getLocationSocket: () => mockSocket,
 }));
-import SignalMenu, { SIGNAL_OPTIONS } from '../src/components/SignalMenu';
+import SignalSheet, { SIGNAL_OPTIONS } from '../src/components/SignalSheet';
 import { useToastStore } from '../src/store/toastStore';
 
 const mounted: ReactTestRenderer[] = [];
@@ -31,16 +30,13 @@ function render(el: React.ReactElement) {
 const real = (t: ReactTestRenderer, label: string) =>
   t.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
 
-describe('FABs', () => {
+describe('live controls', () => {
   let vibrate: jest.SpyInstance;
   const originalOS = Platform.OS;
   beforeEach(() => {
     (Platform as any).OS = 'android';
     vibrate = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
     vibrate.mockClear();
-    mockSocket.connected = true;
-    mockSocket.emit.mockClear();
-    useToastStore.setState({ toasts: [] });
   });
   afterEach(() => {
     mounted.splice(0).forEach((t) => act(() => t.unmount()));
@@ -48,61 +44,26 @@ describe('FABs', () => {
     vibrate.mockRestore();
   });
 
-  it('Fab press calls the handler with the select haptic by default', () => {
+  it('SideButton press calls the handler with the select haptic and keeps its label/selected state', () => {
     const onPress = jest.fn();
-    const t = render(
-      <Fab onPress={onPress} accessibilityLabel="Follow my location">
-        <View />
-      </Fab>,
-    );
-    act(() => real(t, 'Follow my location').props.onPress({}));
+    const t = render(<SideButton icon="gps" label="FOLLOW" active onPress={onPress} accessibilityLabel="Follow my location" />);
+    const btn = real(t, 'Follow my location');
+    expect(btn.props.accessibilityState.selected).toBe(true);
+    act(() => btn.props.onPress({}));
     expect(onPress).toHaveBeenCalledTimes(1);
     expect(vibrate).toHaveBeenCalledWith(12);
   });
 
-  it('NavFab press calls the handler with the tap haptic and keeps its label', () => {
+  it('ControlKey press calls the handler with the select haptic', () => {
     const onPress = jest.fn();
-    const t = render(<NavFab onPress={onPress} />);
-    act(() => real(t, 'Navigate in Google Maps').props.onPress({}));
+    const t = render(<ControlKey icon="haz" label="Hazard" onPress={onPress} accessibilityLabel="Report a hazard" />);
+    act(() => real(t, 'Report a hazard').props.onPress({}));
     expect(onPress).toHaveBeenCalledTimes(1);
-    expect(vibrate).toHaveBeenCalledWith(8);
-  });
-
-  it('active state keeps both glyph layers mounted (cross-fade, not a swap)', () => {
-    const off = <View testID="glyph-off" />;
-    const on = <View testID="glyph-on" />;
-    const t = render(
-      <Fab active={false} activeChildren={on} accessibilityLabel="Recenter">
-        {off}
-      </Fab>,
-    );
-    const ids = () => t.root.findAll((n) => n.props.testID === 'glyph-off' || n.props.testID === 'glyph-on').length;
-    const before = ids();
-    expect(before).toBeGreaterThan(0);
-    act(() =>
-      t.update(
-        <Fab active activeChildren={on} accessibilityLabel="Recenter">
-          {off}
-        </Fab>,
-      ),
-    );
-    expect(ids()).toBe(before);
-    expect(t.root.findAll((n) => n.props.testID === 'glyph-on').length).toBeGreaterThan(0);
-    expect(t.root.findAll((n) => n.props.testID === 'glyph-off').length).toBeGreaterThan(0);
-  });
-
-  it('disabled Fab does not fire', () => {
-    const onPress = jest.fn();
-    const t = render(
-      <Fab onPress={onPress} disabled accessibilityLabel="x">
-        <View />
-      </Fab>,
-    );
-    expect(real(t, 'x').props.disabled).toBe(true);
+    expect(vibrate).toHaveBeenCalledWith(12);
   });
 });
 
-describe('SignalMenu (motion)', () => {
+describe('SignalSheet (motion)', () => {
   const originalOS = Platform.OS;
   afterEach(() => {
     mounted.splice(0).forEach((t) => act(() => t.unmount()));
@@ -116,7 +77,7 @@ describe('SignalMenu (motion)', () => {
   });
 
   it('every option is a pressable that emits only an allowlisted label', () => {
-    const t = render(<SignalMenu visible groupId="g" riderId="r" onSend={jest.fn()} />);
+    const t = render(<SignalSheet visible groupId="g" riderId="r" onSend={jest.fn()} />);
     SIGNAL_OPTIONS.forEach((o) => {
       act(() => real(t, `Send signal: ${o.label}`).props.onPress({}));
     });
@@ -129,7 +90,7 @@ describe('SignalMenu (motion)', () => {
     (Platform as any).OS = 'android';
     const vibrate = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
     vibrate.mockClear();
-    const t = render(<SignalMenu visible groupId="g" riderId="r" onSend={jest.fn()} />);
+    const t = render(<SignalSheet visible groupId="g" riderId="r" onSend={jest.fn()} />);
     act(() => real(t, 'Send signal: All good').props.onPress({}));
     expect(vibrate).toHaveBeenCalledTimes(1);
     expect(vibrate).toHaveBeenCalledWith(12);
@@ -143,8 +104,8 @@ describe('SignalMenu (motion)', () => {
 
   it('closing keeps the menu mounted for the exit animation, then removes it', () => {
     jest.useFakeTimers();
-    const t = render(<SignalMenu visible groupId="g" riderId="r" onSend={jest.fn()} />);
-    act(() => t.update(<SignalMenu visible={false} groupId="g" riderId="r" onSend={jest.fn()} />));
+    const t = render(<SignalSheet visible groupId="g" riderId="r" onSend={jest.fn()} />);
+    act(() => t.update(<SignalSheet visible={false} groupId="g" riderId="r" onSend={jest.fn()} />));
     // Still rendered, but not interactive while it animates out.
     expect(t.toJSON()).not.toBeNull();
     const menu = t.root.findAll((n) => n.props.pointerEvents === 'none' && n.props.style)[0];

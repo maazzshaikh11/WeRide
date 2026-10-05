@@ -1,23 +1,29 @@
 /**
- * Live Map (core screen) — redesigned per master spec §3.3.
- * Layer 0: Mapbox map (dark style)
- * Layer 1: map overlays (riders, hazards, SOS, route line)
- * Layer 2: floating UI — one header bar (back, ride name, live pill), toasts,
- *          banners, FAB column (recenter / nav / signal / SOS), signal menu,
- *          bottom sheet, info cards, SOS modal.
+ * Live Ride screen — demo.html "Road mode", on a real Mapbox map.
+ * Layer 0: Mapbox map (dark/light by theme)
+ * Layer 1: map overlays (riders, hazards, SOS, route line) + the rider's own avatar,
+ *          with a small floating distance label pinned to its RIGHT (distance to the
+ *          nearest live crew member, from real verified fixes — nothing simulated)
+ * Layer 2: floating UI — header (back, ride name, live pill), one status plate
+ *          ("is the group OK?"), side buttons (follow/fit, Google Maps, route details),
+ *          speed + ETA cluster, and the control keys (SOS hold, Signal, Hazard, Talk).
+ *          Signal / Hazard / Route open as sheets.
+ *
+ * There is no separate crew-ahead/behind panel: the readout belongs next to the avatar.
  *
  * Person A/B/C/D functionality fully preserved:
  *  - TrackingService lifecycle (Person A)
  *  - Hazard/SOS Firestore subscriptions (Person B)
  *  - RoutingClient + route store (Person C)
- *  - VoxClient untouched — Voice tab owns voice now (Person D)
+ *  - VoxClient untouched — Voice tab owns voice now (Person D); Talk opens it
  */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, Linking, ScrollView, Animated, useWindowDimensions } from 'react-native';
+import { View, Text, Linking, ScrollView } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAPBOX_TOKEN } from '@env';
+import { Plate } from '../../ui';
 import RiderMarkerOverlay, { RiderInfoCard } from './overlays/RiderMarkerOverlay';
 import { HazardOverlayMapLayer, HazardOverlayInfoCard } from './overlays/HazardOverlay';
 import { SosOverlayMapLayer, SosOverlayInfoCards, ActiveSos } from './overlays/SosOverlay';
@@ -27,18 +33,15 @@ import { useAppStore } from '../../store/appStore';
 import { useRidersStore } from '../../store/ridersStore';
 import { useRouteStore } from '@routing/client/routeStore';
 import { useToastStore } from '../../store/toastStore';
-import { WeRideColors, WeRideRadius } from '../../theme/theme';
-import { type } from '../../theme/typography';
+import { useStyles, useTheme } from '../../theme/ThemeProvider';
 import { getToggleAvoidHazards } from './overlays/routeControls';
 import LivePill from '../../components/LivePill';
 import ToastContainer from '../../components/ToastContainer';
 import NetworkBanner from '../../components/NetworkBanner';
-import SignalMenu from '../../components/SignalMenu';
-import RoutePanel from '../../components/RoutePanel';
-import { COLLAPSED_HEIGHT as ROUTE_PANEL_COLLAPSED_H, MAX_HEIGHT as ROUTE_PANEL_MAX_H } from '../../components/routePanelState';
+import SignalSheet from '../../components/SignalSheet';
+import HazardSheet from '../../components/HazardSheet';
+import RouteSheet from '../../components/RouteSheet';
 import SosModal from '../../components/SosModal';
-import Fab, { FAB_SIZE } from '../../components/Fab';
-import NavFab from '../../components/NavFab';
 import SosFab from '../../components/SosFab';
 import { googleMapsDeepLink } from '@routing/client/deepLink';
 import { GroupService } from '@routing/group/groupService';
@@ -46,12 +49,14 @@ import { resolveSos } from '@hazard/services/sosService';
 import { resolveHazard } from '@hazard/services/hazardService';
 import { useRidePlanStore } from '../../store/ridePlanStore';
 import { useStopsStore } from '../../store/stopsStore';
-import { Motion, PressableScale, useReducedMotion } from '../../ui';
+import { Icon, PressableScale } from '../../ui';
 import { fitPadding } from '../../utils/mapFit';
 import { nextNetworkBanner, NetworkTracker } from '../../utils/networkBanner';
 import { fitPointsFor, fitSignature } from './rideGeometry';
 import { useRouteFit } from './useRouteFit';
-import { ROUTE_COLOR } from './mapStyle';
+import LiveAvatar from './live/LiveAvatar';
+import { ControlKey, CONTROL_GAP, CONTROL_H, SIDE_BTN, SideButton, SpeedCluster, Vignettes, clockAfter } from './live/LiveChrome';
+import { formatGap, freshRiders, liveStatus, nearestRider } from './live/liveGeometry';
 
 // Phase 6 — tracking service wiring (Person A, unchanged)
 import { Ekf } from '@tracking/ekf';
@@ -64,22 +69,25 @@ import { getLocationSocket } from '../../services/socketService';
 MapboxGL.setAccessToken(MAPBOX_TOKEN ?? '');
 
 // Floating-UI footprint the route must stay clear of when the camera frames it.
-// Single source of truth: the header, FAB column and sheet below are all laid
-// out from these numbers.
-const GUTTER = 16;                                    // screen side gutter
-const HEADER_PAD = 8;                                 // gap above / below the header bar
-const HEADER_BAR_H = 52;                              // header bar (back chip, ride name, live pill)
-const HEADER_CONTENT_H = HEADER_PAD + HEADER_BAR_H + HEADER_PAD; // below the status-bar inset
-const FAB_GAP = 12;
-const FAB_COLUMN_W = FAB_SIZE + GUTTER;               // FAB + right gutter
-const SHEET_COLLAPSED_H = ROUTE_PANEL_COLLAPSED_H;    // RoutePanel collapsed height
-const FAB_COLUMN_BOTTOM = SHEET_COLLAPSED_H + GUTTER; // FAB column sits above the collapsed sheet
+// Single source of truth: the header, status plate, side buttons, cluster and
+// controls below are all laid out from these numbers.
+const GUTTER = 14;                                    // screen side gutter (demo: 14)
+const HEADER_PAD = 8;                                 // gap above / below the header row
+const HEADER_BAR_H = 44;                              // back chip / title / live pill row
+const PLATE_H = 82;                                   // status plate (demo min-height 82)
+const TOP_CHROME_H = HEADER_PAD + HEADER_BAR_H + HEADER_PAD + PLATE_H + HEADER_PAD; // below the status-bar inset
+const SIDE_COLUMN_W = SIDE_BTN + GUTTER;              // side buttons + right gutter
+const CLUSTER_H = 132;                                // speed / ETA cluster
+const CONTROLS_BOTTOM = 16;                           // controls sit this far above the tab bar
+const BOTTOM_CHROME_H = CONTROLS_BOTTOM + CONTROL_H + CLUSTER_H + 8;
+const SIDE_GAP = 12;
 const NETWORK_BANNER_H = 64;                          // reserved height of the banner (toasts stack below it)
 const FOLLOW_ZOOM = 16;
 
 /** Minimal slice of the tab navigator's `navigation` prop that MapScreen uses. */
 export interface MapScreenNavigation {
   goBack: () => void;
+  navigate?: (name: string) => void;
   getParent?: () => { goBack: () => void } | undefined;
 }
 
@@ -99,13 +107,28 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
   const avoidHazardTypes = useRouteStore((s) => s.avoidHazardTypes);
   const push = useToastStore((s) => s.push);
   const insets = useSafeAreaInsets();
-  const { height: windowH } = useWindowDimensions();
-  const reducedMotion = useReducedMotion();
-
-  // The expanded route sheet grows over the FAB column (SOS included). The column
-  // rides up with it on the same spring, capped so it never runs into the header.
-  const [sheetExpanded, setSheetExpanded] = useState(false);
-  const fabLift = useRef(new Animated.Value(0)).current;
+  const { road, scheme } = useTheme();
+  const styles = useStyles(({ road: r, roadType: t }) => ({
+    container: { flex: 1, backgroundColor: r.bg },
+    map: { flex: 1 },
+    top: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: GUTTER, zIndex: 10 },
+    headerRow: { height: HEADER_BAR_H, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    iconBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: r.card, borderWidth: 1.5, borderColor: r.line, alignItems: 'center', justifyContent: 'center' },
+    titleBox: { flex: 1, minWidth: 0, justifyContent: 'center', paddingHorizontal: 12, height: 44, borderRadius: 14, backgroundColor: r.card, borderWidth: 1.5, borderColor: r.line },
+    title: { ...t.h3, fontSize: 16, lineHeight: 20 },
+    bannerWrap: { position: 'absolute', left: 0, right: 0, zIndex: 20 },
+    sideColumn: { position: 'absolute', right: GUTTER, gap: SIDE_GAP, zIndex: 30 },
+    bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25 },
+    infoCardsScroll: { maxHeight: 220 },
+    infoCardsContent: { paddingRight: SIDE_COLUMN_W - GUTTER },
+    controls: { position: 'absolute', left: GUTTER, right: GUTTER, bottom: CONTROLS_BOTTOM, flexDirection: 'row', gap: CONTROL_GAP, zIndex: 25 },
+    noGroup: { flex: 1, backgroundColor: r.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8 },
+    noGroupTitle: { ...t.h2 },
+    noGroupSub: { ...t.body, textAlign: 'center' },
+  }));
+  const [signalOpen, setSignalOpen] = useState(false);
+  const [hazardOpen, setHazardOpen] = useState(false);
+  const [routeOpen, setRouteOpen] = useState(false);
 
   // Camera: frame the route (Google Maps style); follow the rider only on request.
   const cameraRef = useRef<MapboxGL.Camera>(null);
@@ -117,7 +140,6 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
   const [followPref, setFollowPref] = useState<boolean | null>(null);
 
   // UI state
-  const [signalMenuOpen, setSignalMenuOpen] = useState(false);
   const [sosModalOpen, setSosModalOpen] = useState(false);
   const [sosEvents, setSosEvents] = useState<ActiveSos[]>([]);
   const [selectedHazard, setSelectedHazard] = useState<any>(null);
@@ -257,20 +279,6 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
 
   const riderCount = riders.size;
 
-  const fabColumnH = 4 * FAB_SIZE + 3 * FAB_GAP;
-  const maxLift = Math.max(
-    0,
-    Math.min(
-      ROUTE_PANEL_MAX_H - ROUTE_PANEL_COLLAPSED_H,
-      windowH - FAB_COLUMN_BOTTOM - fabColumnH - (insets.top + HEADER_CONTENT_H + GUTTER),
-    ),
-  );
-  const fabLiftPx = sheetExpanded ? maxLift : 0;
-  useEffect(() => {
-    if (reducedMotion) fabLift.setValue(-fabLiftPx);
-    else Animated.spring(fabLift, { toValue: -fabLiftPx, ...Motion.spring, useNativeDriver: true }).start();
-  }, [fabLiftPx, reducedMotion, fabLift]);
-
   const plan = useMemo(
     () => ({ start: planStart, stops: planStops, destination: planDestination }),
     [planStart, planStops, planDestination],
@@ -281,9 +289,9 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
   const padding = useMemo(
     () =>
       fitPadding({
-        headerHeight: insets.top + HEADER_CONTENT_H,
-        fabColumnWidth: FAB_COLUMN_W,
-        sheetHeight: SHEET_COLLAPSED_H,
+        headerHeight: insets.top + TOP_CHROME_H,
+        fabColumnWidth: SIDE_COLUMN_W,
+        sheetHeight: BOTTOM_CHROME_H,
       }),
     [insets.top],
   );
@@ -354,6 +362,18 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
     }
   }, [navigation]);
 
+  // ---- live values: all from real data; null/empty when there is nothing to show ----
+  const others = useMemo(() => freshRiders(riders, userId), [riders, userId]);
+  const own = lastValidLocation ? { lat: lastValidLocation.lat, lng: lastValidLocation.lng } : null;
+  const nearest = nearestRider(own, others);
+  const gapLabel = nearest ? formatGap(nearest.distanceM) : null;
+  const sosFrom = sosEvents.find((e) => !e.resolved && !e.isSender)?.rider_id ?? null;
+  const status = liveStatus({ own, others, signalLost: networkBanner === 'lost', sosFrom });
+  const speedKmh = lastValidLocation && Number.isFinite(lastValidLocation.speed_mps) ? Math.max(0, lastValidLocation.speed_mps * 3.6) : null;
+  const etaClock = route && Number.isFinite(route.eta_minutes) ? clockAfter(route.eta_minutes) : null;
+  const remainingKm = route && Number.isFinite(route.distance_km) ? route.distance_km : null;
+  const toLabel = planDestination?.label?.split(',')[0] ?? null;
+
   // Explicit empty state: no demo-group fallback. All hooks above run
   // unconditionally, so this early return is hook-safe.
   if (!groupId) {
@@ -367,12 +387,14 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
     );
   }
 
+  const topInset = insets.top + TOP_CHROME_H;
+
   return (
     <View style={styles.container}>
       {/* Layer 0 — Map */}
       <MapboxGL.MapView
         style={styles.map}
-        styleURL={MapboxGL.StyleURL.Dark}
+        styleURL={scheme === 'dark' ? MapboxGL.StyleURL.Dark : MapboxGL.StyleURL.Light}
         scaleBarEnabled={false}
         onDidFinishLoadingMap={() => setMapReady(true)}
       >
@@ -390,34 +412,45 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
             }
           }}
         />
-        <MapboxGL.UserLocation showsUserHeadingIndicator />
+        {/* The system puck only until our own avatar (below) has a fix to sit on. */}
+        <MapboxGL.UserLocation showsUserHeadingIndicator visible={!lastValidLocation} />
         {/* Layer 1 — map overlays */}
         <RiderMarkerOverlay groupId={groupId} />
         <HazardOverlayMapLayer groupId={groupId} onHazardPress={setSelectedHazard} />
         <SosOverlayMapLayer groupId={groupId} userId={userId ?? undefined} onSosEventsChange={onSosEventsChange} />
         <RouteOverlay groupId={groupId} />
+        {/* Own avatar, with the live distance label to its right. */}
+        {lastValidLocation ? (
+          <MapboxGL.MarkerView
+            id="own-avatar"
+            coordinate={[lastValidLocation.lng, lastValidLocation.lat]}
+            anchor={{ x: 0.5, y: 0.5 }}
+            allowOverlap
+          >
+            <LiveAvatar label={gapLabel} />
+          </MapboxGL.MarkerView>
+        ) : null}
       </MapboxGL.MapView>
+
+      <Vignettes />
 
       {/* Layer 2 — floating UI */}
 
-      {/* 3.3.1 Screen header: one bar — back, ride name + FL/privacy line, live pill */}
-      <View
-        style={[styles.header, { paddingTop: insets.top + HEADER_PAD, paddingBottom: HEADER_PAD }]}
-        pointerEvents="box-none"
-      >
-        <View style={[styles.headerBar, navigation ? styles.headerBarWithBack : null]}>
+      {/* Header row + the one status plate */}
+      <View style={[styles.top, { paddingTop: insets.top + HEADER_PAD }]} pointerEvents="box-none">
+        <View style={styles.headerRow}>
           {navigation ? (
             <PressableScale
-              style={styles.backBtn}
+              style={styles.iconBtn}
               onPress={goToRides}
               haptic="tap"
               accessibilityLabel="Back to rides"
               accessibilityRole="button"
             >
-              <Text style={styles.backText}>‹ Rides</Text>
+              <Icon name="back" size={22} color={road.ink} />
             </PressableScale>
           ) : null}
-          <View style={styles.headerTitles}>
+          <View style={styles.titleBox}>
             <Text style={styles.title} numberOfLines={1}>
               {rideName ?? groupId.slice(0, 8)}
             </Text>
@@ -425,11 +458,23 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
           </View>
           <LivePill variant={connected ? 'live' : 'grey'} />
         </View>
+        <View style={{ marginTop: HEADER_PAD }}>
+          <Plate
+            key={status.key}
+            testID="status-plate"
+            tone={status.tone}
+            icon={status.icon}
+            title={status.title}
+            subtitle={status.subtitle}
+            titleSize={status.title.length > 17 ? 23 : 28}
+            style={{ minHeight: PLATE_H }}
+          />
+        </View>
       </View>
 
-      {/* 3.3.5 Network banner */}
+      {/* Network banner */}
       {networkBanner && (
-        <View style={[styles.bannerWrap, { top: insets.top + HEADER_CONTENT_H }]}>
+        <View style={[styles.bannerWrap, { top: topInset }]}>
           <NetworkBanner
             state={networkBanner}
             riderName={userId ? `Rider ${userId.slice(-4)}` : 'A rider'}
@@ -438,62 +483,25 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
         </View>
       )}
 
-      {/* 3.3.3 Toasts: below the header (and below the banner when it is up) */}
-      <ToastContainer
-        top={insets.top + HEADER_CONTENT_H + (networkBanner ? NETWORK_BANNER_H : 0)}
-      />
+      {/* Toasts: below the plate (and below the banner when it is up) */}
+      <ToastContainer top={topInset + (networkBanner ? NETWORK_BANNER_H : 0)} />
 
-      {/* 3.3.7 Signal menu: opens beside the signal FAB */}
-      <SignalMenu
-        visible={signalMenuOpen}
-        groupId={groupId}
-        riderId={userId ?? ''}
-        onSend={() => setSignalMenuOpen(false)}
-        right={FAB_COLUMN_W + FAB_GAP}
-        bottom={FAB_COLUMN_BOTTOM + FAB_SIZE + FAB_GAP + fabLiftPx}
-      />
-
-      {/* 3.3.6 FAB column */}
-      <Animated.View style={[styles.fabColumn, { transform: [{ translateY: fabLift }] }]}>
-        {/* Recenter: the accent border and the glyph colour cross-fade (Fab) instead of swapping. */}
-        <Fab
-          onPress={toggleFollow}
+      {/* Side buttons: follow/fit, Google Maps, route details */}
+      <View style={[styles.sideColumn, { top: topInset + SIDE_GAP }]} pointerEvents="box-none">
+        <SideButton
+          icon={following ? 'gps' : 'target'}
+          label={following ? 'FOLLOW' : 'FIT'}
           active={following}
-          haptic="select"
+          onPress={toggleFollow}
           accessibilityLabel={following ? 'Show the whole route' : 'Follow my location'}
-          accessibilityRole="button"
-          activeChildren={
-            <View style={[styles.locateRing, styles.locateRingOn]}>
-              <View style={[styles.locateDot, styles.locateDotOn]} />
-            </View>
-          }
-        >
-          <View style={styles.locateRing}>
-            <View style={styles.locateDot} />
-          </View>
-        </Fab>
-        <NavFab onPress={openGoogleMaps} />
-        <Fab
-          onPress={() => setSignalMenuOpen((v) => !v)}
-          active={signalMenuOpen}
-          haptic="select"
-          accessibilityLabel="Send a quick signal"
-          accessibilityRole="button"
-        >
-          <View style={styles.bubble}>
-            <View style={styles.bubbleDot} />
-            <View style={styles.bubbleDot} />
-            <View style={styles.bubbleDot} />
-          </View>
-        </Fab>
-        <SosFab
-          onHoldComplete={() => setSosModalOpen(true)}
-          disabled={sosActive}
+          testID="side-follow"
         />
-      </Animated.View>
+        <SideButton icon="nav" label="MAPS" onPress={openGoogleMaps} accessibilityLabel="Open route in Google Maps" testID="side-maps" />
+        <SideButton icon="route" label="ROUTE" onPress={() => setRouteOpen(true)} accessibilityLabel="Route details" testID="side-route" />
+      </View>
 
-      {/* Bottom stack: info cards, SOS info cards, bottom sheet */}
-      <View style={styles.bottomStack} pointerEvents="box-none">
+      {/* Info cards (hazard / SOS / rider) sit above the controls */}
+      <View style={[styles.bottom, { bottom: CONTROLS_BOTTOM + CONTROL_H + 12 }]} pointerEvents="box-none">
         <ScrollView
           style={styles.infoCardsScroll}
           contentContainerStyle={styles.infoCardsContent}
@@ -526,25 +534,58 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
           />
           <RiderInfoCard />
         </ScrollView>
-
-        <View pointerEvents="box-none">
-          <RoutePanel
-            onExpandedChange={setSheetExpanded}
-            avoidHazards={avoidHazardTypes.length > 0}
-            onToggleAvoidHazards={() => {
-              const toggle = getToggleAvoidHazards();
-              if (toggle) {
-                toggle();
-              } else {
-                push('Route not ready yet', 'warn');
-              }
-            }}
-            onOpenInGoogleMaps={openGoogleMaps}
-          />
-        </View>
       </View>
 
-      {/* 3.3.11 SOS modal */}
+      {/* Speed, ETA, distance left — tap for route details */}
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: CONTROLS_BOTTOM + CONTROL_H + 8, zIndex: 20 }} pointerEvents="box-none">
+        <SpeedCluster
+          speedKmh={speedKmh}
+          etaClock={etaClock}
+          remainingKm={remainingKm}
+          toLabel={toLabel}
+          onPress={() => setRouteOpen(true)}
+        />
+      </View>
+
+      {/* Control keys: SOS (hold) · Signal · Hazard · Talk */}
+      <View style={styles.controls}>
+        <SosFab onHoldComplete={() => setSosModalOpen(true)} disabled={sosActive} />
+        <ControlKey icon="signal" label="Signal" onPress={() => setSignalOpen(true)} accessibilityLabel="Send a quick signal" testID="key-signal" />
+        <ControlKey icon="haz" label="Hazard" onPress={() => setHazardOpen(true)} accessibilityLabel="Report a hazard" testID="key-hazard" />
+        <ControlKey icon="mic" label="Talk" onPress={() => navigation?.navigate?.('Voice')} accessibilityLabel="Talk to the crew" testID="key-talk" />
+      </View>
+
+      {/* Sheets */}
+      <SignalSheet
+        visible={signalOpen}
+        groupId={groupId}
+        riderId={userId ?? ''}
+        onSend={() => setSignalOpen(false)}
+        onClose={() => setSignalOpen(false)}
+      />
+      <HazardSheet
+        visible={hazardOpen}
+        onClose={() => setHazardOpen(false)}
+        groupId={groupId}
+        riderId={userId}
+        location={lastValidLocation}
+      />
+      <RouteSheet
+        visible={routeOpen}
+        onClose={() => setRouteOpen(false)}
+        avoidHazards={avoidHazardTypes.length > 0}
+        onToggleAvoidHazards={() => {
+          const toggle = getToggleAvoidHazards();
+          if (toggle) {
+            toggle();
+          } else {
+            push('Route not ready yet', 'warn');
+          }
+        }}
+        onOpenInGoogleMaps={openGoogleMaps}
+      />
+
+      {/* SOS modal */}
       <SosModal
         visible={sosModalOpen}
         riderId={userId ?? ''}
@@ -558,98 +599,6 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
         onCancel={() => setSosModalOpen(false)}
         onSent={handleSosSent}
       />
-
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: WeRideColors.dark },
-  map: { flex: 1 },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: GUTTER,
-    zIndex: 10,
-  },
-  headerBar: {
-    height: HEADER_BAR_H,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: GUTTER,
-    backgroundColor: '#111111F2',
-    borderWidth: 1,
-    borderColor: WeRideColors.border,
-    borderRadius: WeRideRadius.xxl,
-  },
-  headerBarWithBack: { paddingLeft: 4 },
-  backBtn: {
-    minWidth: 44,
-    height: 44,
-    paddingHorizontal: 12,
-    borderRadius: WeRideRadius.xl,
-    backgroundColor: WeRideColors.dark3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backText: { ...type.bodyStrong },
-  headerTitles: { flex: 1, justifyContent: 'center' },
-  // Compact chrome over the map: the ride name must fit beside the back chip and the live pill.
-  title: { ...type.titleSm, fontSize: 18, lineHeight: 24 },
-  bannerWrap: { position: 'absolute', left: 0, right: 0, zIndex: 20 },
-  noGroup: {
-    flex: 1,
-    backgroundColor: WeRideColors.dark,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 8,
-  },
-  noGroupTitle: { ...type.titleSm },
-  noGroupSub: { ...type.body, color: WeRideColors.textSub, textAlign: 'center' },
-  fabColumn: {
-    position: 'absolute',
-    right: GUTTER,
-    bottom: FAB_COLUMN_BOTTOM, // clear of the collapsed route sheet
-    gap: FAB_GAP,
-    zIndex: 30,
-  },
-  locateRing: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: WeRideColors.text,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  locateRingOn: { borderColor: ROUTE_COLOR },
-  locateDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: WeRideColors.text },
-  locateDotOn: { backgroundColor: ROUTE_COLOR },
-  bubble: {
-    width: 24,
-    height: 18,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: WeRideColors.text,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-  },
-  bubbleDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: WeRideColors.text },
-  bottomStack: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 25,
-  },
-  infoCardsScroll: { maxHeight: 220 },
-  // Cards keep their own 16 px side margin; the extra right padding keeps them
-  // clear of the FAB column (FAB width + gap, minus the card's own margin).
-  infoCardsContent: { paddingRight: FAB_COLUMN_W + FAB_GAP - GUTTER },
-});

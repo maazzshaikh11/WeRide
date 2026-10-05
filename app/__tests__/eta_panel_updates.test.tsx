@@ -1,10 +1,10 @@
 /**
- * ETA Panel Updates test — updated for store-driven RoutePanel.
- * Verifies RoutePanel re-renders when useRouteStore route data changes.
+ * ETA Panel Updates test — updated for store-driven RouteSheet.
+ * Verifies RouteSheet re-renders when useRouteStore route data changes.
  */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
-import RoutePanel from '../src/components/RoutePanel';
+import RouteSheet from '../src/components/RouteSheet';
 import { useRouteStore } from '@routing/client/routeStore';
 import { RouteResponse } from '../src/models/routeResponse';
 
@@ -24,18 +24,18 @@ function makeRoute(etaMinutes: number, distanceKm: number, safetyScore: number):
   };
 }
 
-// Track mounted trees so Animated timers (BottomSheet) never outlive a test.
+// Track mounted trees so Animated timers  never outlive a test.
 const mounted: renderer.ReactTestRenderer[] = [];
 function renderPanel() {
   let tree!: renderer.ReactTestRenderer;
   act(() => {
-    tree = renderer.create(<RoutePanel />);
+    tree = renderer.create(<RouteSheet visible onClose={() => undefined} />);
   });
   mounted.push(tree);
   return tree;
 }
 
-describe('RoutePanel Updates (eta_panel_updates)', () => {
+describe('RouteSheet Updates (eta_panel_updates)', () => {
   beforeEach(() => {
     useRouteStore.getState().setRoute(makeRoute(10, 5, 0.8));
     useRouteStore.getState().setIsLoading(false);

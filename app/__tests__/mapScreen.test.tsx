@@ -104,12 +104,13 @@ jest.mock('@rnmapbox/maps', () => ({
     LineLayer: 'LineLayer',
     SymbolLayer: 'SymbolLayer',
     UserLocation: 'UserLocation',
+    MarkerView: 'MarkerView',
     UserTrackingMode: {
       Follow: 'normal',
       FollowWithHeading: 'compass',
       FollowWithCourse: 'course',
     },
-    StyleURL: { Dark: 'dark' },
+    StyleURL: { Dark: 'dark', Light: 'light' },
   },
   setAccessToken: jest.fn(),
   MapView: 'MapView',
@@ -118,7 +119,7 @@ jest.mock('@rnmapbox/maps', () => ({
   CircleLayer: 'CircleLayer',
   LineLayer: 'LineLayer',
   SymbolLayer: 'SymbolLayer',
-  StyleURL: { Dark: 'dark' },
+  StyleURL: { Dark: 'dark', Light: 'light' },
 }));
 
 // Stub out overlay components so we don't need to resolve their imports.
@@ -140,16 +141,16 @@ jest.mock('../src/screens/map/overlays/routeControls',   () => ({
 }));
 
 // Stub the new shared UI components (they pull in Animated + stores).
-jest.mock('../src/components/RoutePanel', () => ({ __esModule: true, default: () => null }));
+jest.mock('../src/components/RouteSheet', () => ({ __esModule: true, default: () => null }));
+jest.mock('../src/components/HazardSheet', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/ToastContainer', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/LivePill', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/components/NetworkBanner', () => ({ __esModule: true, default: () => null }));
-jest.mock('../src/components/SignalMenu', () => ({ __esModule: true, default: () => null }));
-jest.mock('../src/components/SosModal', () => ({ __esModule: true, default: () => null }));
-jest.mock('../src/components/Fab', () => {
+jest.mock('../src/components/SignalSheet', () => {
   const React = require('react');
-  return { __esModule: true, FAB_SIZE: 48, default: (props: any) => React.createElement('View', props ?? null) };
+  return { __esModule: true, default: (props: any) => React.createElement('SignalSheetStub', props) };
 });
+jest.mock('../src/components/SosModal', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/store/toastStore', () => ({
   useToastStore: (selector?: (s: unknown) => unknown) =>
     selector ? selector({ toasts: [], push: jest.fn(), dismiss: jest.fn() }) : { toasts: [], push: jest.fn(), dismiss: jest.fn() },
@@ -420,28 +421,43 @@ describe('MapScreen — Phase 6 TrackingService lifecycle', () => {
     expect(parentGoBack).toHaveBeenCalledTimes(1);
   });
 
-  test('recenter and signal FABs use the select haptic; signal FAB active state follows its menu', () => {
+  const press = (renderer: any, label: string) =>
+    renderer.root.findAll((n: any) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
+
+  test('side buttons: follow/fit, Google Maps and route details keep their labels', () => {
     const renderer = renderWithUser('user-abc');
-    const fab = (label: string) =>
-      renderer.root.findAll((n: any) => n.props.accessibilityLabel === label && n.type === 'View')[0];
-
-    const recenter = fab('Follow my location') ?? fab('Show the whole route');
-    expect(recenter.props.haptic).toBe('select');
-    expect(recenter.props.activeChildren).toBeTruthy(); // glyph colour cross-fades in Fab
-
-    expect(fab('Send a quick signal').props.haptic).toBe('select');
-    expect(fab('Send a quick signal').props.active).toBe(false);
-    act(() => fab('Send a quick signal').props.onPress());
-    expect(fab('Send a quick signal').props.active).toBe(true);
-    act(() => fab('Send a quick signal').props.onPress());
-    expect(fab('Send a quick signal').props.active).toBe(false);
+    const follow = press(renderer, 'Follow my location') ?? press(renderer, 'Show the whole route');
+    expect(follow).toBeDefined();
+    expect(press(renderer, 'Open route in Google Maps')).toBeDefined();
+    expect(press(renderer, 'Route details')).toBeDefined();
   });
 
-  test('NavFab and SosFab keep their accessibility labels', () => {
+  test('control keys: SOS (hold), Signal, Hazard, Talk are all present', () => {
     const renderer = renderWithUser('user-abc');
-    const has = (label: string) =>
-      renderer.root.findAll((n: any) => n.props.accessibilityLabel === label).length > 0;
-    expect(has('Navigate in Google Maps')).toBe(true);
+    const has = (label: string) => renderer.root.findAll((n: any) => n.props.accessibilityLabel === label).length > 0;
     expect(has('Hold for 2 seconds to send SOS')).toBe(true);
+    expect(has('Send a quick signal')).toBe(true);
+    expect(has('Report a hazard')).toBe(true);
+    expect(has('Talk to the crew')).toBe(true);
+  });
+
+  test('Signal key opens the signal sheet; Talk opens the Voice tab', () => {
+    const navigate = jest.fn();
+    const renderer = renderWithUser('user-abc', 'group-1', { navigation: { goBack: jest.fn(), navigate } });
+    const sheet = () => renderer.root.findByType('SignalSheetStub' as any);
+    expect(sheet().props.visible).toBe(false);
+    act(() => press(renderer, 'Send a quick signal').props.onPress({}));
+    expect(sheet().props.visible).toBe(true);
+    act(() => sheet().props.onClose());
+    expect(sheet().props.visible).toBe(false);
+    act(() => press(renderer, 'Talk to the crew').props.onPress({}));
+    expect(navigate).toHaveBeenCalledWith('Voice');
+  });
+
+  test('there is no crew ahead/behind panel any more', () => {
+    const renderer = renderWithUser('user-abc');
+    const labels = renderer.root.findAll((n: any) => typeof n.props.accessibilityLabel === 'string').map((n: any) => n.props.accessibilityLabel);
+    expect(labels.some((l: string) => /ahead|behind|ladder|convoy/i.test(l))).toBe(false);
+    expect(renderer.root.findAll((n: any) => n.props.testID === 'crew-ladder')).toHaveLength(0);
   });
 });

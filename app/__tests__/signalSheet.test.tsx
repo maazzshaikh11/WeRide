@@ -1,5 +1,5 @@
 /**
- * SignalMenu must not claim a signal was sent when the socket is down.
+ * SignalSheet must not claim a signal was sent when the socket is down.
  * Online it emits 'signal:send' (the server relays it to the group).
  */
 import React from 'react';
@@ -10,7 +10,7 @@ jest.mock('../src/services/socketService', () => ({
   getLocationSocket: () => mockSocket,
 }));
 
-import SignalMenu, { SIGNAL_OPTIONS } from '../src/components/SignalMenu';
+import SignalSheet, { SIGNAL_OPTIONS } from '../src/components/SignalSheet';
 import { useToastStore } from '../src/store/toastStore';
 
 const mounted: ReturnType<typeof create>[] = [];
@@ -28,7 +28,7 @@ function pressOption(tree: ReturnType<typeof create>, label: string) {
   act(() => node.props.onPress());
 }
 
-describe('SignalMenu', () => {
+describe('SignalSheet', () => {
   afterEach(() => {
     // Unmount so Animated effects don't flush after environment teardown.
     mounted.splice(0).forEach((t) => act(() => t.unmount()));
@@ -42,7 +42,7 @@ describe('SignalMenu', () => {
   it('emits signal:send with group, rider and label when online', () => {
     mockSocket.connected = true;
     const onSend = jest.fn();
-    const tree = render(<SignalMenu visible groupId="g1" riderId="r1" onSend={onSend} />);
+    const tree = render(<SignalSheet visible groupId="g1" riderId="r1" onSend={onSend} />);
     pressOption(tree, 'Pull over');
     expect(mockSocket.emit).toHaveBeenCalledWith('signal:send', {
       group_id: 'g1',
@@ -58,7 +58,7 @@ describe('SignalMenu', () => {
   it('offline: does NOT emit, does NOT report success, tells the rider', () => {
     mockSocket.connected = false;
     const onSend = jest.fn();
-    const tree = render(<SignalMenu visible groupId="g1" riderId="r1" onSend={onSend} />);
+    const tree = render(<SignalSheet visible groupId="g1" riderId="r1" onSend={onSend} />);
     pressOption(tree, 'Need fuel');
     expect(mockSocket.emit).not.toHaveBeenCalled();
     expect(onSend).not.toHaveBeenCalled();
@@ -70,11 +70,11 @@ describe('SignalMenu', () => {
     expect(SIGNAL_OPTIONS.map((o) => o.label)).toEqual(['Wait for me', 'Pull over', 'All good', 'Need fuel']);
   });
 
-  it('renders nothing when closed and one 48pt-min option per signal when open', () => {
-    const closed = render(<SignalMenu visible={false} groupId="g1" riderId="r1" onSend={jest.fn()} />);
+  it('renders nothing when closed and one tile per signal when open', () => {
+    const closed = render(<SignalSheet visible={false} groupId="g1" riderId="r1" onSend={jest.fn()} />);
     expect(closed.toJSON()).toBeNull();
 
-    const open = render(<SignalMenu visible groupId="g1" riderId="r1" onSend={jest.fn()} />);
+    const open = render(<SignalSheet visible groupId="g1" riderId="r1" onSend={jest.fn()} />);
     SIGNAL_OPTIONS.forEach((o) => {
       expect(open.root.findAllByProps({ accessibilityLabel: `Send signal: ${o.label}` }).length).toBeGreaterThan(0);
     });

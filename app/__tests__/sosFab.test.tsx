@@ -128,7 +128,7 @@ describe('SosFab hold-to-trigger', () => {
     expect(button(t).props.disabled).toBe(true);
   });
 
-  it('renders the ring segments outside the button and keeps the accessibility label/hint', () => {
+  it('keeps the accessibility label/hint', () => {
     const t = render(<SosFab onHoldComplete={jest.fn()} />);
     expect(button(t).props.accessibilityHint).toBe('Press and hold to open the SOS confirmation');
     expect(button(t).props.accessibilityRole).toBe('button');

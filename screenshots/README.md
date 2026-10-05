@@ -23,7 +23,7 @@ How the app looks right now (dark Ember theme), one image per screen/state. Phon
 ## What these are — and are not
 
 These are **not device screenshots**. The app's real screens and components (real stores, real
-styles, the bundled Bebas Neue / Inter / Space Mono fonts) are rendered in headless Chromium with
+styles, the bundled Fraunces / Figtree fonts) are rendered in headless Chromium with
 `react-native-web`, and the native-only modules (Firebase, Mapbox, sockets, sensors) are stubbed.
 So:
 

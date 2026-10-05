@@ -11,7 +11,7 @@ OUT="$(cd ../../.. && pwd)/screenshots"; mkdir -p "$OUT"
 shoot() { # name file [height]
   local h=${3:-844}
   "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
-    --window-size=390,$h --virtual-time-budget=3500 --screenshot="$OUT/$2.png" "file://$PWD/index.html#$1" >/dev/null 2>&1
+    --window-size=390,$h --virtual-time-budget=6000 --screenshot="$OUT/$2.png" "file://$PWD/index.html#$1" >/dev/null 2>&1
   echo "$2.png"
 }
 declare -A FILES=(

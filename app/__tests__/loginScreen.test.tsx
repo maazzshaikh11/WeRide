@@ -86,7 +86,8 @@ describe('LoginScreen session restore', () => {
     const nav = { replace: jest.fn() };
     const tree = render(nav);
     expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'Email input')).toHaveLength(0);
-    expect(hasText(tree, 'WE')).toBe(true);
+    // Brand logo (image with an accessible name) is shown while auth state is unknown.
+    expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'WeRide').length).toBeGreaterThan(0);
     expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'Checking sign-in').length).toBeGreaterThan(0);
   });
 

@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, TextInput, Text, StyleSheet, Pressable, ActivityIndicator,
+  View, TextInput, Text, StyleSheet, Pressable, ActivityIndicator, Image,
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,11 +38,22 @@ export function validateAuthForm(mode: Mode, email: string, password: string, co
   return errors;
 }
 
-function Wordmark() {
+// Brand mark (assets/brand/logo-mark.svg rasterised by scripts/generate-brand-assets.py).
+// 720x505 source; drawn at 3x density for the widths below.
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- RN static asset import
+const LOGO_SOURCE = require('../../assets/images/logo-mark.png');
+const LOGO_ASPECT = 720 / 505;
+
+function Wordmark({ width = 200 }: { width?: number }) {
   return (
-    <Text style={styles.logo} accessibilityRole="header">
-      WE<Text style={styles.logoAccent}>RIDE</Text>
-    </Text>
+    <View accessible accessibilityRole="header" accessibilityLabel="WeRide">
+      <Image
+        source={LOGO_SOURCE}
+        style={{ width, height: width / LOGO_ASPECT }}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
+      />
+    </View>
   );
 }
 
@@ -134,7 +145,7 @@ export default function LoginScreen({ navigation }: any) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.splash} accessibilityLabel="Checking sign-in" accessibilityLiveRegion="polite">
-          <Wordmark />
+          <Wordmark width={168} />
           <ActivityIndicator color={WeRideColors.primary} style={styles.splashSpinner} />
         </View>
       </SafeAreaView>
@@ -287,8 +298,6 @@ const styles = StyleSheet.create({
   splash: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   splashSpinner: { marginTop: WeRideSpacing.lg },
   logoWrap: { alignItems: 'center', marginBottom: WeRideSpacing.xxl },
-  logo: { ...type.display, letterSpacing: 1 },
-  logoAccent: { color: WeRideColors.primary },
   modeTitle: { marginBottom: WeRideSpacing.xs },
   input: {
     ...type.input,

@@ -8,17 +8,21 @@ import { createStackNavigator, TransitionPresets } from '@react-navigation/stack
 
 import LoginScreen from '../screens/LoginScreen';
 import GroupListScreen from '../screens/GroupListScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import MainTabNavigator from './MainTabNavigator';
+import { useTheme } from '../theme/ThemeProvider';
 
 export type RootStackParamList = {
   Login: undefined;
   Groups: undefined;
   MainApp: { groupId: string };
+  Settings: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 export function RootStack() {
+  const { colors } = useTheme();
   return (
     <Stack.Navigator
       initialRouteName="Login"
@@ -28,8 +32,9 @@ export function RootStack() {
         ...TransitionPresets.SlideFromRightIOS,
         gestureEnabled: true,
         headerTitleAlign: 'center',
-        headerStyle: { backgroundColor: '#0A0A0A' },
-        headerTintColor: '#F0F0F0',
+        headerStyle: { backgroundColor: colors.bg },
+        headerTintColor: colors.ink,
+        cardStyle: { backgroundColor: colors.bg },
       }}
     >
       <Stack.Screen
@@ -48,6 +53,11 @@ export function RootStack() {
           // No swipe-back to the login form once signed in.
           gestureEnabled: false,
         }}
+      />
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ title: '', headerShown: false }}
       />
       <Stack.Screen
         name="MainApp"

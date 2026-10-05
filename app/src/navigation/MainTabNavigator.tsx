@@ -2,15 +2,16 @@
  * MainTabNavigator — 6-tab bottom navigator (spec §2.2).
  * Home / Stops / Voice / Family / Alerts / History.
  *
- * Text-first tab bar: 11px label, active = accent label + a 2px accent bar
- * above it that slides between tabs (one indicator, native-driver translateX),
- * inactive = muted label. Each tab is a PressableScale. Solid background, 1px top border, height
- * 56 + bottom safe-area inset (the inset is padding, not extra tab height).
+ * demo.html tab bar: an icon in a 52×32 well over an uppercase 10.5 label.
+ * The selected tab's well fills with the accent (cross-fades + a small spring),
+ * the label goes from `ink3` to `ink`. Each tab is a PressableScale. Solid
+ * background, 1px top rule, height 64 + bottom safe-area inset (the inset is
+ * padding, not extra tab height).
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { CommonActions } from '@react-navigation/native';
-import { View, Animated, StyleSheet } from 'react-native';
+import { View, Animated, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MapScreen from '../screens/map/MapScreen';
@@ -19,9 +20,8 @@ import VoiceScreen from '../screens/VoiceScreen';
 import FamilyScreen from '../screens/FamilyScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import HistoryScreen from '../screens/HistoryScreen';
-import { WeRideColors, WeRideRadius } from '../theme/theme';
-import { type } from '../theme/typography';
-import { PressableScale, Motion, useReducedMotion, haptic } from '../ui';
+import { useStyles, useTheme } from '../theme/ThemeProvider';
+import { PressableScale, Motion, useReducedMotion, haptic, Icon, IconName } from '../ui';
 
 export type MainTabParamList = {
   Home: { groupId: string };
@@ -34,111 +34,76 @@ export type MainTabParamList = {
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-export const TAB_BAR_HEIGHT = 56;
+export const TAB_BAR_HEIGHT = 64;
 
 export const TABS = [
-  { name: 'Home', label: 'Home', component: MapScreen },
-  { name: 'Stops', label: 'Stops', component: StopsScreen },
-  { name: 'Voice', label: 'Voice', component: VoiceScreen },
-  { name: 'Family', label: 'Family', component: FamilyScreen },
-  { name: 'Alerts', label: 'Alerts', component: AlertsScreen },
-  { name: 'History', label: 'History', component: HistoryScreen },
-] as const;
+  { name: 'Home', label: 'Home', icon: 'route', component: MapScreen },
+  { name: 'Stops', label: 'Stops', icon: 'pin', component: StopsScreen },
+  { name: 'Voice', label: 'Voice', icon: 'mic', component: VoiceScreen },
+  { name: 'Family', label: 'Family', icon: 'eye', component: FamilyScreen },
+  { name: 'Alerts', label: 'Alerts', icon: 'bell', component: AlertsScreen },
+  { name: 'History', label: 'History', icon: 'log', component: HistoryScreen },
+] as const satisfies readonly { name: string; label: string; icon: IconName; component: React.ComponentType<any> }[];
 
-/** Horizontal offset of the sliding indicator for the tab at `index`. */
-export function indicatorOffset(index: number, tabWidth: number): number {
-  return index * tabWidth;
-}
-
-/**
- * The single accent bar that slides under the selected tab. Position is a
- * native-driver translateX (never animated on the JS thread); until the bar
- * has been measured it stays hidden so it never flashes at the wrong spot.
- */
-export function TabIndicator({ index, tabWidth }: { index: number; tabWidth: number }) {
-  const x = useRef(new Animated.Value(indicatorOffset(index, tabWidth))).current;
-  const measured = useRef(false);
-  const reduced = useReducedMotion();
-
-  useEffect(() => {
-    const target = indicatorOffset(index, tabWidth);
-    if (tabWidth <= 0) return;
-    if (!measured.current || reduced) {
-      // First measurement (or reduced motion): jump, don't slide in from 0.
-      measured.current = true;
-      x.setValue(target);
-      return;
-    }
-    const anim = Animated.spring(x, { toValue: target, friction: 9, tension: 170, useNativeDriver: true });
-    anim.start();
-    return () => anim.stop();
-  }, [index, tabWidth, reduced, x]);
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      testID="tab-indicator"
-      style={[
-        styles.indicatorTrack,
-        { width: tabWidth, opacity: tabWidth > 0 ? 1 : 0, transform: [{ translateX: x }] },
-      ]}
-    >
-      <View style={styles.indicator} />
-    </Animated.View>
-  );
-}
-
-/** Label whose colour cross-fades (opacity overlay, native driver) with selection. */
-function TabLabel({ label, focused }: { label: string; focused: boolean }) {
+/** Icon well + label for one tab; selection cross-fades the accent fill. */
+function TabItem({ label, icon, focused }: { label: string; icon: IconName; focused: boolean }) {
+  const { colors, type } = useTheme();
+  const styles = useStyles(({ colors: c }) => ({
+    wrap: { alignItems: 'center', gap: 3 },
+    well: { width: 52, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 12, backgroundColor: c.pri },
+  }));
   const t = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const first = useRef(true);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
-    const anim = Animated.timing(t, { toValue: focused ? 1 : 0, duration: Motion.focus.durationMs, useNativeDriver: true });
+    if (reduced) {
+      t.setValue(focused ? 1 : 0);
+      return;
+    }
+    const anim = Animated.spring(t, { toValue: focused ? 1 : 0, ...Motion.spring, useNativeDriver: true });
     anim.start();
     return () => anim.stop();
-  }, [focused, t]);
+  }, [focused, reduced, t]);
 
   return (
-    // Fills the tab slot so the (wider) bold active label is never clipped.
-    <View style={styles.labelWrap}>
-      <Animated.Text
-        style={[type.label, styles.label, { color: WeRideColors.textSub, opacity: t.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
-        numberOfLines={1}
-      >
-        {label}
-      </Animated.Text>
-      <Animated.Text
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        style={[type.labelStrong, styles.label, styles.labelActive, { color: WeRideColors.primary, opacity: t }]}
-        numberOfLines={1}
-      >
-        {label}
-      </Animated.Text>
+    <View style={styles.wrap}>
+      <View style={styles.well}>
+        <Animated.View
+          testID={focused ? 'tab-active-well' : undefined}
+          style={[styles.fill, { opacity: t, transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }] }]}
+        />
+        <Icon name={icon} size={22} color={focused ? colors.priInk : colors.ink3} />
+      </View>
+      <Text style={[type.tab, { color: focused ? colors.ink : colors.ink3 }]} numberOfLines={1}>
+        {label.toUpperCase()}
+      </Text>
     </View>
   );
 }
 
 export function MainTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const [barWidth, setBarWidth] = useState(0);
-  const tabWidth = state.routes.length > 0 ? barWidth / state.routes.length : 0;
+  const styles = useStyles(({ colors: c }) => ({
+    bar: { flexDirection: 'row', backgroundColor: c.bg, borderTopWidth: 1, borderTopColor: c.line, paddingTop: 8, paddingHorizontal: 6 },
+    tab: { flex: 1, minWidth: 44, alignItems: 'center', justifyContent: 'flex-start' },
+  }));
 
   return (
     <View
       testID="main-tab-bar"
       style={[styles.bar, { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }]}
-      onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
     >
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const focused = state.index === index;
-        const label = TABS.find((t) => t.name === route.name)?.label ?? route.name;
+        const def = TABS.find((t) => t.name === route.name);
+        const label = def?.label ?? route.name;
 
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -163,13 +128,10 @@ export function MainTabBar({ state, descriptors, navigation }: BottomTabBarProps
             accessibilityState={{ selected: focused }}
             style={styles.tab}
           >
-            {/* Keeps the indicator's slot so label position is unchanged. */}
-            <View style={styles.indicatorSlot} />
-            <TabLabel label={label} focused={focused} />
+            <TabItem label={label} icon={def?.icon ?? 'route'} focused={focused} />
           </PressableScale>
         );
       })}
-      <TabIndicator index={state.index} tabWidth={tabWidth} />
     </View>
   );
 }
@@ -191,35 +153,3 @@ export default function MainTabNavigator() {
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    backgroundColor: WeRideColors.dark,
-    borderTopWidth: 1,
-    borderTopColor: WeRideColors.border,
-  },
-  tab: {
-    flex: 1,
-    minWidth: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  indicatorSlot: { height: 2 },
-  indicatorTrack: {
-    position: 'absolute',
-    top: (TAB_BAR_HEIGHT - 22) / 2,
-    left: 0,
-    alignItems: 'center',
-  },
-  indicator: {
-    width: 24,
-    height: 2,
-    borderRadius: WeRideRadius.sm,
-    backgroundColor: WeRideColors.primary,
-  },
-  labelWrap: { alignSelf: 'stretch' },
-  labelActive: { position: 'absolute', left: 0, right: 0, textAlign: 'center' },
-  label: { letterSpacing: 0, textAlign: 'center' },
-});

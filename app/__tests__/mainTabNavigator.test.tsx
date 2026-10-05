@@ -53,7 +53,9 @@ jest.mock('../src/ui/haptics', () => ({
   haptic: jest.fn(),
 }));
 
-import MainTabNavigator, { TABS, TAB_BAR_HEIGHT, TabIndicator, indicatorOffset } from '../src/navigation/MainTabNavigator';
+import MainTabNavigator, { TABS, TAB_BAR_HEIGHT } from '../src/navigation/MainTabNavigator';
+import { ThemeContext, buildTheme } from '../src/theme/ThemeProvider';
+import { THEMES, ThemeId, Scheme } from '../src/theme/palettes';
 import { haptic } from '../src/ui/haptics';
 
 const mounted: renderer.ReactTestRenderer[] = [];
@@ -99,17 +101,17 @@ describe('MainTabNavigator', () => {
     const labels = tree.root
       .findAll((n) => (n.type as unknown) === 'Text')
       .map((n) => ([] as unknown[]).concat(n.props.children).join(''));
-    for (const l of ['Home', 'Stops', 'Voice', 'Family', 'Alerts', 'History']) expect(labels).toContain(l);
+    for (const l of ['HOME', 'STOPS', 'VOICE', 'FAMILY', 'ALERTS', 'HISTORY']) expect(labels).toContain(l);
   });
 
-  test('bar height is 56 plus the bottom inset, padding is the inset, solid background', () => {
+  test('bar height is 64 plus the bottom inset, padding is the inset, solid background', () => {
     const tree = render();
     const bar = tree.root.find((n) => n.props.testID === 'main-tab-bar' && (n.type as unknown) === 'View');
     const style = StyleSheet.flatten(bar.props.style);
     expect(style.height).toBe(TAB_BAR_HEIGHT + 34);
     expect(style.paddingBottom).toBe(34);
     expect(style.borderTopWidth).toBe(1);
-    expect(String(style.backgroundColor)).toMatch(/^#[0-9a-fA-F]{6}$/);
+    expect(style.backgroundColor).toBe(THEMES.demo.dark.bg);
   });
 
   test('tapping a tab selects it and shows that screen', () => {
@@ -125,44 +127,19 @@ describe('MainTabNavigator', () => {
   /** The real pressable of a tab (the outer wrapper skips the press/haptic handlers). */
   const pressTab = (tree: renderer.ReactTestRenderer, label: string) =>
     tree.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
-  const indicator = (tree: renderer.ReactTestRenderer) => tree.root.findByType(TabIndicator);
-  const measureBar = (tree: renderer.ReactTestRenderer, width: number) => {
-    const bar = tree.root.find((n) => n.props.testID === 'main-tab-bar' && (n.type as unknown) === 'View');
-    act(() => {
-      bar.props.onLayout({ nativeEvent: { layout: { width, height: 90, x: 0, y: 0 } } });
-    });
-  };
-
-  describe('sliding indicator + press feedback', () => {
+  describe('selection + press feedback', () => {
     beforeEach(() => {
       (haptic as jest.Mock).mockClear();
     });
 
-    test('there is exactly one indicator; it starts on the first tab and is unmeasured until layout', () => {
+    test('exactly one tab shows the accent well, and it follows the selection', () => {
       const tree = render();
-      expect(tree.root.findAllByType(TabIndicator)).toHaveLength(1);
-      expect(indicator(tree).props).toMatchObject({ index: 0, tabWidth: 0 });
-    });
-
-    test('measuring the bar gives each of the six tabs an equal slot', () => {
-      const tree = render();
-      measureBar(tree, 360);
-      expect(indicator(tree).props).toMatchObject({ index: 0, tabWidth: 60 });
-      expect(indicatorOffset(4, 60)).toBe(240);
-    });
-
-    test('pressing a tab navigates and moves the indicator to that tab', () => {
-      const tree = render();
-      measureBar(tree, 360);
+      expect(tree.root.findAll((n) => n.props.testID === 'tab-active-well' && typeof n.type === 'string')).toHaveLength(1);
       act(() => {
         pressTab(tree, 'Alerts tab').props.onPress();
       });
       expect(tabs(tree).map((n) => n.props.accessibilityState.selected)).toEqual([false, false, false, false, true, false]);
-      expect(indicator(tree).props).toMatchObject({ index: 4, tabWidth: 60 });
-      act(() => {
-        pressTab(tree, 'Stops tab').props.onPress();
-      });
-      expect(indicator(tree).props.index).toBe(1);
+      expect(tree.root.findAll((n) => n.props.testID === 'tab-active-well' && typeof n.type === 'string')).toHaveLength(1);
     });
 
     test("switching tabs gives the 'select' haptic; re-pressing the active tab gives none", () => {
@@ -191,4 +168,32 @@ describe('MainTabNavigator', () => {
       }
     });
   });
+
+  describe.each([['demo', 'light'], ['demo', 'dark'], ['ember', 'light'], ['ember', 'dark']] as [ThemeId, Scheme][])(
+    'theme %s / %s',
+    (id, scheme) => {
+      test('bar background, active well and labels use that palette', () => {
+        const palette = THEMES[id][scheme];
+        let tree!: renderer.ReactTestRenderer;
+        act(() => {
+          tree = renderer.create(
+            <ThemeContext.Provider value={buildTheme(id, palette)}>
+              <NavigationContainer>
+                <MainTabNavigator />
+              </NavigationContainer>
+            </ThemeContext.Provider>,
+          );
+        });
+        mounted.push(tree);
+        const bar = tree.root.find((n) => n.props.testID === 'main-tab-bar' && (n.type as unknown) === 'View');
+        expect(StyleSheet.flatten(bar.props.style).backgroundColor).toBe(palette.bg);
+        const well = tree.root.find((n) => n.props.testID === 'tab-active-well' && typeof n.type === 'string');
+        expect(StyleSheet.flatten(well.props.style).backgroundColor).toBe(palette.pri);
+        const home = tree.root.findAll((n) => (n.type as unknown) === 'Text' && n.props.children === 'HOME')[0];
+        expect(StyleSheet.flatten(home.props.style).color).toBe(palette.ink);
+        const stops = tree.root.findAll((n) => (n.type as unknown) === 'Text' && n.props.children === 'STOPS')[0];
+        expect(StyleSheet.flatten(stops.props.style).color).toBe(palette.ink3);
+      });
+    },
+  );
 });

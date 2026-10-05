@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { StatusBar } from 'react-native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { RootStack } from './navigation/RootStack';
+import { ThemeProvider, useTheme } from './theme/ThemeProvider';
 import { initFirebase } from './services/firebaseService';
 import { initStorage } from './services/localStorage';
 import { useAppStore } from './store/appStore';
@@ -44,6 +46,22 @@ function SyncBootstrap() {
   return null;
 }
 
+/** Navigation + status bar follow the resolved theme (background flashes would show the wrong colour). */
+function ThemedNavigation({ children }: { children: React.ReactNode }) {
+  const { colors, scheme } = useTheme();
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: { ...base.colors, background: colors.bg, card: colors.bg, text: colors.ink, border: colors.line, primary: colors.pri },
+  };
+  return (
+    <NavigationContainer theme={navTheme}>
+      <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
+      {children}
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   useEffect(() => {
     (async () => {
@@ -54,10 +72,12 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <SyncBootstrap />
-        <RootStack />
-      </NavigationContainer>
+      <ThemeProvider>
+        <ThemedNavigation>
+          <SyncBootstrap />
+          <RootStack />
+        </ThemedNavigation>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

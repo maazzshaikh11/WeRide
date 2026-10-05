@@ -122,6 +122,12 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
   // Keep a stable ref to the service so useEffect cleanup can always call .stop()
   const serviceRef = useRef<TrackingService | null>(null);
 
+  // Latest finite fix regardless of accuracy/spoof gates. Routing and hazard
+  // reports require a trusted fix (lastValidLocation), but an SOS must still
+  // carry the best position we have: a rough one beats none in an emergency.
+  // A ref, not state, so the 1 Hz stream does not re-render the screen.
+  const lastAnyFixRef = useRef<{ lat: number; lng: number } | null>(null);
+
   useEffect(() => {
     // Guard: do not start tracking without a valid identity.
     if (!userId || !groupId) {
@@ -141,6 +147,7 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
     const publisher = new OwnLocationPublisher(
       { socket, riderId: userId, groupId },
       (fix) => {
+        lastAnyFixRef.current = { lat: fix.lat, lng: fix.lng };
         if (!isUsableOwnFix(fix)) return;
         const routeState = useRouteStore.getState();
         routeState.setCurrentLocation(fix);
@@ -513,7 +520,11 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
         riderId={userId ?? ''}
         groupId={groupId}
         riderCount={Math.max(riderCount, 1)}
-        location={lastValidLocation ? { lat: lastValidLocation.lat, lng: lastValidLocation.lng } : null}
+        location={
+          lastValidLocation
+            ? { lat: lastValidLocation.lat, lng: lastValidLocation.lng }
+            : lastAnyFixRef.current
+        }
         onCancel={() => setSosModalOpen(false)}
         onSent={handleSosSent}
       />

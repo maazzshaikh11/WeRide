@@ -6,6 +6,7 @@ const rules = [
   [/^(@react-native-firebase\/.*|@react-native-clipboard\/clipboard|@react-native-community\/netinfo|react-native-webrtc|react-native-geolocation-service|react-native-background-geolocation|react-native-get-random-values|@react-native-ml-kit\/.*|react-native-screens|react-native-gesture-handler)$/, 'generic.js'],
   [/^(@react-navigation\/.*|socket\.io-client|react-native-mmkv|react-native-sensors)$/, 'named.js'],
   [/^@rnmapbox\/maps$/, 'mapbox.js'],
+  [/^react-native-svg$/, 'svg.js'],
   [/^react-native-safe-area-context$/, 'safearea.js'],
   [/^@env$/, 'env.js'],
   [/services\/socketService$/, 'socket.js'],
@@ -19,7 +20,7 @@ const rules = [
 const stubPlugin = { name: 'stubs', setup(b) { b.onResolve({ filter: /.*/ }, (a) => { for (const [re, f] of rules) if (re.test(a.path)) return { path: S(f) }; return null; }); } };
 await build({
   entryPoints: [process.argv[2] || 'scenes.tsx'], bundle: true, outfile: 'scenes.js', format: 'iife', jsx: 'automatic',
-  loader: { '.ts': 'ts', '.tsx': 'tsx', '.png': 'dataurl', '.js': 'jsx' },
+  loader: { '.ts': 'ts', '.tsx': 'tsx', '.png': 'dataurl', '.jpeg': 'dataurl', '.jpg': 'dataurl', '.js': 'jsx' },
   plugins: [stubPlugin],
   alias: {
     react: path.resolve('node_modules/react'), 'react-dom': path.resolve('node_modules/react-dom'),

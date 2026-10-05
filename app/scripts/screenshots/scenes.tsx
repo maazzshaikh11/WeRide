@@ -35,7 +35,12 @@ import FamilyScreen from '@app/screens/FamilyScreen';
 import MapScreen from '@app/screens/map/MapScreen';
 import CreateRideModal from '@app/components/CreateRideModal';
 import SosModal from '@app/components/SosModal';
-import SignalMenu from '@app/components/SignalMenu';
+import SignalSheet from '@app/components/SignalSheet';
+import HazardSheet from '@app/components/HazardSheet';
+import RouteSheet from '@app/components/RouteSheet';
+import SettingsScreen from '@app/screens/SettingsScreen';
+import { ThemeContext, buildTheme, useTheme } from '@app/theme/ThemeProvider';
+import { THEMES, ThemeId, Scheme } from '@app/theme/palettes';
 import ToastContainer from '@app/components/ToastContainer';
 import { MainTabBar } from '@app/navigation/MainTabNavigator';
 
@@ -73,16 +78,17 @@ function seedRide() {
     currentLocation: loc, lastValidLocation: loc,
   });
   const mk = (id: string, lat: number, lng: number) => ({ rider_id: id, group_id: 'g1', timestamp_hlc: `${Date.now()}:0`, lat, lng, speed_mps: 11, heading_deg: 90, spoof_flag: false, nis_score: 0.5, accuracy_m: 8 });
-  ['u2', 'u3', 'u4'].forEach((id, i) => useRidersStore.getState().upsertRider(mk(id, 19.0 - i * 0.01, 72.9 + i * 0.01)));
+  [0.0009, -0.002, 0.0034].forEach((d, i) => useRidersStore.getState().upsertRider(mk(`u${i + 2}`, 19.0 + d, 72.9)));
 }
 
 const ROUTE = { route_id: 'r1', path_points: [[19.0596, 72.8295], [19.0, 72.9], [18.9, 73.1], [18.79, 73.34], [18.7546, 73.4062]], distance_km: 84.2, eta_minutes: 107, safety_score: 0.82, recalculated_at_hlc: '1:0' };
 // In the app the routing server answers; in this harness there is none, so apply its reply.
 const reseedRoute = () => setTimeout(() => useRouteStore.setState({ route: ROUTE }), 700);
 const nav = { navigate() {}, goBack() {}, replace() {}, reset() {}, getParent: () => ({ goBack() {} }) };
-const Frame = ({ children, bg = '#0A0A0A', height = 844 }: any) => (
-  <View style={{ width: 390, height, backgroundColor: bg, overflow: 'hidden' }}>{children}</View>
-);
+const Frame = ({ children, bg, height = 844 }: any) => {
+  const { colors } = useTheme();
+  return <View style={{ width: 390, height, backgroundColor: bg ?? colors.bg, overflow: 'hidden' }}>{children}</View>;
+};
 // A tab screen laid out like the navigator does: content above, bar below (not overlapping).
 const TabScreen = ({ children, idx }: any) => (
   <Frame><View style={{ flex: 1 }}>{children}</View><MainTabBar {...tabState(idx)} /></Frame>
@@ -115,12 +121,21 @@ const scenes: Record<string, () => React.ReactElement> = {
   history: () => { seedRide(); return <TabScreen idx={5}><HistoryScreen navigation={nav} /></TabScreen>; },
   voice: () => { seedRide(); return <TabScreen idx={2}><VoiceScreen /></TabScreen>; },
   family: () => { seedRide(); return <TabScreen idx={3}><FamilyScreen /></TabScreen>; },
-  map: () => { seedRide(); reseedRoute(); return <Frame><MapScreen navigation={nav} /></Frame>; },
-  'map-expanded': () => { seedRide(); reseedRoute(); click('[aria-label="Expand ride details"]', 900); return <Frame><MapScreen navigation={nav} /></Frame>; },
-  sos: () => { seedRide(); return <Frame bg="#0b0f14"><SosModal visible riderId="u1" groupId="g1" riderCount={4} location={{ lat: 19, lng: 72.9 }} onCancel={() => {}} onSent={() => {}} /></Frame>; },
-  signals: () => { seedRide(); return <Frame bg="#0b0f14"><SignalMenu visible groupId="g1" riderId="u1" onSend={() => {}} /></Frame>; },
+  // The live screen sits above the tab bar, like in the app.
+  map: () => { seedRide(); reseedRoute(); return <TabScreen idx={0}><MapScreen navigation={nav} /></TabScreen>; },
+  'map-expanded': () => { seedRide(); reseedRoute(); click('[aria-label="Route details"]', 900); return <TabScreen idx={0}><MapScreen navigation={nav} /></TabScreen>; },
+  hazards: () => { seedRide(); reseedRoute(); click('[aria-label="Report a hazard"]', 900); return <TabScreen idx={0}><MapScreen navigation={nav} /></TabScreen>; },
+  settings: () => <Frame><SettingsScreen navigation={nav} /></Frame>,
+  sos: () => { seedRide(); return <Frame><SosModal visible riderId="u1" groupId="g1" riderCount={4} location={{ lat: 19, lng: 72.9 }} onCancel={() => {}} onSent={() => {}} /></Frame>; },
+  signals: () => { seedRide(); reseedRoute(); click('[aria-label="Send a quick signal"]', 900); return <TabScreen idx={0}><MapScreen navigation={nav} /></TabScreen>; },
   tabbar: () => <Frame><View style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}><MainTabBar {...tabState(0)} /></View></Frame>,
 };
 
-const name = (location.hash || '#login').slice(1);
-createRoot(document.getElementById('root')!).render((scenes[name] ?? scenes.login)());
+// #scene[:theme[:scheme]]  e.g. #map:ember:light
+const [name, themeArg = 'demo', schemeArg = 'dark'] = (location.hash || '#login').slice(1).split(':');
+const themeId = (themeArg === 'ember' ? 'ember' : 'demo') as ThemeId;
+const scheme = (schemeArg === 'light' ? 'light' : 'dark') as Scheme;
+document.body.style.background = THEMES[themeId][scheme].bg;
+createRoot(document.getElementById('root')!).render(
+  <ThemeContext.Provider value={buildTheme(themeId, THEMES[themeId][scheme])}>{(scenes[name] ?? scenes.login)()}</ThemeContext.Provider>,
+);

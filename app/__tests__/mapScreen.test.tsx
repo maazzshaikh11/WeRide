@@ -20,6 +20,11 @@
 
 // ---- module-level mocks (must be before any import that uses them) -----------
 
+// MapScreen reads safe-area insets for the header and camera padding.
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+
 // Stateful appStore mock: callable zustand hook shape + getState/setState.
 jest.mock('@app/store/appStore', () => {
   let _userId: string | null = null;

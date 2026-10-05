@@ -12,9 +12,10 @@
  *  - RoutingClient + route store (Person C)
  *  - VoxClient untouched — Voice tab owns voice now (Person D)
  */
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Text, Linking, Pressable, ScrollView } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAPBOX_TOKEN } from '@env';
 import RiderMarkerOverlay, { RiderInfoCard } from './overlays/RiderMarkerOverlay';
@@ -44,6 +45,10 @@ import { resolveSos } from '@hazard/services/sosService';
 import { resolveHazard } from '@hazard/services/hazardService';
 import { useRidePlanStore } from '../../store/ridePlanStore';
 import { useStopsStore } from '../../store/stopsStore';
+import { fitPadding } from '../../utils/mapFit';
+import { fitPointsFor, fitSignature } from './rideGeometry';
+import { useRouteFit } from './useRouteFit';
+import { ROUTE_COLOR } from './mapStyle';
 
 // Phase 6 — tracking service wiring (Person A, unchanged)
 import { Ekf } from '@tracking/ekf';
@@ -54,6 +59,12 @@ import { loadHlc } from '@tracking/hlcStore';
 import { getLocationSocket } from '../../services/socketService';
 
 MapboxGL.setAccessToken(MAPBOX_TOKEN ?? '');
+
+// Floating-UI footprint the route must stay clear of when the camera frames it.
+const HEADER_CONTENT_H = 52;   // eyebrow + ride title row (below the status bar inset)
+const FAB_COLUMN_W = 58;       // 46 px FAB + 12 px right margin
+const SHEET_COLLAPSED_H = 208; // RoutePanel COLLAPSED_HEIGHT
+const FOLLOW_ZOOM = 16;
 
 export default function MapScreen() {
   // No demo fallback: without a real group there is nothing to track.
@@ -66,6 +77,16 @@ export default function MapScreen() {
   const route = useRouteStore((s) => s.route);
   const avoidHazardTypes = useRouteStore((s) => s.avoidHazardTypes);
   const push = useToastStore((s) => s.push);
+  const insets = useSafeAreaInsets();
+
+  // Camera: frame the route (Google Maps style); follow the rider only on request.
+  const cameraRef = useRef<MapboxGL.Camera>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const planStart = useRidePlanStore((s) => s.start);
+  const planStops = useRidePlanStore((s) => s.stops);
+  const planDestination = useRidePlanStore((s) => s.destination);
+  // null = automatic (follow only when there is nothing to frame), else rider's choice.
+  const [followPref, setFollowPref] = useState<boolean | null>(null);
 
   // UI state
   const [signalMenuOpen, setSignalMenuOpen] = useState(false);
@@ -191,6 +212,40 @@ export default function MapScreen() {
 
   const riderCount = riders.size;
 
+  const plan = useMemo(
+    () => ({ start: planStart, stops: planStops, destination: planDestination }),
+    [planStart, planStops, planDestination],
+  );
+  const fitPoints = useMemo(() => fitPointsFor(route, plan), [route, plan]);
+  const signature = useMemo(() => fitSignature(plan, route != null), [plan, route]);
+  const following = followPref ?? fitPoints.length === 0;
+  const padding = useMemo(
+    () =>
+      fitPadding({
+        headerHeight: insets.top + HEADER_CONTENT_H,
+        fabColumnWidth: FAB_COLUMN_W,
+        sheetHeight: SHEET_COLLAPSED_H,
+      }),
+    [insets.top],
+  );
+  const { markFitted } = useRouteFit({
+    cameraRef,
+    mapReady,
+    following,
+    points: fitPoints,
+    signature,
+    padding,
+  });
+
+  // Recenter control: toggles between "frame the route" and "follow me".
+  const toggleFollow = useCallback(() => {
+    if (fitPoints.length === 0) {
+      push('Nothing to frame yet — follow mode is on', 'warn');
+      return;
+    }
+    setFollowPref(!following);
+  }, [following, fitPoints.length, push]);
+
   // FAB: open Google Maps deep link (Person C's deepLink util)
   const openGoogleMaps = useCallback(() => {
     const origin = lastValidLocation
@@ -246,14 +301,25 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       {/* Layer 0 — Map */}
-      <MapboxGL.MapView style={styles.map} styleURL={MapboxGL.StyleURL.Dark}>
+      <MapboxGL.MapView
+        style={styles.map}
+        styleURL={MapboxGL.StyleURL.Dark}
+        scaleBarEnabled={false}
+        onDidFinishLoadingMap={() => setMapReady(true)}
+      >
         <MapboxGL.Camera
-          defaultSettings={{
-            centerCoordinate: [-122.4194, 37.7749],
-            zoomLevel: 14,
-          }}
-          followUserLocation
+          ref={cameraRef}
+          followUserLocation={following}
           followUserMode={MapboxGL.UserTrackingMode.FollowWithHeading}
+          followZoomLevel={FOLLOW_ZOOM}
+          onUserTrackingModeChange={(e) => {
+            // The rider dragged the map out of follow mode: leave the camera
+            // where they put it instead of snapping back to the route.
+            if (!e.nativeEvent.payload.followUserLocation) {
+              markFitted();
+              setFollowPref(false);
+            }
+          }}
         />
         <MapboxGL.UserLocation showsUserHeadingIndicator />
         {/* Layer 1 — map overlays */}
@@ -266,7 +332,7 @@ export default function MapScreen() {
       {/* Layer 2 — floating UI */}
 
       {/* 3.3.1 Screen header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View>
           <Text style={styles.eyebrow}>RIDE OVERVIEW</Text>
           <Text style={styles.title} numberOfLines={1}>
@@ -317,6 +383,17 @@ export default function MapScreen() {
 
       {/* 3.3.6 FAB column */}
       <View style={styles.fabColumn}>
+        <Fab
+          onPress={toggleFollow}
+          accessibilityLabel={following ? 'Show the whole route' : 'Follow my location'}
+          accessibilityRole="button"
+        >
+          <View style={[styles.fabSignal, following && styles.fabRecenterOn]}>
+            <View style={[styles.locateRing, following && styles.locateRingOn]}>
+              <View style={[styles.locateDot, following && styles.locateDotOn]} />
+            </View>
+          </View>
+        </Fab>
         <Fab onPress={openGoogleMaps} accessibilityLabel="Navigate in Google Maps">
           <View style={styles.fabNav}>
             <Text style={styles.fabIcon}>🧭</Text>
@@ -416,7 +493,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 54,
     paddingBottom: 10,
     zIndex: 10,
   },
@@ -455,7 +531,7 @@ const styles = StyleSheet.create({
   fabColumn: {
     position: 'absolute',
     right: 12,
-    bottom: 190,
+    bottom: SHEET_COLLAPSED_H + 16, // clear of the collapsed route sheet
     gap: 10,
     zIndex: 30,
   },
@@ -477,6 +553,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  fabRecenterOn: { borderColor: ROUTE_COLOR },
+  locateRing: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: WeRideColors.text,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  locateRingOn: { borderColor: ROUTE_COLOR },
+  locateDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: WeRideColors.text },
+  locateDotOn: { backgroundColor: ROUTE_COLOR },
   fabSos: {
     width: 46,
     height: 46,

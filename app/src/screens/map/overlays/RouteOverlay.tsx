@@ -11,10 +11,8 @@
  * - Prevents origin churn: Only recalcs when moved > 100m
  */
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 
-import { WeRideColors } from '@app/theme/theme';
 import { ROUTING_URL } from '@env';
 import { RoutingClient } from '@routing/client/routingClient';
 import { useRouteStore } from '@routing/client/routeStore';
@@ -23,6 +21,8 @@ import { HazardCluster } from '@app/models/hazardCluster';
 import { subscribeToHazardClusters } from '@hazard/services/hazardService';
 import { useRidePlanStore } from '@app/store/ridePlanStore';
 import { registerToggleAvoidHazards } from './routeControls';
+import { buildRidePins, routeLatLngs } from '../rideGeometry';
+import { ROUTE_CASING_COLOR, ROUTE_COLOR, PIN_DARK, PIN_LIGHT } from '../mapStyle';
 
 interface Props {
   groupId: string;
@@ -98,6 +98,9 @@ export default function RouteOverlay({ groupId }: Props) {
     const destKey = `${destination.lat},${destination.lng}`;
     if (lastDestKey.current !== destKey) {
       lastDestKey.current = destKey;
+      // Drop the route to the previous destination so it is neither drawn nor
+      // used to frame the camera while the new one is being fetched.
+      setRoute(null);
       client.scheduleRecalculation({
         group_id: groupId,
         origin,
@@ -117,7 +120,7 @@ export default function RouteOverlay({ groupId }: Props) {
       RECALC_DISTANCE_THRESHOLD_M,
       activeHazards
     );
-  }, [groupId, client, avoidHazardTypes, activeHazards, lastValidLocation, destination]);
+  }, [groupId, client, avoidHazardTypes, activeHazards, lastValidLocation, destination, setRoute]);
 
   // Phase 6 T-17: Listen to real hazard_cluster stream (Person B).
   // Subscribes once per group; reads current origin/destination from latestRef
@@ -185,62 +188,111 @@ export default function RouteOverlay({ groupId }: Props) {
 
   // Route line GeoJSON — re-compute when recalculated_at_hlc changes
   const routeGeoJson = useMemo(() => {
-    if (!route) return null;
+    if (!route || routeLatLngs(route).length < 2) return null;
     return routeToGeoJsonLine(route);
   }, [route?.recalculated_at_hlc, route]);
 
-  // Stop pins from the ride plan (demo shows numbered/emoji pins on the map).
-  const stopPins = useMemo(() => {
-    const pins: { id: string; lat: number; lng: number; icon: string; label: string }[] = [];
-    if (planStart) pins.push({ id: 'plan-start', lat: planStart.lat, lng: planStart.lng, icon: '🟢', label: planStart.label });
-    planStops.forEach((s, i) =>
-      pins.push({ id: s.id, lat: s.lat, lng: s.lng, icon: s.icon || `${i + 1}️⃣`, label: s.label })
-    );
-    if (destination) pins.push({ id: 'plan-destination', lat: destination.lat, lng: destination.lng, icon: '🏁', label: destination.label });
-    return pins;
-  }, [planStart, planStops, destination]);
+  // Start / numbered stops / destination from the ride plan (real data only).
+  const pins = useMemo(
+    () =>
+      buildRidePins(
+        { start: planStart, stops: planStops, destination },
+        route,
+      ),
+    [planStart, planStops, destination, route],
+  );
 
-  // Route line + stop pins — the bottom sheet (RoutePanel) is rendered by MapScreen.
+  // Draw order = z-order: casing < route < pins < labels.
   return (
     <>
       {routeGeoJson && (
         <MapboxGL.ShapeSource id="routeSource" shape={routeGeoJson as any}>
           <MapboxGL.LineLayer
-            id="routeLine"
+            id="routeCasing"
             style={{
-              lineColor: WeRideColors.primary,
-              lineWidth: 4,
-              lineOpacity: 0.8,
+              lineColor: ROUTE_CASING_COLOR,
+              lineWidth: ['interpolate', ['linear'], ['zoom'], 6, 4, 12, 8, 17, 13],
+              lineCap: 'round',
+              lineJoin: 'round',
+              lineOpacity: 0.9,
+            }}
+          />
+          <MapboxGL.LineLayer
+            id="routeLine"
+            aboveLayerID="routeCasing"
+            style={{
+              lineColor: ROUTE_COLOR,
+              lineWidth: ['interpolate', ['linear'], ['zoom'], 6, 2.5, 12, 5, 17, 9],
+              lineCap: 'round',
+              lineJoin: 'round',
             }}
           />
         </MapboxGL.ShapeSource>
       )}
-      {stopPins.map((pin) => (
-        <MapboxGL.PointAnnotation
-          key={pin.id}
-          id={pin.id}
-          coordinate={[pin.lng, pin.lat]}
-          title={pin.label}
-        >
-          <View style={styles.pin}>
-            <Text style={styles.pinIcon}>{pin.icon}</Text>
-          </View>
-        </MapboxGL.PointAnnotation>
-      ))}
+      {pins.features.length > 0 && (
+        <MapboxGL.ShapeSource id="ridePinsSource" shape={pins as any}>
+          {/* Stops: dark disc, ember ring, number inside */}
+          <MapboxGL.CircleLayer
+            id="pinStop"
+            filter={['==', ['get', 'kind'], 'stop']}
+            style={{
+              circleRadius: 10,
+              circleColor: PIN_DARK,
+              circleStrokeColor: ROUTE_COLOR,
+              circleStrokeWidth: 2,
+            }}
+          />
+          <MapboxGL.SymbolLayer
+            id="pinStopNumber"
+            filter={['==', ['get', 'kind'], 'stop']}
+            style={{
+              textField: ['get', 'n'],
+              textSize: 11,
+              textColor: PIN_LIGHT,
+              textFont: ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+              textAllowOverlap: true,
+            }}
+          />
+          {/* Start: white disc, ember ring */}
+          <MapboxGL.CircleLayer
+            id="pinStart"
+            filter={['==', ['get', 'kind'], 'start']}
+            style={{
+              circleRadius: 8,
+              circleColor: PIN_LIGHT,
+              circleStrokeColor: ROUTE_COLOR,
+              circleStrokeWidth: 4,
+            }}
+          />
+          {/* Destination: ember disc inside a white ring — larger than the start */}
+          <MapboxGL.CircleLayer
+            id="pinEndRing"
+            filter={['==', ['get', 'kind'], 'end']}
+            style={{ circleRadius: 14, circleColor: PIN_LIGHT }}
+          />
+          <MapboxGL.CircleLayer
+            id="pinEnd"
+            filter={['==', ['get', 'kind'], 'end']}
+            style={{ circleRadius: 9.5, circleColor: ROUTE_COLOR }}
+          />
+          <MapboxGL.SymbolLayer
+            id="pinLabels"
+            filter={['!=', ['get', 'kind'], 'stop']}
+            style={{
+              textField: ['get', 'label'],
+              textSize: 12,
+              textColor: PIN_LIGHT,
+              textHaloColor: PIN_DARK,
+              textHaloWidth: 1.5,
+              textFont: ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+              textAnchor: 'top',
+              textOffset: [0, 1.4],
+              textMaxWidth: 8,
+              textOptional: true,
+            }}
+          />
+        </MapboxGL.ShapeSource>
+      )}
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  pin: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: WeRideColors.dark2,
-    borderWidth: 2,
-    borderColor: WeRideColors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pinIcon: { fontSize: 14 },
-});

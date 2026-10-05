@@ -196,6 +196,20 @@ export default function MapScreen() {
     };
   }, [userId, groupId]);
 
+  // Quick signals from the rest of the group (server relays as signal:received).
+  useEffect(() => {
+    if (!groupId) return;
+    const socket = getLocationSocket();
+    const onSignal = (p: { group_id?: string; rider_id?: string; label?: string }) => {
+      if (!p || p.group_id !== groupId || p.rider_id === userId || !p.label) return;
+      push(`Rider ${String(p.rider_id ?? '').slice(-4)}: ${p.label}`, 'warn');
+    };
+    socket.on('signal:received', onSignal);
+    return () => {
+      socket.off('signal:received', onSignal);
+    };
+  }, [groupId, userId, push]);
+
   // Network banner state transitions (spec §3.3.5, FLOW 12)
   useEffect(() => {
     if (prevConnectedRef.current === null) {

@@ -39,12 +39,13 @@ export default function SignalMenu({ visible, groupId, riderId, onSend }: Props)
   if (!visible) return null;
 
   const send = (label: string) => {
-    try {
-      const socket = getLocationSocket();
-      socket.emit('signal:send', { group_id: groupId, rider_id: riderId, label });
-    } catch {
-      // offline — signal still shown locally
+    const socket = getLocationSocket();
+    // Never claim a signal went out when it could not: nothing is queued offline.
+    if (!socket.connected) {
+      push('Offline — signal not sent', 'warn');
+      return;
     }
+    socket.emit('signal:send', { group_id: groupId, rider_id: riderId, label });
     push(`📡 Signal sent: ${label}`);
     onSend(label);
   };

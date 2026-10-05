@@ -42,6 +42,20 @@ function isValidLocationPayload(p) {
   );
 }
 
+// Quick signals (SignalMenu). Labels are an allowlist so the relay cannot be
+// used to broadcast arbitrary text to a group.
+export const SIGNAL_LABELS = ['Wait for me', 'Pull over', 'All good', 'Need fuel'];
+
+function isValidSignalPayload(p) {
+  return (
+    p != null &&
+    typeof p === 'object' &&
+    typeof p.group_id === 'string' && p.group_id.length > 0 &&
+    typeof p.rider_id === 'string' && p.rider_id.length > 0 &&
+    SIGNAL_LABELS.includes(p.label)
+  );
+}
+
 io.on('connection', (socket) => {
   socket.on('join-group', (msg) => {
     const groupId = typeof msg === 'string' ? msg : msg?.groupId;
@@ -55,6 +69,21 @@ io.on('connection', (socket) => {
     if (typeof groupId === 'string' && groupId.length > 0) {
       socket.leave(GROUP_ROOM(groupId));
     }
+  });
+
+  // Relay a quick signal to the rest of the sender's group as `signal:received`.
+  // The sender must be in the group room (cross-group spam is dropped) and, like
+  // location updates, does not receive its own echo.
+  socket.on('signal:send', (payload) => {
+    if (!isValidSignalPayload(payload)) return;
+    const room = GROUP_ROOM(payload.group_id);
+    if (!socket.rooms.has(room)) return;
+    socket.to(room).emit('signal:received', {
+      group_id: payload.group_id,
+      rider_id: payload.rider_id,
+      label: payload.label,
+      sent_at: Date.now(),
+    });
   });
 
   socket.on('location:update', (payload) => {

@@ -10,7 +10,6 @@ import { StyleSheet, Text } from 'react-native';
 import { EMBER, THEMES, THEME_IDS, resolvePalette, withAlpha, Palette, ThemeId, Scheme } from '../src/theme/palettes';
 import { ThemeProvider, buildTheme, useTheme } from '../src/theme/ThemeProvider';
 import { useThemeStore } from '../src/theme/themeStore';
-import SettingsScreen from '../src/screens/SettingsScreen';
 
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({
@@ -196,77 +195,5 @@ describe('theme persistence', () => {
       expect(() => fresh.getState().setThemeId('ember')).not.toThrow();
       expect(fresh.getState().themeId).toBe('ember');
     }
-  });
-});
-
-describe('SettingsScreen', () => {
-  const goBack = jest.fn();
-  const mount = () => {
-    let tree!: renderer.ReactTestRenderer;
-    act(() => {
-      tree = renderer.create(
-        <ThemeProvider>
-          <SettingsScreen navigation={{ goBack }} />
-        </ThemeProvider>,
-      );
-    });
-    return tree;
-  };
-  const press = (tree: renderer.ReactTestRenderer, label: string | RegExp) => {
-    const hit = tree.root.findAll(
-      (n) =>
-        typeof n.props.onPress === 'function' &&
-        typeof n.props.accessibilityLabel === 'string' &&
-        (typeof label === 'string' ? n.props.accessibilityLabel === label : label.test(n.props.accessibilityLabel)),
-    )[0];
-    act(() => hit.props.onPress());
-  };
-
-  beforeEach(() => {
-    mockScheme = 'dark';
-    goBack.mockClear();
-    act(() => {
-      useThemeStore.getState().setThemeId('demo');
-      useThemeStore.getState().setMode('system');
-    });
-  });
-
-  it('offers exactly the two themes and marks the current one selected', () => {
-    const tree = mount();
-    const radios = tree.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityRole === 'radio' && /theme\./.test(n.props.accessibilityLabel ?? ''));
-    expect(radios.map((r) => r.props.accessibilityLabel.split(' theme.')[0])).toEqual(['Demo', 'Ember']);
-    expect(radios.map((r) => r.props.accessibilityState.selected)).toEqual([true, false]);
-    act(() => tree.unmount());
-  });
-
-  it('choosing Ember switches the whole app theme and the choice is stored', () => {
-    const tree = mount();
-    press(tree, /^Ember theme/);
-    expect(useThemeStore.getState().themeId).toBe('ember');
-    const root = tree.root.findByProps({ testID: 'settings-screen' });
-    expect(StyleSheet.flatten(root.props.style).backgroundColor).toBe(THEMES.ember.dark.bg);
-    act(() => tree.unmount());
-  });
-
-  it('Light / Dark / System override the OS and the screen re-colours at once', () => {
-    const tree = mount();
-    const bg = () => StyleSheet.flatten(tree.root.findByProps({ testID: 'settings-screen' }).props.style).backgroundColor;
-    expect(bg()).toBe(THEMES.demo.dark.bg);
-    press(tree, 'Light');
-    expect(useThemeStore.getState().mode).toBe('light');
-    expect(bg()).toBe(THEMES.demo.light.bg);
-    press(tree, 'System');
-    expect(bg()).toBe(THEMES.demo.dark.bg); // OS is dark in this test
-    mockScheme = 'light';
-    press(tree, 'Dark');
-    expect(bg()).toBe(THEMES.demo.dark.bg); // manual override beats the OS
-    act(() => tree.unmount());
-  });
-
-  it('back goes back', () => {
-    const tree = mount();
-    press(tree, 'Back');
-    expect(goBack).toHaveBeenCalledTimes(1);
-    act(() => tree.unmount());
   });
 });

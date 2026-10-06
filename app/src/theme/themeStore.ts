@@ -40,16 +40,49 @@ function load(): { themeId: ThemeId; mode: ThemePreference } {
   };
 }
 
+const KEY_FIX = 'theme.lastfix';
+
+export interface LastFix {
+  lat: number;
+  lng: number;
+}
+
+/** The rider's last known position (device-only), so Road theme "Sunset auto" can tell day from night off the bike. */
+function loadFix(): LastFix | null {
+  try {
+    const raw = prefs()?.getString(KEY_FIX);
+    const v = raw ? JSON.parse(raw) : null;
+    return v && Number.isFinite(v.lat) && Number.isFinite(v.lng) ? { lat: v.lat, lng: v.lng } : null;
+  } catch {
+    return null;
+  }
+}
+
 interface ThemeState {
   themeId: ThemeId;
   /** 'system' follows the OS; 'light' / 'dark' override it. */
   mode: ThemePreference;
+  /** Last known position, used only to decide sunrise/sunset for the Road theme. */
+  lastFix: LastFix | null;
   setThemeId: (id: ThemeId) => void;
   setMode: (mode: ThemePreference) => void;
+  setLastFix: (fix: LastFix) => void;
 }
 
-export const useThemeStore = create<ThemeState>((set) => ({
+export const useThemeStore = create<ThemeState>((set, get) => ({
   ...load(),
+  lastFix: loadFix(),
+  setLastFix: (fix) => {
+    const cur = get().lastFix;
+    // Sunrise moves a minute per ~15 km, so only a real move is worth a write.
+    if (cur && Math.abs(cur.lat - fix.lat) < 0.25 && Math.abs(cur.lng - fix.lng) < 0.25) return;
+    set({ lastFix: fix });
+    try {
+      prefs()?.set(KEY_FIX, JSON.stringify(fix));
+    } catch {
+      /* best effort */
+    }
+  },
   setThemeId: (themeId) => {
     set({ themeId });
     prefs()?.set(KEY_THEME, themeId);

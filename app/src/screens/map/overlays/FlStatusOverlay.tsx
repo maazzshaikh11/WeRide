@@ -9,8 +9,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 import { useTheme } from '../../../theme/ThemeProvider';
-import { getFlData } from '../../../services/localStorage';
-import { FlRoundLogger } from '@flvoice/fl/flRoundLogger';
+import { flStatusLine } from '../../../services/flService';
+import { usePrefsStore } from '../../../store/prefsStore';
 import { Motion, useReducedMotion } from '../../../ui';
 
 interface FlBadgeState {
@@ -19,23 +19,16 @@ interface FlBadgeState {
 
 export default function FlStatusOverlay() {
   const { type } = useTheme();
+  const learn = usePrefsStore((s) => s.prefs.learn);
   const [state, setState] = useState<FlBadgeState>({
     message: 'Ride data stays on-device',
   });
 
   useEffect(() => {
-    try {
-      const logger = new FlRoundLogger(getFlData());
-      const latest = logger.latestRound();
-      if (latest) {
-        setState({
-          message: `FL round ${latest.roundId} done · ${latest.participants} clients`,
-        });
-      }
-    } catch {
-      // FL state unavailable — keep default privacy message
-    }
-  }, []);
+    // Opted out of "Improve ETAs for everyone": no round status, just the privacy line.
+    const line = learn ? flStatusLine() : null;
+    setState({ message: line ?? 'Ride data stays on-device' });
+  }, [learn]);
 
   const reduced = useReducedMotion();
   const fade = useRef(new Animated.Value(1)).current;

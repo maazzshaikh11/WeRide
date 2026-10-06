@@ -19,6 +19,11 @@ export interface FlClientParams {
   serverUrl: string;
   masking?: DpMasking;
   mu?: number; // FedProx proximal coefficient
+  /**
+   * Consent gate, checked before every network call and before training. The app binds it to the rider's
+   * "Improve ETAs for everyone" setting (Me > Privacy). Omitted = no consent: the client never trains or uploads.
+   */
+  isEnabled?: () => boolean;
 }
 
 export class FlClient {
@@ -26,6 +31,7 @@ export class FlClient {
   readonly serverUrl: string;
   readonly masking: DpMasking;
   readonly mu: number;
+  private readonly _isEnabled: () => boolean;
 
   private _globalWeights?: Float32Array;
   private _round = 0;
@@ -35,10 +41,21 @@ export class FlClient {
     this.serverUrl = params.serverUrl;
     this.masking = params.masking ?? new DpMasking();
     this.mu = params.mu ?? 0.01;
+    this._isEnabled = params.isEnabled ?? (() => false);
+  }
+
+  /** true when the rider has opted in to contribute model updates. */
+  get enabled(): boolean {
+    try {
+      return this._isEnabled() === true;
+    } catch {
+      return false;
+    }
   }
 
   /** Fetch current global weights from the server. */
   async fetchGlobal(): Promise<void> {
+    if (!this.enabled) return;
     const res = await fetch(`${this.serverUrl}/fl/global`);
     const data = await res.json();
     // _globalWeights = DpMasking.decode(data.weights);
@@ -47,6 +64,7 @@ export class FlClient {
 
   /** Train locally for E epochs on MMKV 'fl_data'. Returns the masked weight delta. */
   async trainLocal(epochs: number): Promise<Float32Array> {
+    if (!this.enabled) return new Float32Array(0);
     if (!this._globalWeights) await this.fetchGlobal();
     // TODO: TFLite training loop with FedProx proximal term
     const delta = new Float32Array(this._globalWeights?.length ?? 10);
@@ -55,6 +73,7 @@ export class FlClient {
 
   /** Submit the masked weight delta to the server. */
   async submit(maskedDelta: Float32Array, localLoss: number, sampleCount: number): Promise<void> {
+    if (!this.enabled) return;
     const payload = {
       client_id: this.clientId,
       round_id: this._round,
@@ -72,6 +91,7 @@ export class FlClient {
 
   /** Full round: fetch global → train → submit. */
   async runRound(epochs = 3): Promise<void> {
+    if (!this.enabled) return;
     await this.fetchGlobal();
     const masked = await this.trainLocal(epochs);
     await this.submit(masked, 0.0, 0);

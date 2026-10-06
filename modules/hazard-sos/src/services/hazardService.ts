@@ -58,6 +58,28 @@ export interface HazardCluster {
 }
 
 /**
+ * Firestore rejects nested arrays, but the frozen hazard_cluster contract
+ * models polygon_points as [lat, lng] pairs. Encode pairs as {lat, lng}
+ * maps at the Firestore write boundary and decode back on reads, so the
+ * domain model, contract, and map rendering keep working with pairs.
+ */
+export function encodePolygonPoints(
+  points: [number, number][]
+): Array<{ lat: number; lng: number }> {
+  return points.map(([lat, lng]) => ({ lat, lng }));
+}
+
+export function decodePolygonPoints(stored: unknown): [number, number][] {
+  if (!Array.isArray(stored)) return [];
+  return (stored as Array<[number, number] | { lat: number; lng: number }>).map(
+    (p) =>
+      Array.isArray(p)
+        ? [Number(p[0]), Number(p[1])]
+        : [Number((p as { lat?: unknown })?.lat ?? 0), Number((p as { lng?: unknown })?.lng ?? 0)]
+  );
+}
+
+/**
  * Submit a hazard report.
  *
  * Online: write to Firestore immediately.
@@ -213,7 +235,9 @@ export async function triggerClustering(groupId: string): Promise<void> {
       hazard_type: hazardType,
       centroid_lat: centroid.lat,
       centroid_lng: centroid.lng,
-      polygon_points: bbox,
+      // Firestore-safe encoding of the [lat, lng] pairs (nested arrays are
+      // rejected by Firestore); decoded back to pairs on read.
+      polygon_points: encodePolygonPoints(bbox) as unknown as [number, number][],
       report_count: cluster.reports.length,
       hazard_score: hazardScore,
       created_at_hlc: isNewCluster ? nowHlc : existingClusters.get(clusterId)!.created_at_hlc,
@@ -304,6 +328,8 @@ export function subscribeToHazardClusters(
         const clusters: HazardCluster[] = [];
         for (const doc of snapshot.docs) {
           const data = doc.data() as HazardCluster;
+          // Decode the Firestore-safe {lat, lng} encoding back to pairs.
+          data.polygon_points = decodePolygonPoints(data.polygon_points);
           clusters.push(data);
         }
         callback(clusters);

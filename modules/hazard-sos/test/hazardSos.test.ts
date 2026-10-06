@@ -2437,7 +2437,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
         centroid_lat: expect.any(Number),
         centroid_lng: expect.any(Number),
         polygon_points: expect.arrayContaining([
-          expect.arrayContaining([expect.any(Number), expect.any(Number)]),
+          expect.objectContaining({ lat: expect.any(Number), lng: expect.any(Number) }),
         ]),
         report_count: 2,
         hazard_score: expect.any(Number),
@@ -2447,6 +2447,19 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
       expect(cluster.hazard_score).toBeGreaterThanOrEqual(0);
       expect(cluster.hazard_score).toBeLessThanOrEqual(1);
       expect(cluster.polygon_points.length).toBe(4);
+    });
+
+    test('polygon codec: bbox pairs encode to Firestore-safe maps and decode back (tolerant both ways)', () => {
+      const { encodePolygonPoints, decodePolygonPoints } = require('../src/services/hazardService');
+      const pairs: [number, number][] = [[37.1, -122.1], [37.1, -122.0], [37.2, -122.0], [37.2, -122.1]];
+      const encoded = encodePolygonPoints(pairs);
+      // Firestore-safe: array of maps, no nested arrays.
+      expect(encoded).toEqual(pairs.map(([lat, lng]) => ({ lat, lng })));
+      expect(encoded.every((p: any) => !Array.isArray(p))).toBe(true);
+      expect(decodePolygonPoints(encoded)).toEqual(pairs);
+      // Tolerant read of legacy/contract pair shape.
+      expect(decodePolygonPoints(pairs)).toEqual(pairs);
+      expect(decodePolygonPoints(undefined)).toEqual([]);
     });
 
     test('hazard_cluster_update: repeated clustering updates existing logical cluster rather than blindly creating duplicates', async () => {

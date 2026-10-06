@@ -37,16 +37,16 @@ beforeEach(() => {
 afterEach(() => { mounted.splice(0).forEach((t) => act(() => t.unmount())); jest.useRealTimers(); });
 
 describe('RollOutOverlay', () => {
-  it.each(ALL)('%s/%s: "<LEAD> · LEAD", Rolling out, 3, the road-mode line', (id, scheme) => {
+  it.each(ALL)('%s/%s: "<LEAD> ∙ LEAD", Rolling out, 3, the road-mode line', (id, scheme) => {
     const t = mount({ kind: 'rollout', groupId: 'r1', leadName: 'Meera' }, id, scheme);
     const tx = texts(t);
-    expect(tx).toContain('MEERA · LEAD');
+    expect(tx).toContain('MEERA ∙ LEAD');
     expect(tx).toContain('Rolling out');
     expect(tx).toContain('3');
     expect(tx).toContain('Phones lock to Road mode');
   });
 
-  it('counts 3 · 2 · 1, then hides itself and resets to Live; starts the recorder once at the start', () => {
+  it('counts 3 ∙ 2 ∙ 1, then hides itself and resets to Live; starts the recorder once at the start', () => {
     const t = mount({ kind: 'rollout', groupId: 'r1', leadName: 'Meera' });
     expect(mockStart).toHaveBeenCalledTimes(1);
     expect(mockStart).toHaveBeenCalledWith({ id: 'r1', name: 'Run' });
@@ -62,7 +62,7 @@ describe('RollOutOverlay', () => {
     expect(mockReset).toHaveBeenCalledTimes(1);
   });
 
-  it('BREAK OVER (from Stop): 2 · 1, no recorder start, back to the Live screen underneath', () => {
+  it('BREAK OVER (from Stop): 2 ∙ 1, no recorder start, back to the Live screen underneath', () => {
     const t = mount({ kind: 'rollout', groupId: 'r1', next: 'Live' });
     expect(texts(t)).toContain('BREAK OVER');
     expect(texts(t)).toContain('2');

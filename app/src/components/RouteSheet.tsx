@@ -64,13 +64,13 @@ export default function RouteSheet({ visible, onClose, avoidHazards = false, onT
     hasDestination: planDestination != null,
   });
 
-  // Meta: "Pune → Lonavala · started 38 min ago" (spec §3.3.8), only real parts.
+  // Meta: "Pune → Lonavala ∙ started 38 min ago" (spec §3.3.8), only real parts.
   const shortLabel = (label?: string | null) => label?.split(',')[0] ?? null;
   const originLabel = shortLabel(planStart?.label);
   const destLabel = shortLabel(planDestination?.label);
   const routeLabel = originLabel && destLabel ? `${originLabel} → ${destLabel}` : destLabel ? `→ ${destLabel}` : null;
   const startedAgo = rideStartedAt != null ? `started ${Math.max(1, Math.round((Date.now() - rideStartedAt) / 60000))} min ago` : null;
-  const metaText = [routeLabel, startedAgo].filter(Boolean).join(' · ');
+  const metaText = [routeLabel, startedAgo].filter(Boolean).join(' ∙ ');
 
   const currentStop = stops.find((x) => x.status === 'current') ?? stops.find((x) => x.status === 'upcoming');
   const empty = mode === 'ready' || mode === 'loading' ? null : EMPTY_STATE_COPY[mode];

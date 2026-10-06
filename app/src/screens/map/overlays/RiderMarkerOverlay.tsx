@@ -9,21 +9,28 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useRidersStore } from '@app/store/ridersStore';
-import { markerColorForState } from './riderMarkerState';
+import { riderMarkerLook } from './riderMarkerState';
 import { useTheme } from '../../../theme/ThemeProvider';
+import { avatarColor } from '../../../theme/palettes';
+import { useAppStore } from '../../../store/appStore';
+import { useProfileStore, riderInitials, riderName } from '../../../store/profileStore';
+import { useRidesStore } from '../../../store/ridesStore';
+import { useRouteStore } from '@routing/client/routeStore';
+import { haversineMeters } from '../../../utils/geoUtils';
+import { GAP_THRESHOLD_M } from '../live/liveGeometry';
 import { useInfoCardStyles, INFO_CARD_RADIUS } from './infoCardStyles';
 import { FadeIn, Pill, PressableCard } from '../../../ui';
 import type { PillTone } from '../../../ui';
 
 const CIRCLE_RADIUS = 18; // demo .av is 36px
 const RING_WIDTH = 2.5; // demo .av ring: 2.5px in the page background
-/** Initials colour on the avatar fill (demo .av uses near-black; white on the red flagged fill). */
-const INITIALS_DARK = '#10110E';
 const STALE_SWEEP_INTERVAL_MS = 1000;
 
-/** Space Mono-style initials from a rider id (2 chars, uppercase). */
-function initialsFor(riderId: string): string {
-  return riderId.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || '??';
+/** A stable colour for a rider who is not in the ride's crew order (should not happen; never random). */
+function hashedColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return avatarColor(h);
 }
 
 function formatSpeed(mps: number): string {
@@ -51,8 +58,12 @@ function statusLabel(markerState: string, speed: number): { label: string; tone:
   return { label: 'On pace', tone: 'ok' };
 }
 
-export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
+export default function RiderMarkerOverlay({ groupId, sosRiderIds }: { groupId: string; sosRiderIds?: readonly string[] }) {
   const { colors } = useTheme();
+  const profiles = useProfileStore((state) => state.byId);
+  const myUid = useAppStore((state) => state.userId);
+  const memberIds = useRidesStore((state) => state.rides.find((r) => r.id === groupId)?.member_ids);
+  const own = useRouteStore((state) => state.lastValidLocation);
   const riders = useRidersStore((state) => state.riders);
   const refreshStaleStates = useRidersStore((state) => state.refreshStaleStates);
   const selectedRiderId = useRidersStore((state) => state.selectedRiderId);
@@ -72,8 +83,16 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
   const geojson = useMemo(() => {
     const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
 
+    const order = [...new Set(memberIds ?? [])];
     riders.forEach((entry, riderId) => {
-      const color = markerColorForState(entry.markerState, colors);
+      // Crew colour = position in the ride's member order (same as every other avatar in the app).
+      const idx = order.indexOf(riderId);
+      const avatar = idx >= 0 ? avatarColor(idx) : hashedColor(riderId);
+      const sos = sosRiderIds?.includes(riderId) ?? false;
+      const distM = own ? haversineMeters(own.lat, own.lng, entry.location.lat, entry.location.lng) : 0;
+      const far = entry.markerState === 'GREEN' && own != null && distM > GAP_THRESHOLD_M;
+      const look = riderMarkerLook({ state: entry.markerState, avatar, sos, far }, colors);
+      const first = riderName(profiles, riderId, myUid).split(/\s+/)[0];
       features.push({
         type: 'Feature',
         id: riderId,
@@ -83,9 +102,12 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
         },
         properties: {
           rider_id: riderId,
-          markerColor: color,
-          initialsColor: entry.markerState === 'RED' ? '#FFFFFF' : INITIALS_DARK,
-          initials: initialsFor(riderId),
+          markerColor: look.fill,
+          ringColor: look.ring,
+          initialsColor: look.text,
+          initials: riderInitials(profiles, riderId),
+          // demo `.ld .nm`: a name chip for the riders that need attention (far, no signal, SOS)
+          name: far || sos || entry.markerState === 'GREY' ? first.toUpperCase() : '',
           speed_mps: entry.location.speed_mps,
           heading_deg: entry.location.heading_deg,
           nis_score: entry.location.nis_score,
@@ -100,7 +122,7 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
       type: 'FeatureCollection' as const,
       features,
     };
-  }, [riders, colors]);
+  }, [riders, colors, profiles, myUid, memberIds, own, sosRiderIds]);
 
   const shapeSourceRef = useRef<MapboxGL.ShapeSource>(null);
 
@@ -129,8 +151,6 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
     }
   }, [riders, selectedRiderId, selectRider]);
 
-  const selectedEntry = selectedRiderId ? riders.get(selectedRiderId) : null;
-
   if (riders.size === 0) {
     return null;
   }
@@ -149,7 +169,7 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
             circleRadius: CIRCLE_RADIUS,
             circleColor: ['get', 'markerColor'],
             circleStrokeWidth: RING_WIDTH,
-            circleStrokeColor: colors.bg,
+            circleStrokeColor: ['get', 'ringColor'],
           }}
         />
         <MapboxGL.SymbolLayer
@@ -158,6 +178,20 @@ export default function RiderMarkerOverlay({ groupId }: { groupId: string }) {
             textField: ['get', 'initials'] as any,
             textSize: 11,
             textColor: ['get', 'initialsColor'] as any,
+            textAllowOverlap: true,
+          }}
+        />
+        <MapboxGL.SymbolLayer
+          id="rider-names"
+          filter={['!=', ['get', 'name'], '']}
+          style={{
+            textField: ['get', 'name'] as any,
+            textSize: 12,
+            textAnchor: 'left',
+            textOffset: [1.9, 0],
+            textColor: colors.ink,
+            textHaloColor: colors.bg,
+            textHaloWidth: 2,
             textAllowOverlap: true,
           }}
         />

@@ -5,7 +5,7 @@
  *          with a small floating distance label pinned to its RIGHT (distance to the
  *          nearest live crew member, from real verified fixes — nothing simulated)
  * Layer 2: floating UI — header (back, ride name, live pill), one status plate
- *          ("is the group OK?"), side buttons (follow/fit, Google Maps, route details),
+ *          ("is the group OK?"), side buttons (group, follow/fit),
  *          speed + ETA cluster, and the control keys (SOS hold, Signal, Hazard, Talk).
  *          Signal / Hazard / Route open as sheets.
  *
@@ -96,7 +96,8 @@ const PLATE_H = 82;                                   // status plate (demo min-
 const TOP_CHROME_H = HEADER_PAD + HEADER_BAR_H + HEADER_PAD + PLATE_H + HEADER_PAD; // below the status-bar inset
 const SIDE_COLUMN_W = SIDE_BTN + GUTTER;              // side buttons + right gutter
 const CLUSTER_H = 132;                                // speed / ETA cluster
-const CONTROLS_BOTTOM = 16;                           // controls sit this far above the tab bar
+const CONTROLS_BOTTOM = 30;                           // demo `.ctls { bottom: 30px }` (26 in glove mode)
+const GLOVE_CONTROLS_BOTTOM = 26;
 const SIDE_GAP = 12;
 const NETWORK_BANNER_H = 64;                          // reserved height of the banner (toasts stack below it)
 const FOLLOW_ZOOM = 16;
@@ -151,7 +152,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
     bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25 },
     infoCardsScroll: { maxHeight: 220 },
     infoCardsContent: { paddingRight: SIDE_COLUMN_W - GUTTER },
-    controls: { position: 'absolute', left: GUTTER, right: GUTTER, bottom: CONTROLS_BOTTOM, flexDirection: 'row', gap: CONTROL_GAP, zIndex: 25 },
+    controls: { position: 'absolute', left: GUTTER, right: GUTTER, bottom: glove ? GLOVE_CONTROLS_BOTTOM : CONTROLS_BOTTOM, flexDirection: 'row', gap: CONTROL_GAP, zIndex: 25 },
     noGroup: { flex: 1, backgroundColor: r.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8 },
     noGroupTitle: { ...t.h2 },
     noGroupSub: { ...t.body, textAlign: 'center' },
@@ -374,7 +375,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
       fitPadding({
         headerHeight: insets.top + TOP_CHROME_H,
         fabColumnWidth: SIDE_COLUMN_W,
-        sheetHeight: CONTROLS_BOTTOM + controlHeight(glove) + CLUSTER_H + 8,
+        sheetHeight: (glove ? GLOVE_CONTROLS_BOTTOM : CONTROLS_BOTTOM) + controlHeight(glove) + CLUSTER_H + 8,
       }),
     [insets.top, glove],
   );
@@ -507,12 +508,14 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
     nameOf,
     units,
   });
+  const sosRiderIds = useMemo(() => sosEvents.filter((e) => !e.resolved).map((e) => e.rider_id), [sosEvents]);
   const sosActive = sosEvents.some((e) => e.isSender && !e.resolved);
   const speedKmh = lastValidLocation && Number.isFinite(lastValidLocation.speed_mps) ? Math.max(0, lastValidLocation.speed_mps * 3.6) : null;
   const etaClock = route && Number.isFinite(route.eta_minutes) ? clockAfter(route.eta_minutes) : null;
   const remainingKm = route && Number.isFinite(route.distance_km) ? route.distance_km : null;
   const toLabel = planDestination?.label?.split(',')[0] ?? null;
   const ctlH = controlHeight(glove);
+  const controlsBottom = glove ? GLOVE_CONTROLS_BOTTOM : CONTROLS_BOTTOM;
 
   // Recorder events that start on a transition: a gap opening (> 500 m spread) — once per gap.
   const gapOpen = own != null && others.length > 0 && groupSpreadM([own, ...others.map((r) => r.location)]) > GAP_EVENT_M;
@@ -586,7 +589,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
         {/* The system puck only until our own avatar (below) has a fix to sit on. */}
         <MapboxGL.UserLocation showsUserHeadingIndicator visible={!lastValidLocation} />
         {/* Layer 1 — map overlays */}
-        <RiderMarkerOverlay groupId={groupId} />
+        <RiderMarkerOverlay groupId={groupId} sosRiderIds={sosRiderIds} />
         <HazardOverlayMapLayer groupId={groupId} onHazardPress={setSelectedHazard} />
         <SosOverlayMapLayer groupId={groupId} userId={userId ?? undefined} onSosEventsChange={onSosEventsChange} />
         <RouteOverlay groupId={groupId} />
@@ -664,7 +667,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
       {/* Toasts: below the plate (and below the banner when it is up) */}
       <ToastContainer top={topInset + (networkBanner ? NETWORK_BANNER_H : 0)} />
 
-      {/* Side buttons: group view, follow/fit, Google Maps, route details */}
+      {/* Side buttons: group view, follow/fit. Route details + Google Maps live behind the speed / ETA cluster. */}
       <View style={[styles.sideColumn, { top: topInset + SIDE_GAP }]} pointerEvents="box-none">
         <SideButton icon="group" label="GROUP" active={groupView} onPress={showGroup} accessibilityLabel="Show the whole group" testID="side-group" />
         <SideButton
@@ -675,12 +678,10 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
           accessibilityLabel={following ? 'Show the whole route' : 'Follow my location'}
           testID="side-follow"
         />
-        <SideButton icon="nav" label="MAPS" onPress={openGoogleMaps} accessibilityLabel="Open route in Google Maps" testID="side-maps" />
-        <SideButton icon="route" label="ROUTE" onPress={() => setRouteOpen(true)} accessibilityLabel="Route details" testID="side-route" />
       </View>
 
       {/* Info cards (hazard / SOS / rider) sit above the controls */}
-      <View style={[styles.bottom, { bottom: CONTROLS_BOTTOM + ctlH + 12 }]} pointerEvents="box-none">
+      <View style={[styles.bottom, { bottom: controlsBottom + ctlH + 12 }]} pointerEvents="box-none">
         <ScrollView
           style={styles.infoCardsScroll}
           contentContainerStyle={styles.infoCardsContent}
@@ -716,7 +717,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
       </View>
 
       {/* Speed, ETA, distance left — tap for route details */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: CONTROLS_BOTTOM + ctlH + 8, zIndex: 20 }} pointerEvents="box-none">
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: controlsBottom + ctlH + 8, zIndex: 20 }} pointerEvents="box-none">
         <SpeedCluster
           speedKmh={speedKmh}
           etaClock={etaClock}
@@ -728,7 +729,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
         />
       </View>
 
-      {/* Control keys: SOS (hold) · Signal · Hazard · Talk (hold) */}
+      {/* Control keys: SOS (hold) ∙ Signal ∙ Hazard ∙ Talk (hold) */}
       <View style={[styles.controls, { alignItems: 'flex-end' }]}>
         <View style={{ height: ctlH, justifyContent: 'center' }}>
           <SosFab

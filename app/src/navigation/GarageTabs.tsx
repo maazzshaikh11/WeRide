@@ -1,5 +1,5 @@
 /**
- * GarageTabs — the demo's four-tab bar (Ride · Crews · Log · Me), shown on the Garage screens only.
+ * GarageTabs — the demo's four-tab bar (Ride ∙ Crews ∙ Log ∙ Me), shown on the Garage screens only.
  * Icon in a 52×32 well over an uppercase label; the selected well fills with the accent.
  */
 import React, { useEffect, useRef } from 'react';

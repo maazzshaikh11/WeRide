@@ -139,12 +139,12 @@ function Body({ state }: { state: InState }) {
   const dismiss = () => useOverlayStore.getState().hide();
 
   const top = Math.max(insets.top, 24);
-  const ago = state.startedMs ? `SOS · ${ageLabel(now - state.startedMs)}` : 'SOS';
+  const ago = state.startedMs ? `SOS ∙ ${ageLabel(now - state.startedMs)}` : 'SOS';
   const where = gapM != null ? `${formatShortDistance(gapM, units)} ${dir === 'behind' ? 'behind you' : dir === 'ahead' ? 'ahead of you' : 'away'}` : 'Location not shared yet';
 
   return (
     <View style={st.root} testID="overlay-SosIncoming" accessibilityViewIsModal>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: top + 22, paddingBottom: 230 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: top + 16, paddingBottom: 230 }} showsVerticalScrollIndicator={false}>
         <Text style={[type.label, { color: FG, opacity: 0.85, letterSpacing: 2.75 }]} testID="sosin-ago">{ago}</Text>
         <Text
           style={[type.display, { color: FG, fontSize: 52, lineHeight: 52, letterSpacing: -1.8, marginTop: 8 }]}
@@ -158,7 +158,7 @@ function Body({ state }: { state: InState }) {
         </Text>
         <Text style={[type.h3, { color: FG, marginTop: 12 }]} testID="sosin-where">
           <Text style={type.num}>{where}</Text>
-          {bike ? ` · ${bike}` : ''}
+          {bike ? ` ∙ ${bike}` : ''}
         </Text>
 
         {senderPos ? (
@@ -181,18 +181,18 @@ function Body({ state }: { state: InState }) {
             const tail = r.state === 'arrived' ? `with ${name}` : 'responding';
             return (
               <View key={r.uid} style={st.rowCard} accessible accessibilityLabel={`${n}, ${d != null ? formatShortDistance(d, units) + ', ' : ''}${tail}`} testID={`sosin-resp-${r.uid}`}>
-                <Avatar initials={riderInitials(byId, r.uid)} color={avatarColor(i)} size={36} ring={false} />
+                <Avatar initials={riderInitials(byId, r.uid)} color={avatarColor(i)} size={32} ring={false} />
                 <Text style={[type.h3, { color: FG, fontSize: 16, flex: 1 }]} numberOfLines={1}>{n}</Text>
-                <Text style={[type.smStrong, { color: FG }]}>{d != null ? `${formatShortDistance(d, units)} · ${tail}` : tail}</Text>
+                <Text style={[type.smStrong, { color: FG }]}>{d != null ? `${formatShortDistance(d, units)} ∙ ${tail}` : tail}</Text>
               </View>
             );
           })}
           {going ? (
             <View style={[st.rowCard, { backgroundColor: FG }]} accessible accessibilityLabel={`You, ${myState === 'arrived' ? 'with ' + name : 'going'}`} testID="sosin-you">
-              <Avatar initials={riderInitials(byId, me ?? '')} me size={36} ring={false} />
+              <Avatar initials={riderInitials(byId, me ?? '')} me size={32} ring={false} />
               <Text style={[type.h3, { color: RED, fontSize: 16, flex: 1 }]}>You</Text>
               <Text style={[type.smStrong, { color: RED, fontFamily: type.h3.fontFamily }]}>
-                {gapM != null ? `${formatShortDistance(gapM, units)} · ` : ''}{myState === 'arrived' ? `with ${name}` : 'going'}
+                {gapM != null ? `${formatShortDistance(gapM, units)} ∙ ` : ''}{myState === 'arrived' ? `with ${name}` : 'going'}
               </Text>
             </View>
           ) : null}
@@ -203,7 +203,7 @@ function Body({ state }: { state: InState }) {
         <Text style={[type.buttonXs, { color: FG }]}>Not now</Text>
       </PressableScale>
 
-      <View style={[st.bottom, { bottom: Math.max(insets.bottom, 12) + 18 }]}>
+      <View style={[st.bottom, { bottom: BOTTOM_PAD }]}>
         {going ? (
           <PressableScale onPress={iAmWith} accessibilityRole="button" accessibilityLabel={`I’m with ${name}`} style={[st.big, { height: 80 }]} testID="sosin-arrived">
             <Text style={[type.button, { color: RED, fontSize: 22, lineHeight: 26 }]} numberOfLines={1}>{`I’m with ${name}`}</Text>
@@ -217,15 +217,20 @@ function Body({ state }: { state: InState }) {
           <Text style={[type.button, { color: RED }]}>Call 112</Text>
         </PressableScale>
       </View>
-      <OverlayToast toast={toast} />
+      {/* above the buttons: the top of this screen is the headline (and "Not now") */}
+      <OverlayToast toast={toast} bottom={BOTTOM_PAD + BUTTONS_H + 12} />
     </View>
   );
 }
 
+/** Distance of the button stack from the screen's bottom edge (demo: 30) and its height (big 80 + gap 10 + 60). */
+const BOTTOM_PAD = 30;
+const BUTTONS_H = 150;
+
 const st = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, backgroundColor: RED, overflow: 'hidden' },
   mapWrap: { marginTop: 16, borderRadius: 22, overflow: 'hidden', borderWidth: 3, borderColor: FG },
-  rowCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD, borderRadius: 16, paddingVertical: 10, paddingHorizontal: 14, minHeight: 56 },
+  rowCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 14, minHeight: 48 },
   notNow: { position: 'absolute', right: 16, minHeight: 44, paddingHorizontal: 14, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
   bottom: { position: 'absolute', left: 14, right: 14, gap: 10 },
   big: { borderRadius: 22, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },

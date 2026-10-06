@@ -14,7 +14,7 @@ export interface RouteOption {
   /** 0..100 */
   safety: number;
   hazardCount: number;
-  /** "Passes 2 reported hazards · +7 min" */
+  /** "Passes 2 reported hazards ∙ +7 min" */
   note: string;
   /** Only true for a route that is genuinely the safest, to highlight it. */
   recommended: boolean;
@@ -51,7 +51,7 @@ export function buildOptions(alts: RouteAlternative[]): RouteOption[] {
       : alt.label === 'Alternative' ? (altCount > 1 ? `Alternative ${++altN}` : 'Alternative')
       : alt.label;
     const delta = Math.round(alt.eta_minutes - minEta);
-    const note = hazardNote(alt.hazard_count) + (delta >= 1 ? ` · +${delta} min` : '');
+    const note = hazardNote(alt.hazard_count) + (delta >= 1 ? ` ∙ +${delta} min` : '');
     return {
       index,
       alt,

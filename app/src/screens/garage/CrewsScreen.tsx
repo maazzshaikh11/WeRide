@@ -28,7 +28,7 @@ function CrewCard({ crew, index, ride, now, meUid, onPress }: { crew: Crew; inde
     card: { backgroundColor: c.card, borderRadius: 22, borderWidth: 1.5, borderColor: c.line, padding: 18, overflow: 'hidden' },
     ring: { position: 'absolute', right: -44, top: -44, width: 140, height: 140, borderRadius: 70, borderWidth: 15, borderColor: c.pri },
   }));
-  const when = ride ? (ride.start_time_ms != null ? `${formatWhen(ride.start_time_ms, now)} · ${ride.name}` : ride.name) : 'No ride planned';
+  const when = ride ? (ride.start_time_ms != null ? `${formatWhen(ride.start_time_ms, now)} ∙ ${ride.name}` : ride.name) : 'No ride planned';
   const soon = startsWithin24h(ride, now);
   return (
     <PressableScale

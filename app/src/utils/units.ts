@@ -30,6 +30,26 @@ export function formatShortDistance(m: number, units: Units = 'km'): string {
   return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
 }
 
+/** Longest-gap wording (demo "0.4 km"): km/mi with one decimal from 100 m up, "<100 m" (or "<330 ft") below. */
+export function gapLabel(m: number, units: Units = 'km'): string {
+  if (!Number.isFinite(m)) return '--';
+  if (m < 100) return units === 'mi' ? '<330 ft' : '<100 m';
+  const v = toUnitDistance(m / 1000, units);
+  return `${v.toFixed(1)} ${distanceUnit(units)}`;
+}
+
+/**
+ * A spread / gap between riders: metres below 100 m ("60 m", "190 ft" in miles), otherwise one decimal of km / mi
+ * ("0.6 km", "1.3 km") like the demo's "6 riders ∙ 0.6 km spread".
+ */
+export function formatSpread(m: number, units: Units = 'km'): string {
+  if (!Number.isFinite(m) || m < 0) return '--';
+  if (units === 'mi') {
+    return m < 100 ? `${Math.round((m * 3.28084) / 10) * 10} ft` : `${(m / 1609.344).toFixed(1)} mi`;
+  }
+  return m < 100 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+}
+
 export function formatSpeed(kmh: number, units: Units = 'km'): string {
   if (!Number.isFinite(kmh)) return '--';
   return String(Math.round(toUnitSpeed(kmh, units)));

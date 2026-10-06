@@ -41,10 +41,10 @@ describe('weeklyKm', () => {
 
 describe('seasonLabel', () => {
   it('spans the first and last month', () => {
-    expect(seasonLabel([{ started_ms: at(2026, 8, 15) }, { started_ms: at(2026, 9, 4) }, { started_ms: at(2026, 8, 27) }])).toBe('SEASON · SEP – OCT');
+    expect(seasonLabel([{ started_ms: at(2026, 8, 15) }, { started_ms: at(2026, 9, 4) }, { started_ms: at(2026, 8, 27) }])).toBe('SEASON ∙ SEP – OCT');
   });
   it('one month', () => {
-    expect(seasonLabel([{ started_ms: at(2026, 9, 4) }, { started_ms: at(2026, 9, 20) }])).toBe('SEASON · OCT');
+    expect(seasonLabel([{ started_ms: at(2026, 9, 4) }, { started_ms: at(2026, 9, 20) }])).toBe('SEASON ∙ OCT');
   });
   it('YOUR LOG when empty', () => {
     expect(seasonLabel([])).toBe('YOUR LOG');

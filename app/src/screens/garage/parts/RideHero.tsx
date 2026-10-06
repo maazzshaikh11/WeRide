@@ -106,7 +106,7 @@ export default function RideHero(p: RideHeroProps) {
   const ready = docs.rollCall.filter((r) => r.state === 'ready').length;
   const from = shortPlace(ride.meetup?.label ?? ride.ride_plan?.start?.label);
   const to = shortPlace(ride.ride_plan?.destination?.label);
-  const routeLine = [from && to ? `${from} → ${to}` : to ? `To ${to}` : null, crew ? `with ${crew.name}` : null].filter(Boolean).join(' · ');
+  const routeLine = [from && to ? `${from} → ${to}` : to ? `To ${to}` : null, crew ? `with ${crew.name}` : null].filter(Boolean).join(' ∙ ');
   const kv = KvForRide(ride, units);
 
   if (ride.status === 'live') {
@@ -114,14 +114,14 @@ export default function RideHero(p: RideHeroProps) {
     const nameOf = (u: string) => riderName(byId, u, uid).split(' ')[0];
     const lead = crew && Object.entries(crew.roles).find(([, r]) => r === 'lead')?.[0];
     const sweep = crew && Object.entries(crew.roles).find(([, r]) => r === 'sweep')?.[0];
-    const roles = [lead ? `${nameOf(lead)} ${lead === uid ? 'lead' : 'leads'}` : null, sweep ? `${nameOf(sweep)} ${sweep === uid ? 'sweep' : 'sweeps'}` : null].filter(Boolean).join(' · ');
+    const roles = [lead ? `${nameOf(lead)} ${lead === uid ? 'lead' : 'leads'}` : null, sweep ? `${nameOf(sweep)} ${sweep === uid ? 'sweep' : 'sweeps'}` : null].filter(Boolean).join(' ∙ ');
     const count = riding > 0 ? riding : members;
     return (
       <NightRoad>
         <Ticket dark testID="hero-live" header={header ? <RoadThemed>{header}</RoadThemed> : undefined}>
           <RoadThemed>
             <LiveBody
-              pill={`${ride.name} · ${count} ${riding > 0 ? 'riding' : count === 1 ? 'rider' : 'riders'}`}
+              pill={`${ride.name} ∙ ${count} ${riding > 0 ? 'riding' : count === 1 ? 'rider' : 'riders'}`}
               roles={roles}
               onRejoin={p.onRejoin}
             />
@@ -134,7 +134,7 @@ export default function RideHero(p: RideHeroProps) {
   if (ride.status === 'finished') {
     const arrived = docs.presence.filter((d) => d.state === 'arrived').length;
     const riders = log?.riders ?? members;
-    const sub = arrived > 0 && arrived >= members ? `Everyone home · ${arrived} of ${members}` : arrived > 0 ? `${arrived} of ${members} home` : `${riders} ${riders === 1 ? 'rider' : 'riders'}`;
+    const sub = arrived > 0 && arrived >= members ? `Everyone home ∙ ${arrived} of ${members}` : arrived > 0 ? `${arrived} of ${members} home` : `${riders} ${riders === 1 ? 'rider' : 'riders'}`;
     return (
       <Ticket testID="hero-finished" header={header}>
         <View style={styles.row}>

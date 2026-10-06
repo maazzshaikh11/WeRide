@@ -44,8 +44,7 @@ export default function PrivacyScreen({ navigation }: { navigation?: NavLike }) 
   return (
     <SubScreen title={'Privacy &\nlearning'} navigation={navigation} testID="screen-Privacy">
       <Text style={[type.body, { marginTop: 12 }]}>
-        The app learns from everyone without seeing anyone: only masked numbers leave your phone, never your routes.
-        Your live position goes to your crew during a ride, and to nobody else.
+        The app learns without seeing anyone. Your live position goes to your crew during a ride.
       </Text>
 
       <Card style={{ marginTop: 24 }} testID="privacy-diagram">

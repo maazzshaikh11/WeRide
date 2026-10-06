@@ -7,7 +7,7 @@ describe('coordinates and clock', () => {
   it('formats like the demo', () => {
     expect(formatCoords(18.97184, 73.39024)).toBe('18.9718° N 73.3902° E');
     expect(formatCoords(-33.8688, -70.1)).toBe('33.8688° S 70.1000° W');
-    expect(formatFixLine({ lat: 18.9718, lng: 73.3902, accuracy_m: 4.2 })).toBe('18.9718° N 73.3902° E · ±4 m');
+    expect(formatFixLine({ lat: 18.9718, lng: 73.3902, accuracy_m: 4.2 })).toBe('18.9718° N 73.3902° E ∙ ±4 m');
     expect(formatFixLine({ lat: 18.9718, lng: 73.3902 })).toBe('18.9718° N 73.3902° E');
   });
   it('no fix is stated honestly', () => expect(formatFixLine(null)).toBe('No GPS fix yet'));

@@ -135,8 +135,8 @@ describe('header', () => {
   it('shows the real date/time, a greeting by hour and the rider\'s avatar (-> Me)', async () => {
     setup([]);
     const { t, navigation } = await mount();
-    expect(has(t, 'SAT 11 OCT · 5:41 AM')).toBe(true);
-    expect(has(t, 'Good morning.')).toBe(true);
+    expect(has(t, 'SAT 11 OCT ∙ 5:41 AM')).toBe(true);
+    expect(has(t, 'Early start.')).toBe(true);
     expect(has(t, 'AR')).toBe(true);
     press(t, 'Me');
     expect(navigation.navigate).toHaveBeenCalledWith('Me');
@@ -154,8 +154,8 @@ describe('planned ride hero', () => {
     setup([ride()]);
     const { t } = await mount(id, scheme);
     expect(has(t, 'Sunrise Ghat Run')).toBe(true);
-    expect(has(t, 'Sat 11 Oct · 6:30 AM')).toBe(true);
-    expect(has(t, 'Bandra Fort → Lonavala · with Ghat Ghosts')).toBe(true);
+    expect(has(t, 'Sat 11 Oct ∙ 6:30 AM')).toBe(true);
+    expect(has(t, 'Bandra Fort → Lonavala ∙ with Ghat Ghosts')).toBe(true);
     expect(texts(t).join('|')).toContain('84');
     expect(has(t, '2h 05')).toBe(true);
     expect(has(t, '91')).toBe(true);
@@ -246,8 +246,8 @@ describe('meetup / live / finished', () => {
     expect(has(t, 'Ride on.')).toBe(true);
     expect(has(t, '● LIVE')).toBe(true);
     expect(has(t, 'You’re on the road.')).toBe(true);
-    expect(has(t, 'Meera leads · Kabir sweeps')).toBe(true);
-    expect(has(t, 'Sunrise Ghat Run · 2 riding')).toBe(true);
+    expect(has(t, 'Meera leads ∙ Kabir sweeps')).toBe(true);
+    expect(has(t, 'Sunrise Ghat Run ∙ 2 riding')).toBe(true);
     press(t, 'Rejoin ride');
     expect(navigation.navigate).toHaveBeenCalledWith('Live', { groupId: 'r1' });
     expect(useAppStore.getState().groupId).toBe('r1');
@@ -268,7 +268,7 @@ describe('meetup / live / finished', () => {
     const { t, navigation } = await mount();
     expect(has(t, 'Back safe.')).toBe(true);
     expect(has(t, 'Nice ride, Arjun.')).toBe(true);
-    expect(has(t, 'Everyone home · 3 of 3')).toBe(true);
+    expect(has(t, 'Everyone home ∙ 3 of 3')).toBe(true);
     expect(has(t, '✓ FINISHED')).toBe(true);
     press(t, 'See the recap');
     expect(navigation.navigate).toHaveBeenCalledWith('Recap', { rideId: 'r1' });
@@ -318,8 +318,8 @@ describe('weather', () => {
     setup([ride()]);
     const { t } = await mount();
     expect(mockFetchWeather).toHaveBeenCalledWith(19.04, 72.82);
-    expect(has(t, '21° · Mostly clear')).toBe(true);
-    expect(has(t, 'wind 9 km/h · sunrise 6:24 AM')).toBe(true);
+    expect(has(t, '21° ∙ Mostly clear')).toBe(true);
+    expect(has(t, 'wind 9 km/h ∙ sunrise 6:24 AM')).toBe(true);
   });
   it('falls back to the rider\'s position when there is no ride', async () => {
     mockFetchWeather.mockResolvedValue(FINE);
@@ -337,7 +337,7 @@ describe('weather', () => {
     usePrefsStore.setState({ prefs: { ...usePrefsStore.getState().prefs, units: 'mi' } });
     mockFetchWeather.mockResolvedValue(FINE);
     setup([ride()]);
-    expect(has((await mount()).t, 'wind 6 mph · sunrise 6:24 AM')).toBe(true);
+    expect(has((await mount()).t, 'wind 6 mph ∙ sunrise 6:24 AM')).toBe(true);
   });
 });
 
@@ -363,8 +363,8 @@ describe('route intel', () => {
     const { t } = await mount();
     press(t, 'View route intel');
     expect(has(t, 'Before you roll')).toBe(true);
-    expect(has(t, /^Pothole · km \d+$/)).toBe(true);
-    expect(has(t, '3 reports · first reported 40 min ago')).toBe(true);
+    expect(has(t, /^Pothole ∙ km \d+$/)).toBe(true);
+    expect(has(t, '3 reports ∙ first reported 40 min ago')).toBe(true);
     expect(has(t, 'Route safety score 91')).toBe(true);
     expect(has(t, 'Hazards show up when two riders report the same spot. That keeps one bad tap from crying wolf.')).toBe(true);
   });
@@ -386,7 +386,7 @@ describe('also coming up / where next / crew pulse', () => {
     expect(has(t, 'Old')).toBe(false);
     pressId(t, 'upcoming-r2');
     expect(has(t, 'UPCOMING')).toBe(true);
-    expect(has(t, 'Sat 18 Oct · 5:41 AM · 84 km · 0 riders confirmed')).toBe(true);
+    expect(has(t, 'Sat 18 Oct ∙ 5:41 AM ∙ 84 km ∙ 0 riders confirmed')).toBe(true);
   });
   it('hides "Also coming up" when there is nothing else', async () => {
     setup([ride()]);

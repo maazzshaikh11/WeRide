@@ -5,9 +5,9 @@
  * NetworkBanner dismisses as agreed.
  */
 import React from 'react';
-import { Platform, Text, Vibration } from 'react-native';
+import { Platform, StyleSheet, Text, Vibration } from 'react-native';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
-import { ControlKey, SideButton, SpeedCluster } from '../src/screens/map/live/LiveChrome';
+import { ControlKey, SideButton, SpeedCluster, clockAfter } from '../src/screens/map/live/LiveChrome';
 import AvatarStack from '../src/components/AvatarStack';
 import NetworkBanner from '../src/components/NetworkBanner';
 
@@ -108,7 +108,7 @@ describe('SignalSheet (motion)', () => {
       act(() => real(t, `Send signal: ${o.label}`).props.onPress({}));
     });
     const labels = mockSocket.emit.mock.calls.map((c) => c[1].label);
-    expect(labels).toEqual(['Wait for me', 'Pull over', 'All good', 'Need fuel']);
+    expect(labels).toEqual(['Wait up', 'Pull over', 'All good', 'Need fuel']);
     mockSocket.emit.mock.calls.forEach((c) => expect(c[0]).toBe('signal:send'));
   });
 
@@ -157,6 +157,20 @@ describe('AvatarStack', () => {
     expect(empty.toJSON()).toBeNull();
   });
 
+  it('shifts the initials of every covered avatar (all but the last) so they stay readable', () => {
+    const t = render(<AvatarStack names={['alice', 'bob', 'carol']} />);
+    const pads = t.root
+      .findAll((n) => typeof n.type === 'string' && n.props.accessibilityLabel && ['AL', 'BO', 'CA'].includes(n.props.accessibilityLabel))
+      .map((n) => StyleSheet.flatten(n.props.style).paddingRight);
+    expect(pads).toEqual([9, 9, undefined]);
+    // with a +N chip after them, the last avatar is covered too
+    const more = render(<AvatarStack names={['alice', 'bob', 'carol']} max={2} />);
+    const padsMore = more.root
+      .findAll((n) => typeof n.type === 'string' && n.props.accessibilityLabel && ['AL', 'BO'].includes(n.props.accessibilityLabel))
+      .map((n) => StyleSheet.flatten(n.props.style).paddingRight);
+    expect(padsMore).toEqual([9, 9]);
+  });
+
   it('a rider who joins later is added without disturbing the others', () => {
     const t = render(<AvatarStack names={['alice', 'bob']} />);
     expect(initialsOf(t)).toEqual(['AL', 'BO']);
@@ -196,5 +210,15 @@ describe('NetworkBanner', () => {
     const t = render(<NetworkBanner state="recovered" riderName="Rider 1" onDismiss={onDismiss} />);
     act(() => real(t, 'Dismiss notification').props.onPress({}));
     expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('clockAfter (ETA clock)', () => {
+  it('has no leading zero on the hour, like the demo (8:01), and keeps two-digit minutes', () => {
+    const now = new Date(2026, 9, 4, 5, 0);
+    expect(clockAfter(166, now)).toBe('7:46');
+    expect(clockAfter(61, new Date(2026, 9, 4, 7, 0))).toBe('8:01');
+    expect(clockAfter(0, new Date(2026, 9, 4, 0, 5))).toBe('0:05');
+    expect(clockAfter(0, new Date(2026, 9, 4, 17, 30))).toBe('17:30');
   });
 });

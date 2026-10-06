@@ -22,7 +22,7 @@ import { useRidesStore } from '../../store/ridesStore';
 import { resetRideSession } from '../../store/rideSession';
 import { useSessionStore } from '../../store/sessionStore';
 import { useToastStore } from '../../store/toastStore';
-import { avatarColor } from '../../theme/palettes';
+import { colorForUid } from './crew/CrewAvatars';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
 import { Avatar, Card, Chip, Icon, IconWell, List, ListItem, PressableScale, Screen, SectionLabel, Skeleton } from '../../ui';
 import { intelSummary } from '../../utils/intel';
@@ -58,7 +58,7 @@ function useNow(intervalMs = TICK_MS): number {
 
 export default function RideHomeScreen({ navigation }: Props) {
   const { colors, type } = useTheme();
-  const styles = useStyles(({ type: t }) => ({
+  const styles = useStyles(({ colors: c, type: t }) => ({
     head: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
     headText: { flex: 1, minWidth: 0 },
     greeting: { ...t.h1, marginTop: 8 },
@@ -71,7 +71,7 @@ export default function RideHomeScreen({ navigation }: Props) {
     pulseRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     pulseText: { ...t.smStrong, flex: 1 },
     pulseWhen: { ...t.sm },
-    link: { ...t.sm, textDecorationLine: 'underline' },
+    link: { ...t.smStrong, textDecorationLine: 'underline', textDecorationColor: c.pri, textDecorationStyle: 'solid' },
   }));
 
   const uid = useSessionStore((s) => s.uid);
@@ -262,7 +262,7 @@ export default function RideHomeScreen({ navigation }: Props) {
               const st = routeStatsOf(r);
               const sub = [r.start_time_ms ? ticketWhen(r.start_time_ms) : null, st ? formatDistance(st.distance_km, units) : null, `${r.member_ids.length} ${r.member_ids.length === 1 ? 'rider' : 'riders'}`]
                 .filter(Boolean)
-                .join(' · ');
+                .join(' ∙ ');
               return <ListItem key={r.id} first={i === 0} icon="route" title={r.name} subtitle={sub} onPress={() => setInfoRide(r)} testID={`upcoming-${r.id}`} />;
             })}
           </List>
@@ -283,9 +283,9 @@ export default function RideHomeScreen({ navigation }: Props) {
         <>
           <SectionLabel>Crew pulse</SectionLabel>
           <View style={styles.pulse} testID="crew-pulse">
-            {pulse.map((p, i) => (
+            {pulse.map((p) => (
               <View key={p.key} style={styles.pulseRow}>
-                <Avatar size={28} initials={riderInitials(byId, p.uid)} color={avatarColor(i + 1)} />
+                <Avatar size={28} initials={riderInitials(byId, p.uid)} color={colorForUid(p.uid)} />
                 <Text style={styles.pulseText} numberOfLines={2}>{p.text}</Text>
                 <Text style={styles.pulseWhen}>{agoLabel(p.at, now)}</Text>
               </View>

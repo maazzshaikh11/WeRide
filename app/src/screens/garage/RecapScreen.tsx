@@ -17,7 +17,7 @@ import { useSessionStore } from '../../store/sessionStore';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
 import { Button, Card, CenterLine, Icon, KV, MapSketch, PressableScale, Rail, Ring, Screen, SectionLabel, Skeleton, TopBar, pointsFromFlat } from '../../ui';
 import { eventTone, formatClock, formatElapsed, formatRideDate, hasTogetherData } from '../../utils/logStats';
-import { distanceUnit, formatDistance, formatDuration, formatShortDistance, formatSpeed } from '../../utils/units';
+import { distanceUnit, formatDistance, formatDuration, formatShortDistance, formatSpeed, gapLabel } from '../../utils/units';
 import ReplayScrubber from './parts/ReplayScrubber';
 
 type Props = StackScreenProps<RootStackParamList, 'Recap'>;
@@ -102,7 +102,7 @@ function RecapBody({ log, onRate, onShare, rating }: { log: RideLog; onRate: () 
 
   return (
     <>
-      <Text style={[type.label, { marginTop: 16 }]}>{`${date}${fresh ? ' · JUST NOW' : ''}`}</Text>
+      <Text style={[type.label, { marginTop: 16 }]}>{`${date}${fresh ? ' ∙ JUST NOW' : ''}`}</Text>
       <Text style={[type.h1, { marginTop: 8 }]} accessibilityRole="header">{log.name}</Text>
 
       <View style={s.hero} testID="recap-hero">
@@ -141,7 +141,7 @@ function RecapBody({ log, onRate, onShare, rating }: { log: RideLog; onRate: () 
               <Text style={type.h3} testID="recap-verdict">{tight ? 'A tight ride.' : 'Spread out in places.'}</Text>
               <Text style={[type.sm, { marginTop: 8 }]} testID="recap-cohesion-copy">
                 {`You stayed within ${formatShortDistance(500, units)} of the group ${pct}% of the time. Longest gap: `}
-                <Text style={type.smStrong}>{formatShortDistance(log.longest_gap_m, units)}</Text>
+                <Text style={type.smStrong}>{gapLabel(log.longest_gap_m, units)}</Text>
                 {'.'}
               </Text>
             </>
@@ -165,6 +165,7 @@ function RecapBody({ log, onRate, onShare, rating }: { log: RideLog; onRate: () 
         <CenterLine dim style={{ marginTop: 16 }} />
         <KV
           style={{ marginTop: 16 }}
+          keyLines={2}
           items={[
             { value: String(log.riders), label: 'riders' },
             { value: String(log.hazards_shared), label: 'hazards shared' },

@@ -1,5 +1,5 @@
 /**
- * PermsSheet — Me > Permissions. Three rows with the REAL OS status (Allowed / Not allowed / Off · optional).
+ * PermsSheet — Me > Permissions. Three rows with the REAL OS status (Allowed / Not allowed / Off ∙ optional).
  * Tapping a row that has never been asked requests it; otherwise "Open system settings" is the way to change it.
  */
 import React, { useCallback, useEffect, useRef } from 'react';
@@ -19,7 +19,7 @@ export interface PermsSheetProps {
 const ROWS: Record<PermKind, { title: string; off: string }> = {
   location: { title: 'Location', off: 'Not allowed' },
   notifications: { title: 'Notifications', off: 'Not allowed' },
-  microphone: { title: 'Microphone', off: 'Off · optional' },
+  microphone: { title: 'Microphone', off: 'Off ∙ optional' },
 };
 
 export function permissionLabel(kind: PermKind, status: PermStatus | undefined): string {
@@ -79,7 +79,7 @@ export default function PermsSheet({ visible, onClose, onChanged }: PermsSheetPr
               icon={granted ? 'check' : 'warn'}
               accentIcon={granted}
               title={ROWS[kind].title}
-              subtitle={askable ? `${label} · tap to allow` : label}
+              subtitle={askable ? `${label} ∙ tap to allow` : label}
               onPress={askable ? () => request(kind) : undefined}
               accessibilityLabel={`${ROWS[kind].title}. ${label}${askable ? '. Double tap to allow' : ''}`}
               testID={`perm-${kind}`}

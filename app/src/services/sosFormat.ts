@@ -18,10 +18,10 @@ export function formatCoords(lat: number, lng: number): string {
   return `${Math.abs(lat).toFixed(4)}° ${ns} ${Math.abs(lng).toFixed(4)}° ${ew}`;
 }
 
-/** Coordinates plus the accuracy when known: "18.9718° N 73.3902° E · ±4 m". */
+/** Coordinates plus the accuracy when known: "18.9718° N 73.3902° E ∙ ±4 m". */
 export function formatFixLine(fix: Fix | null): string {
   if (!fix) return 'No GPS fix yet';
-  const acc = fix.accuracy_m != null && Number.isFinite(fix.accuracy_m) ? ` · ±${Math.max(1, Math.round(fix.accuracy_m))} m` : '';
+  const acc = fix.accuracy_m != null && Number.isFinite(fix.accuracy_m) ? ` ∙ ±${Math.max(1, Math.round(fix.accuracy_m))} m` : '';
   return `${formatCoords(fix.lat, fix.lng)}${acc}`;
 }
 
@@ -87,7 +87,7 @@ export function sosCreatedMs(hlc: string | undefined | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** "SOS · 8 S AGO" style age: seconds under a minute, then minutes. */
+/** "SOS ∙ 8 S AGO" style age: seconds under a minute, then minutes. */
 export function ageLabel(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
   if (s < 60) return `${s} S AGO`;

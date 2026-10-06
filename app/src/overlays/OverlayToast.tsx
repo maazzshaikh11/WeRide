@@ -33,11 +33,16 @@ export function useOverlayToast(ms = 2400) {
   return { toast, show };
 }
 
-export default function OverlayToast({ toast }: { toast: LocalToast | null }) {
+/**
+ * `bottom`: sit this far above the screen's bottom edge instead of below the status bar (for screens whose headline
+ * would be covered by a top toast, e.g. the incoming-SOS title).
+ */
+export default function OverlayToast({ toast, bottom }: { toast: LocalToast | null; bottom?: number }) {
   const insets = useSafeAreaInsets();
   if (!toast) return null;
+  const place = bottom != null ? { bottom } : { top: Math.max(insets.top, 24) + 8 };
   return (
-    <View pointerEvents="none" style={{ position: 'absolute', left: 14, right: 14, top: Math.max(insets.top, 24) + 8, zIndex: 20 }} accessibilityLiveRegion="polite" testID="overlay-toast">
+    <View pointerEvents="none" style={{ position: 'absolute', left: 14, right: 14, ...place, zIndex: 20 }} accessibilityLiveRegion="polite" testID="overlay-toast">
       <Plate compact tone={toast.tone} title={toast.message} icon="check" />
     </View>
   );

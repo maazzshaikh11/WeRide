@@ -1,6 +1,6 @@
 /**
  * Arrive — the dark Road screen at the destination (demo `road-arrive`), real data (docs/DEMO_PARITY_SPEC.md §3):
- * green "Arrived" plate ("<destination> · <time>"), "Everyone home.", a tile per rider ("✓ home" from `presence`
+ * green "Arrived" plate ("<destination> ∙ <time>"), "Everyone home.", a tile per rider ("✓ home" from `presence`
  * `arrived`, else "riding in…"; your own `arrived` is written on mount), a stats card (km, time, together % from the ride
  * recorder's running totals, "—" when unknown) and "Hold to end ride": finish the recording -> save the ride log (never blocks
  * on the network: it is queued on the phone until it syncs) -> ride `finished` -> Garage with the Recap on top.
@@ -54,7 +54,7 @@ function ArriveBody({ route }: Props) {
     root: { flex: 1, backgroundColor: c.bg },
     body: { paddingTop: Math.max(insets.top, 24) + 20, paddingHorizontal: 14 },
     card: { marginTop: 16, borderRadius: 22, backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line, padding: 18 },
-    bottom: { position: 'absolute', left: 14, right: 14, bottom: Math.max(insets.bottom, 12) + 18 },
+    bottom: { position: 'absolute', left: 14, right: 14, bottom: 30 },
   }));
   const uid = useAppStore((st) => st.userId);
   const push = useToastStore((st) => st.push);
@@ -117,7 +117,7 @@ function ArriveBody({ route }: Props) {
           tone="green"
           title="Arrived"
           titleSize={40}
-          subtitle={`${destName} · ${clock(arrivedAt.current)}`}
+          subtitle={`${destName} ∙ ${clock(arrivedAt.current)}`}
           right={<Icon name="flag" size={52} color="#FFFFFF" />}
           style={{ paddingVertical: 22, paddingHorizontal: 20, justifyContent: 'space-between' }}
           testID="arrive-plate"

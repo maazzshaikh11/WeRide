@@ -430,12 +430,14 @@ describe('MapScreen — Phase 6 TrackingService lifecycle', () => {
   const press = (renderer: any, label: string) =>
     renderer.root.findAll((n: any) => n.props.accessibilityLabel === label && typeof n.props.onPressIn === 'function')[0];
 
-  test('side buttons: follow/fit, Google Maps and route details keep their labels', () => {
+  test('side column is GROUP + FIT/FOLLOW only; route details open from the speed / ETA cluster', () => {
     const renderer = renderWithUser('user-abc');
     const follow = press(renderer, 'Follow my location') ?? press(renderer, 'Show the whole route');
     expect(follow).toBeDefined();
-    expect(press(renderer, 'Open route in Google Maps')).toBeDefined();
-    expect(press(renderer, 'Route details')).toBeDefined();
+    expect(press(renderer, 'Show the whole group')).toBeDefined();
+    expect(press(renderer, 'Open route in Google Maps')).toBeUndefined();
+    expect(renderer.root.findAll((n: any) => n.props.testID === 'side-maps' || n.props.testID === 'side-route')).toHaveLength(0);
+    expect(press(renderer, 'Route details')).toBeDefined(); // the speed / ETA cluster
   });
 
   test('control keys: SOS (hold), Signal, Hazard, Talk are all present', () => {

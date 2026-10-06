@@ -37,9 +37,9 @@ describe('sky + sunrise formatting', () => {
   });
   it('card lines honour the rider\'s units', () => {
     const w = parseWeather(FIXTURE)!;
-    expect(weatherLines(w, 'km')).toEqual({ title: '21° · Mostly clear', sub: 'wind 9 km/h · sunrise 6:24 AM' });
-    expect(weatherLines(w, 'mi').sub).toBe('wind 6 mph · sunrise 6:24 AM');
-    expect(weatherLines({ ...w, precipMm: 1.25 }, 'km').sub).toBe('rain 1.3 mm · wind 9 km/h · sunrise 6:24 AM');
+    expect(weatherLines(w, 'km')).toEqual({ title: '21° ∙ Mostly clear', sub: 'wind 9 km/h ∙ sunrise 6:24 AM' });
+    expect(weatherLines(w, 'mi').sub).toBe('wind 6 mph ∙ sunrise 6:24 AM');
+    expect(weatherLines({ ...w, precipMm: 1.25 }, 'km').sub).toBe('rain 1.3 mm ∙ wind 9 km/h ∙ sunrise 6:24 AM');
   });
 });
 

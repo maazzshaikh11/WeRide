@@ -12,6 +12,7 @@ import type { HoldMs } from '../../models/domain';
 import AddContactSheet from '../../sheets/AddContactSheet';
 import InverseRail from './parts/InverseRail';
 import SubScreen, { FieldLabel, NavLike } from './parts/SubScreen';
+import { maskPhone } from '../../utils/phoneMask';
 
 const HOLD_OPTIONS = [
   { value: '1000', label: '1.0 s' },
@@ -66,7 +67,7 @@ export default function SafetyScreen({ navigation }: { navigation?: NavLike }) {
             icon="heart"
             accentIcon
             title={c.name}
-            subtitle={c.number}
+            subtitle={maskPhone(c.number)}
             testID={`contact-${c.id}`}
             right={
               <PressableScale

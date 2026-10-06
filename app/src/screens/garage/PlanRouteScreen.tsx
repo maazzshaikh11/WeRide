@@ -16,7 +16,7 @@ import { usePrefsStore } from '../../store/prefsStore';
 import { useRidesStore } from '../../store/ridesStore';
 import { useSessionStore } from '../../store/sessionStore';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
-import { Button, IconWell, MapSketch, Pill, PressableScale, Screen, Skeleton } from '../../ui';
+import { Button, Icon, IconWell, MapSketch, Pill, PressableScale, Screen, Skeleton } from '../../ui';
 import type { IconName, SketchMarker } from '../../ui';
 import { reverseGeocode } from '../../utils/geocode';
 import { getMyPosition, MY_LOCATION_FALLBACK } from '../../utils/myPosition';
@@ -39,6 +39,7 @@ export default function PlanRouteScreen({ navigation }: Props) {
   const styles = useStyles(({ colors: c, type: t }) => ({
     mapBox: { marginTop: 16, borderRadius: 24, overflow: 'hidden', borderWidth: 1.5, borderColor: c.line },
     mapPill: { position: 'absolute', left: 12, top: 12 },
+    hazPill: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 10, borderRadius: 13, backgroundColor: c.ink },
     cards: { marginTop: 16, gap: 12 },
     card: { borderRadius: 22, backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line, padding: 18 },
     cardOn: { borderWidth: 3, borderColor: c.ink, padding: 16.5 },
@@ -114,7 +115,10 @@ export default function PlanRouteScreen({ navigation }: Props) {
           })),
         });
         if (id !== requestId.current) return;
-        setOptions(alternativesOf(route), 0);
+        const alts = alternativesOf(route);
+        // Pre-select the Safest option when the server returned one (it is the "Recommended" card), else the first.
+        const safest = alts.length > 1 ? alts.findIndex((a) => a.label === 'Safest') : -1;
+        setOptions(alts, safest > 0 ? safest : 0);
         setStatus('ready');
       } catch {
         if (id !== requestId.current) return;
@@ -177,7 +181,12 @@ export default function PlanRouteScreen({ navigation }: Props) {
           <View style={styles.mapBox}>
             <MapSketch points={path} markers={markers} height={210} pad={46} testID="route-map" />
             <View style={styles.mapPill}>
-              <Pill label={nearby.length > 0 ? `${nearby.length} ${nearby.length === 1 ? 'hazard' : 'hazards'} on route` : 'No hazards on route'} tone="ink" />
+              <View style={styles.hazPill} testID="route-haz-pill">
+                <Icon name="haz" size={12} color={colors.bg} />
+                <Text style={[type.pill, { color: colors.bg }]} numberOfLines={1}>
+                  {(nearby.length > 0 ? `${nearby.length} ${nearby.length === 1 ? 'hazard' : 'hazards'} on route` : 'No hazards on route').toUpperCase()}
+                </Text>
+              </View>
             </View>
           </View>
           <View style={styles.cards}>

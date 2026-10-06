@@ -70,7 +70,7 @@ export default function RideInfoSheet({ visible, onClose, ride }: RideInfoSheetP
     <Sheet visible={visible} onClose={onClose} testID="sheet-RideInfo" accessibilityLabel={`${ride.name} details`}>
       <Text style={type.label}>UPCOMING</Text>
       <Text style={[type.h2, { marginTop: 8 }]} accessibilityRole="header">{ride.name}</Text>
-      <Text style={[type.sm, { marginTop: 8 }]}>{bits.join(' · ')}</Text>
+      <Text style={[type.sm, { marginTop: 8 }]}>{bits.join(' ∙ ')}</Text>
       {points.length > 0 ? (
         <View style={{ marginTop: 16, borderRadius: 18, overflow: 'hidden' }}>
           <MapSketch points={points} height={150} testID="rideinfo-map" />

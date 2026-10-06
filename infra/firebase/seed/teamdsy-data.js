@@ -236,11 +236,11 @@ function logs(me, now = Date.now()) {
     const stopS = g.ride_plan.stops.length * 14 * 60;
     const duration_s = Math.round((km / sh.avg) * 3600 + stopS);
     const t0 = g.start_time_ms;
-    const ev = [{ t_ms: t0, kind: 'rolled', text: `Rolled out · ${g.member_ids.length} of ${g.member_ids.length} ready` }];
+    const ev = [{ t_ms: t0, kind: 'rolled', text: `Rolled out ∙ ${g.member_ids.length} of ${g.member_ids.length} ready` }];
     ev.push({ t_ms: t0 + duration_s * 1000 * 0.3, kind: 'hazard', text: 'Hazard reported ahead' });
-    if (g.ride_plan.stops.length) ev.push({ t_ms: t0 + duration_s * 1000 * 0.5, kind: 'stop', text: `${g.ride_plan.stops[0].label.split(',')[0]} · 14 min break` });
+    if (g.ride_plan.stops.length) ev.push({ t_ms: t0 + duration_s * 1000 * 0.5, kind: 'stop', text: `${g.ride_plan.stops[0].label.split(',')[0]} ∙ 14 min break` });
     if (sh.together < 90) ev.push({ t_ms: t0 + duration_s * 1000 * 0.65, kind: 'gap', text: `Gap of ${(sh.gap / 1000).toFixed(1)} km — regrouped` });
-    ev.push({ t_ms: t0 + duration_s * 1000, kind: 'arrived', text: `Arrived · ${g.ride_plan.destination.label.split(',')[0]}` });
+    ev.push({ t_ms: t0 + duration_s * 1000, kind: 'arrived', text: `Arrived ∙ ${g.ride_plan.destination.label.split(',')[0]}` });
     return {
       ride_id: groupDocId(g.key), crew_id: crewDocId(g.crew_key), name: g.name, started_ms: t0, ended_ms: t0 + duration_s * 1000,
       km, duration_s, avg_kmh: sh.avg, max_kmh: Math.round(sh.avg * 1.7), together_pct: sh.together, longest_gap_m: sh.gap,

@@ -4,7 +4,7 @@
  *    Lead / Sweep pills from the crew roles;
  *  - a sketch map of the meetup point and the riders' last known positions;
  *  - the ready check from real state (GPS accuracy, location permission, SOS contact, voice channel);
- *  - "I'm ready" / "Ready · waiting for N" (tap again = not ready); the LEAD also gets "Roll out", and when everybody is
+ *  - "I'm ready" / "Ready ∙ waiting for N" (tap again = not ready); the LEAD also gets "Roll out", and when everybody is
  *    ready the lead's phone starts the roll-out itself. Every phone follows the ride turning `live` (RideLifecycleBridge).
  * Opening the screen on a `planned` ride opens the roll call (`meetup`).
  */
@@ -196,7 +196,7 @@ export default function MeetupScreen({ navigation, route }: Props) {
         <Button
           testID="cta-unready"
           variant="ok"
-          label={`Ready · waiting for ${waiting}`}
+          label={`Ready ∙ waiting for ${waiting}`}
           leading={<Icon name="check" size={22} color="#FFFFFF" />}
           accessibilityLabel={waiting > 0 ? `Ready. Waiting for ${waiting}. Tap to cancel` : 'Ready. Tap to cancel'}
           onPress={toggleReady}
@@ -225,16 +225,21 @@ export default function MeetupScreen({ navigation, route }: Props) {
         <TopBar onBack={goBack} style={{ marginBottom: 10 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={type.label} numberOfLines={2}>{`ROLL CALL · ${(ride?.name ?? '…').toUpperCase()}`}</Text>
+            <Text style={type.label} numberOfLines={2}>{`ROLL CALL ∙ ${(ride?.name ?? '…').toUpperCase()}`}</Text>
             <Text style={[type.h1, { marginTop: 8 }]}>Meetup</Text>
           </View>
-          {pill ? <Pill label={pill} tone="ink" style={{ height: 34, paddingHorizontal: 14 }} /> : null}
+          {pill ? (
+            // demo `.pill.k.num`: the start time and countdown in the mono face, which also makes the title above wrap like the demo
+            <View style={{ height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: colors.ink, justifyContent: 'center' }} testID="meetup-countdown" accessible accessibilityLabel={pill}>
+              <Text style={[type.num, { fontSize: 13, lineHeight: 16, letterSpacing: 1, color: colors.bg }]} numberOfLines={1}>{pill}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
           <Icon name="pin" size={14} color={colors.ink2} />
           <Text style={[type.sm, { flex: 1 }]} numberOfLines={2}>
             {placeLine}
-            {leadName ? ` · everyone ready = ${leadName.charAt(0) + leadName.slice(1).toLowerCase()} rolls out` : ''}
+            {leadName ? ` ∙ everyone ready = ${leadName.charAt(0) + leadName.slice(1).toLowerCase()} rolls out` : ''}
           </Text>
         </View>
 

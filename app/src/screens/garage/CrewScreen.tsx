@@ -196,7 +196,7 @@ export default function CrewScreen({ navigation, route }: Props) {
               <Line x1={0} y1={2.5} x2={2000} y2={2.5} stroke={colors.pri} strokeWidth={5} strokeDasharray="18 14" />
             </Svg>
           </View>
-          <Text style={[type.label, { color: colors.bg, opacity: 0.6 }]}>{est ? `CREW · EST. ${est}` : 'CREW'}</Text>
+          <Text style={[type.label, { color: colors.bg, opacity: 0.6 }]}>{est ? `CREW ∙ EST. ${est}` : 'CREW'}</Text>
           <Text style={[type.h1, { color: colors.bg, marginTop: 8 }]} accessibilityRole="header">{crew.name}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, flexWrap: 'wrap', rowGap: 8 }}>
             <CrewAvatars uids={ordered} meUid={uid} />
@@ -241,7 +241,7 @@ export default function CrewScreen({ navigation, route }: Props) {
                     icon="route"
                     accentIcon
                     title={r.name}
-                    subtitle={[r.status === 'live' ? 'Riding now' : r.start_time_ms != null ? formatWhen(r.start_time_ms, now) : 'Time to be set', ridersLabel(r.member_ids.length)].join(' · ')}
+                    subtitle={[r.status === 'live' ? 'Riding now' : r.start_time_ms != null ? formatWhen(r.start_time_ms, now) : 'Time to be set', ridersLabel(r.member_ids.length)].join(' ∙ ')}
                     onPress={() => openRide(r)}
                     testID={`crew-ride-${r.id}`}
                   />
@@ -252,7 +252,7 @@ export default function CrewScreen({ navigation, route }: Props) {
                     first={upcoming.length === 0 && i === 0}
                     icon="check"
                     title={l.name}
-                    subtitle={`${formatDay(l.started_ms)} · ${formatDistance(l.km, units)} · ${Math.round(l.together_pct)}% together`}
+                    subtitle={`${formatDay(l.started_ms)} ∙ ${formatDistance(l.km, units)} ∙ ${Math.round(l.together_pct)}% together`}
                     onPress={() => navigation.navigate('Recap', { rideId: l.ride_id })}
                     testID={`crew-log-${l.ride_id}`}
                   />

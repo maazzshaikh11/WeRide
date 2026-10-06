@@ -1,7 +1,7 @@
 /**
- * RollOutOverlay — the demo's roll-out countdown ("<LEAD> · LEAD", "Rolling out", 3 · 2 · 1 with the pop, "Phones lock
+ * RollOutOverlay — the demo's roll-out countdown ("<LEAD> ∙ LEAD", "Rolling out", 3 ∙ 2 ∙ 1 with the pop, "Phones lock
  * to Road mode"), then it hides itself and opens Live. Also starts the ride recorder (once per ride).
- *  - state.next === 'Live': the BREAK OVER variant from the Stop screen (2 · 1, back to the Live screen underneath).
+ *  - state.next === 'Live': the BREAK OVER variant from the Stop screen (2 ∙ 1, back to the Live screen underneath).
  *  - otherwise: the ride just turned live (roll call or someone else's Roll out): reset to Live.
  * Raised by RideLifecycleBridge / the Stop screen through overlayStore.
  */
@@ -41,7 +41,7 @@ export default function RollOutOverlay({ state }: { state: OverlayState }) {
     startRecorderOnce(ride);
   }, [breakOver, st.groupId]);
 
-  // 3 · 2 · 1, then go
+  // 3 ∙ 2 ∙ 1, then go
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
     const finish = () => {
@@ -71,7 +71,7 @@ export default function RollOutOverlay({ state }: { state: OverlayState }) {
 
   const scale = reduced ? 1 : pop.interpolate({ inputRange: [0, 1], outputRange: [1.5, 0.9] });
   const opacity = reduced ? 1 : pop.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 0.9] });
-  const label = breakOver ? 'BREAK OVER' : `${st.leadName ? `${st.leadName.toUpperCase()} · ` : ''}LEAD`;
+  const label = breakOver ? 'BREAK OVER' : `${st.leadName ? `${st.leadName.toUpperCase()} ∙ ` : ''}LEAD`;
 
   return (
     <View style={s.root} testID="overlay-RollOut" accessible accessibilityLiveRegion="polite" accessibilityLabel={`${breakOver ? 'Break over' : 'Rolling out'}. ${n}`}>

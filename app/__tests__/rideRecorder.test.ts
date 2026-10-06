@@ -142,14 +142,14 @@ describe('RideRecorder basics', () => {
     rec.addEvent('hazard', 'Pothole confirmed', T0 + 3000);
     rec.addEvent('rolled', 'Again', T0 + 3500); // ignored
     rec.addEvent('stop', 'Chai Point', T0 + 4000);
-    rec.addEvent('arrived', 'Arrived · Lonavala', T0 + 5000);
+    rec.addEvent('arrived', 'Arrived ∙ Lonavala', T0 + 5000);
     rec.addEvent('arrived', 'Arrived twice', T0 + 5100);
     const log = rec.finish(2, T0 + 6000)!;
     expect(log.hazards_shared).toBe(2);
     expect(log.signals_sent).toBe(1);
     expect(log.events.map((e) => e.kind)).toEqual(['rolled', 'hazard', 'stop', 'arrived']);
     expect(log.events[0]).toEqual({ t_ms: T0, kind: 'rolled', text: 'Rolled out' });
-    expect(log.events[3].text).toBe('Arrived · Lonavala');
+    expect(log.events[3].text).toBe('Arrived ∙ Lonavala');
   });
 
   it('adds an arrived event on finish when none was recorded', () => {
@@ -157,7 +157,7 @@ describe('RideRecorder basics', () => {
     rec.start(META, T0);
     ride(rec, 5);
     const log = rec.finish(1, T0 + 6000)!;
-    expect(log.events[log.events.length - 1]).toEqual({ t_ms: T0 + 6000, kind: 'arrived', text: 'Arrived · Lonavala' });
+    expect(log.events[log.events.length - 1]).toEqual({ t_ms: T0 + 6000, kind: 'arrived', text: 'Arrived ∙ Lonavala' });
   });
 
   it('start() for the ride already recording keeps the recording', () => {

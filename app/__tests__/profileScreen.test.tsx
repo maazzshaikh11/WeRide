@@ -62,7 +62,7 @@ describe('ProfileScreen', () => {
     await press(t, 'Interceptor 650');
     await press(t, 'Spirited');
     expect(byTestId(t, 'plate-name').props.children).toBe('MEERA IYER');
-    expect(byTestId(t, 'plate-sub').props.children).toBe('Interceptor 650 · Spirited');
+    expect(byTestId(t, 'plate-sub').props.children).toBe('Interceptor 650 ∙ Spirited');
     expect(byLabel(t, 'Interceptor 650').props.accessibilityState.selected).toBe(true);
     expect(byLabel(t, 'Himalayan 450').props.accessibilityState.selected).toBe(false);
   });
@@ -94,7 +94,7 @@ describe('ProfileScreen', () => {
     useProfileStore.setState({ me: me({ bike: 'Royal Enfield GT' }) });
     const t = mount(<ProfileScreen navigation={nav()} />);
     expect(byLabel(t, 'Other').props.accessibilityState.selected).toBe(true);
-    expect(byTestId(t, 'plate-sub').props.children).toBe('Royal Enfield GT · Spirited');
+    expect(byTestId(t, 'plate-sub').props.children).toBe('Royal Enfield GT ∙ Spirited');
   });
 
   it('Continue saves users/{uid} through userService and opens Perms', async () => {

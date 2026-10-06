@@ -1,4 +1,4 @@
-/** The weather card under the Ride tab header (demo: sun well + "21° · clear" + wind / sunrise line). */
+/** The weather card under the Ride tab header (demo: sun well + "21° ∙ clear" + wind / sunrise line). */
 import React from 'react';
 import { Text, View } from 'react-native';
 import type { Units } from '../../../models/domain';
@@ -19,7 +19,7 @@ export function weatherLines(w: Weather, units: Units): { title: string; sub: st
   if (w.precipMm > 0) parts.push(`rain ${w.precipMm < 10 ? w.precipMm.toFixed(1) : Math.round(w.precipMm)} mm`);
   parts.push(`wind ${formatSpeed(w.windKmh, units)} ${units === 'mi' ? 'mph' : 'km/h'}`);
   if (w.sunrise) parts.push(`sunrise ${w.sunrise}`);
-  return { title: `${Math.round(w.tempC)}° · ${w.sky}`, sub: parts.join(' · ') };
+  return { title: `${Math.round(w.tempC)}° ∙ ${w.sky}`, sub: parts.join(' ∙ ') };
 }
 
 export default function WeatherCard({ weather, units }: { weather: Weather; units: Units }) {

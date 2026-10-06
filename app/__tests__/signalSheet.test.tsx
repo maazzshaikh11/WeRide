@@ -67,7 +67,7 @@ describe('SignalSheet', () => {
   });
 
   it('keeps the server-allowlisted labels', () => {
-    expect(SIGNAL_OPTIONS.map((o) => o.label)).toEqual(['Wait for me', 'Pull over', 'All good', 'Need fuel']);
+    expect(SIGNAL_OPTIONS.map((o) => o.label)).toEqual(['Wait up', 'Pull over', 'All good', 'Need fuel']);
   });
 
   it('renders nothing when closed and one tile per signal when open', () => {

@@ -93,11 +93,10 @@ const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', '
 
 export function greetingFor(date: Date): string {
   const h = date.getHours();
-  if (h < 5) return 'Good night';
+  if (h < 7) return 'Early start';
   if (h < 12) return 'Good morning';
   if (h < 17) return 'Good afternoon';
-  if (h < 21) return 'Good evening';
-  return 'Good night';
+  return 'Good evening';
 }
 
 /** "SAT, OCT 4" */
@@ -112,9 +111,9 @@ export function timeOfDay(date: Date): string {
   return `${h % 12 === 0 ? 12 : h % 12}:${m} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
-/** "SUN, OCT 5 · 6:00 AM" for a ride's scheduled start; null when unscheduled. */
+/** "SUN, OCT 5 ∙ 6:00 AM" for a ride's scheduled start; null when unscheduled. */
 export function startLabel(ms: number | null | undefined): string | null {
   if (!ms) return null;
   const d = new Date(ms);
-  return `${dayLabel(d)} · ${timeOfDay(d)}`;
+  return `${dayLabel(d)} ∙ ${timeOfDay(d)}`;
 }

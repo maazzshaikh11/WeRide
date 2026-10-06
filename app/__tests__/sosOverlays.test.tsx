@@ -108,7 +108,7 @@ describe('SosSentOverlay', () => {
     const t = render(<SosSentOverlay state={SENT} />, id, scheme);
     expect(has(t, 'SOS SENT')).toBe(true);
     expect(has(t, 'HELP IS COMING')).toBe(true);
-    expect(has(t, '6:43:12 · 18.9718° N 73.3902° E · ±4 m')).toBe(true);
+    expect(has(t, '6:43:12 ∙ 18.9718° N 73.3902° E ∙ ±4 m')).toBe(true);
     expect(has(t, 'Crew alerted')).toBe(true);
     expect(has(t, 'Sent to 2 crew')).toBe(true); // 3 ride members - me
     expect(has(t, 'Live location on')).toBe(true);
@@ -122,10 +122,23 @@ describe('SosSentOverlay', () => {
     useSosSessionStore.setState({ session: session({ queued: true }) as never });
     const t = render(<SosSentOverlay state={SENT} />);
     expect(has(t, 'SOS SAVED')).toBe(true);
-    expect(has(t, 'NO SIGNAL · QUEUED')).toBe(true);
+    expect(has(t, 'NO SIGNAL ∙ QUEUED')).toBe(true);
     expect(has(t, 'Queued on this phone')).toBe(true);
     expect(has(t, /Saved on this phone/)).toBe(true);
     expect(has(t, 'Sent to 2 crew')).toBe(false);
+  });
+
+  it('queued: compact rows and the 30 pt button stack leave room for all four rows above Call 112', () => {
+    useSosSessionStore.setState({ session: session({ queued: true }) as never });
+    usePrefsStore.setState({ contacts: [{ id: 'c1', name: 'Mom', number: '+919800000000' }] });
+    const t = render(<SosSentOverlay state={SENT} />);
+    for (const id of ['sos-row-crew', 'sos-text-c1', 'sos-row-live', 'sos-row-responder']) {
+      expect(exists(t, id)).toBe(true);
+      expect(flat(t.root.findAll((n) => n.props.testID === id && typeof n.type === 'string')[0].props.style).paddingVertical).toBe(10);
+    }
+    const stack = t.root.findAll((n) => typeof n.type === 'string' && flat(n.props.style).bottom === 30 && flat(n.props.style).gap === 10);
+    expect(stack.length).toBeGreaterThan(0);
+    expect(exists(t, 'sos-call112')).toBe(true);
   });
 
   it('a queued SOS that leaves the queue flips to SOS SENT with a "Signal back" toast', () => {
@@ -138,20 +151,20 @@ describe('SosSentOverlay', () => {
     mockQueuePeek.mockReturnValue([]);
     act(() => { jest.advanceTimersByTime(1600); });
     expect(has(t, 'SOS SENT')).toBe(true);
-    expect(has(t, 'Signal back · SOS delivered')).toBe(true);
+    expect(has(t, 'Signal back ∙ SOS delivered')).toBe(true);
     expect(useSosSessionStore.getState().session?.queued).toBe(false);
   });
 
   it('crash auto-send header', () => {
     useSosSessionStore.setState({ session: session({ auto: true }) as never });
     const t = render(<SosSentOverlay state={{ ...SENT, auto: true }} />);
-    expect(has(t, 'CRASH DETECTED · SENT AUTOMATICALLY')).toBe(true);
+    expect(has(t, 'CRASH DETECTED ∙ SENT AUTOMATICALLY')).toBe(true);
   });
 
   it('no GPS fix: says so honestly', () => {
     useSosSessionStore.setState({ session: session({ fix: null }) as never });
     const t = render(<SosSentOverlay state={SENT} />);
-    expect(has(t, '6:43:12 · No GPS fix yet')).toBe(true);
+    expect(has(t, '6:43:12 ∙ No GPS fix yet')).toBe(true);
   });
 
   it('no emergency contacts: "Add an emergency contact in Me"', () => {
@@ -190,7 +203,7 @@ describe('SosSentOverlay', () => {
     expect(has(t, 'Finding the nearest rider')).toBe(true);
     act(() => mockResponderCb!([{ uid: 'u2', state: 'going', updated_ms: 1 }, { uid: 'u3', state: 'going', updated_ms: 2 }]));
     expect(has(t, 'Meera is coming to you')).toBe(true);
-    expect(has(t, '1.9 km · 1 also responding')).toBe(true);
+    expect(has(t, '1.9 km ∙ 1 also responding')).toBe(true);
     act(() => mockResponderCb!([{ uid: 'u2', state: 'arrived', updated_ms: 3 }]));
     expect(has(t, 'Meera is with you')).toBe(true);
   });
@@ -213,7 +226,7 @@ describe('SosSentOverlay', () => {
     useOverlayStore.setState({ current: SENT });
     const t = render(<SosSentOverlay state={SENT} />);
     const hold = () => t.root.findAll((n) => n.props.testID === 'sos-cancel-hold' && typeof n.props.onPressIn === 'function')[0];
-    expect(has(t, 'I’m OK · hold 2 s to cancel')).toBe(true);
+    expect(has(t, 'I’m OK ∙ hold 2 s to cancel')).toBe(true);
     act(() => hold().props.onPressIn({}));
     act(() => { jest.advanceTimersByTime(900); });
     act(() => hold().props.onPressOut({}));
@@ -261,7 +274,7 @@ describe('SosSentOverlay', () => {
     it.each(CASES)('banner, PRACTICE, nothing is sent (%s %s)', (id, scheme) => {
       const t = render(<SosSentOverlay state={DRILL} />, id, scheme);
       expect(exists(t, 'sos-drill-banner')).toBe(true);
-      expect(has(t, 'DRILL · NOBODY IS ALERTED')).toBe(true);
+      expect(has(t, 'DRILL ∙ NOBODY IS ALERTED')).toBe(true);
       expect(has(t, 'PRACTICE')).toBe(true);
       expect(has(t, 'Crew would be alerted')).toBe(true);
       expect(has(t, 'End drill')).toBe(true);
@@ -361,7 +374,7 @@ describe('CrashCountdownOverlay', () => {
     act(() => { jest.advanceTimersByTime(4000); });
     press(t, 'crash-ok');
     expect(useOverlayStore.getState().current).toBeNull();
-    expect(useToastStore.getState().toasts[0]).toMatchObject({ message: 'Glad you’re OK · Crew was never alerted', variant: 'success' });
+    expect(useToastStore.getState().toasts[0]).toMatchObject({ message: 'Glad you’re OK ∙ Crew was never alerted', variant: 'success' });
     act(() => { jest.advanceTimersByTime(30_000); });
     expect(mockTriggerFlow).not.toHaveBeenCalled();
   });
@@ -426,9 +439,9 @@ describe('SosIncomingOverlay', () => {
   it.each(CASES)('red screen with the real name, bike and distance behind you (%s %s)', (id, scheme) => {
     const t = render(<SosIncomingOverlay state={INC} />, id, scheme);
     expect(has(t, 'KABIR\nNEEDS HELP')).toBe(true);
-    expect(has(t, 'SOS · 8 S AGO')).toBe(true);
+    expect(has(t, 'SOS ∙ 8 S AGO')).toBe(true);
     expect(has(t, '1.3 km behind you')).toBe(true);
-    expect(has(t, ' · Himalayan 411')).toBe(true);
+    expect(has(t, ' ∙ Himalayan 411')).toBe(true);
     expect(exists(t, 'sosin-map')).toBe(true);
     expect(has(t, 'No one has responded yet')).toBe(true);
     expect(has(t, 'I’m going')).toBe(true);
@@ -466,7 +479,7 @@ describe('SosIncomingOverlay', () => {
     const t = render(<SosIncomingOverlay state={INC} />);
     act(() => mockResponderCb!([{ uid: 'u2', state: 'going', updated_ms: 1 }]));
     expect(has(t, 'Meera')).toBe(true);
-    expect(texts(t).some((x) => /^570 m · responding$/.test(x))).toBe(true);
+    expect(texts(t).some((x) => /^570 m ∙ responding$/.test(x))).toBe(true);
     expect(has(t, 'No one has responded yet')).toBe(false);
   });
 
@@ -479,8 +492,12 @@ describe('SosIncomingOverlay', () => {
     expect(mockRespond).toHaveBeenCalledWith('sos-9', 'me', 'going');
     expect(exists(t, 'sosin-you')).toBe(true);
     expect(has(t, 'You')).toBe(true);
-    expect(texts(t).some((x) => /^1\.3 km · going$/.test(x))).toBe(true);
+    expect(texts(t).some((x) => /^1\.3 km ∙ going$/.test(x))).toBe(true);
     expect(has(t, 'Crew sees you responding')).toBe(true);
+    // the toast sits above the buttons, not over the headline at the top
+    const toast = flat(t.root.findAll((n) => n.props.testID === 'overlay-toast')[0].props.style);
+    expect(toast.top).toBeUndefined();
+    expect(toast.bottom).toBe(30 + 150 + 12);
     expect(has(t, 'I’m with Kabir')).toBe(true);
     expect(exists(t, 'sosin-going')).toBe(false);
 
@@ -527,5 +544,18 @@ describe('SosIncomingOverlay', () => {
     render(<SosIncomingOverlay state={INC} />);
     expect(useOverlayStore.getState().current).toEqual(INC);
     expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+});
+
+describe('OverlayToast placement', () => {
+  it('sits below the status bar by default, or above the bottom edge when asked', () => {
+    const T = require('../src/overlays/OverlayToast').default; // eslint-disable-line @typescript-eslint/no-require-imports
+    const top = render(<T toast={{ message: 'Hi', tone: 'black' }} />);
+    expect(flat(top.root.findAll((n) => n.props.testID === 'overlay-toast')[0].props.style).top).toBeGreaterThan(0);
+    const bottom = render(<T toast={{ message: 'Hi', tone: 'black' }} bottom={192} />);
+    const st = flat(bottom.root.findAll((n) => n.props.testID === 'overlay-toast')[0].props.style);
+    expect(st.bottom).toBe(192);
+    expect(st.top).toBeUndefined();
+    expect(render(<T toast={null} />).toJSON()).toBeNull();
   });
 });

@@ -68,7 +68,7 @@ export default function AvatarStack({ names, max = 4 }: Props) {
     <View style={s.row}>
       {shown.map((name, i) => (
         <PopAvatar key={name} pop={known !== null && !known.has(name)} style={i === 0 ? null : { marginLeft: OVERLAP }}>
-          <Avatar initials={initials(name)} color={avatarColor(i)} size={SIZE} />
+          <Avatar initials={initials(name)} color={avatarColor(i)} size={SIZE} covered={i < shown.length - 1 || names.length > max ? -OVERLAP : 0} />
         </PopAvatar>
       ))}
       {names.length > max ? (

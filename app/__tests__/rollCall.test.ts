@@ -61,10 +61,10 @@ describe('ready checks come from real state', () => {
 describe('countdown pill', () => {
   const at = new Date(2026, 9, 18, 6, 30).getTime();
   it('shows the time and the countdown', () => {
-    expect(countdownLabel(at, at - 49 * 60000)).toBe('6:30 · IN 49 MIN');
-    expect(countdownLabel(at, at - 125 * 60000)).toBe('6:30 · IN 2H 05');
-    expect(countdownLabel(at, at)).toBe('6:30 · NOW');
-    expect(countdownLabel(at, at + 7 * 60000)).toBe('6:30 · 7 MIN AGO');
+    expect(countdownLabel(at, at - 49 * 60000)).toBe('6:30 ∙ IN 49 MIN');
+    expect(countdownLabel(at, at - 125 * 60000)).toBe('6:30 ∙ IN 2H 05');
+    expect(countdownLabel(at, at)).toBe('6:30 ∙ NOW');
+    expect(countdownLabel(at, at + 7 * 60000)).toBe('6:30 ∙ 7 MIN AGO');
     expect(countdownLabel(null, 0)).toBeNull();
   });
 });

@@ -366,7 +366,7 @@ describe('CrewScreen', () => {
   it.each(ALL)('%s/%s: hero, riders with roles and the you marker', (id, scheme) => {
     const t = mount(<CrewScreen navigation={nav() as never} route={route} />, id, scheme);
     const txt = flat(t);
-    expect(txt).toContain('CREW · EST. MARCH');
+    expect(txt).toContain('CREW ∙ EST. MARCH');
     expect(txt).toContain('Ghat Ghosts');
     expect(txt).toContain('3 riders');
     expect(txt).not.toContain('km together');

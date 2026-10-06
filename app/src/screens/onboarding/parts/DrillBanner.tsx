@@ -1,4 +1,4 @@
-/** The hazard-striped "DRILL · NOBODY IS ALERTED" strip (demo `drill`): yellow/black stripes, fixed plate colours. */
+/** The hazard-striped "DRILL ∙ NOBODY IS ALERTED" strip (demo `drill`): yellow/black stripes, fixed plate colours. */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, Pattern, Rect } from 'react-native-svg';
@@ -24,7 +24,7 @@ export default function DrillBanner() {
         <Rect x={0} y={0} width="100%" height="100%" fill="url(#hazard)" />
       </Svg>
       <View style={{ backgroundColor: Plates.black.bg, paddingVertical: 3, paddingHorizontal: 12, borderRadius: 5 }}>
-        <Text style={{ fontFamily: type.display.fontFamily, fontSize: 12, lineHeight: 14, letterSpacing: 2.4, color: Plates.yellow.bg }}>DRILL · NOBODY IS ALERTED</Text>
+        <Text style={{ fontFamily: type.display.fontFamily, fontSize: 12, lineHeight: 14, letterSpacing: 2.4, color: Plates.yellow.bg }}>DRILL ∙ NOBODY IS ALERTED</Text>
       </View>
     </View>
   );

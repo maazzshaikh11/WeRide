@@ -10,6 +10,7 @@ import { useTheme } from '../../theme/ThemeProvider';
 import AddContactSheet from '../../sheets/AddContactSheet';
 import { usePrefsStore } from '../../store/prefsStore';
 import { useProfileStore } from '../../store/profileStore';
+import { maskPhone } from '../../utils/phoneMask';
 
 /** The text a contact receives (the live-location link is created by the SOS flow when it really sends). */
 export function previewText(name: string): string {
@@ -43,7 +44,7 @@ export default function ContactScreen({ navigation }: any) {
               icon={i === 0 ? 'heart' : 'users'}
               accentIcon
               title={c.name}
-              subtitle={c.number}
+              subtitle={maskPhone(c.number)}
               testID={`contact-row-${c.id}`}
               right={
                 <PressableScale

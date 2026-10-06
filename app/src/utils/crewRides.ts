@@ -39,7 +39,7 @@ export function formatDay(ms: number): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
 }
 
-/** "MARCH" for the hero's "CREW · EST. MARCH"; null when the creation time is unknown. */
+/** "MARCH" for the hero's "CREW ∙ EST. MARCH"; null when the creation time is unknown. */
 export function monthName(ms: number | null | undefined): string | null {
   if (ms == null || !Number.isFinite(ms)) return null;
   return MONTHS[new Date(ms).getMonth()].toUpperCase();

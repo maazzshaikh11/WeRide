@@ -78,7 +78,7 @@ describe('status line', () => {
   it('reports the latest logged round', () => {
     mockFlStore.keys = ['round_14'];
     mockFlStore.values.round_14 = JSON.stringify({ roundId: 14, localLoss: 0.1, participants: 38, timestamp: 't' });
-    expect(flStatusLine()).toBe('FL round 14 done · 38 clients');
+    expect(flStatusLine()).toBe('FL round 14 done ∙ 38 clients');
   });
 });
 
@@ -89,11 +89,11 @@ describe('FlStatusOverlay respects the choice', () => {
     mockFlStore.values.round_3 = JSON.stringify({ roundId: 3, localLoss: 0, participants: 7, timestamp: 't' });
     let t!: ReturnType<typeof create>;
     act(() => { t = create(<FlStatusOverlay />); });
-    expect(text(t)).toBe('FL round 3 done · 7 clients');
+    expect(text(t)).toBe('FL round 3 done ∙ 7 clients');
     setLearn(false);
     expect(text(t)).toBe('Ride data stays on-device');
     setLearn(true);
-    expect(text(t)).toBe('FL round 3 done · 7 clients');
+    expect(text(t)).toBe('FL round 3 done ∙ 7 clients');
     act(() => t.unmount());
   });
 });

@@ -1,4 +1,4 @@
-import { formatDistance, formatDuration, formatShortDistance, formatSpeed, speedUnit, distanceUnit } from '../src/utils/units';
+import { gapLabel, formatDistance, formatDuration, formatShortDistance, formatSpread, formatSpeed, speedUnit, distanceUnit } from '../src/utils/units';
 
 describe('units', () => {
   it('distance: one decimal under 10, whole above, km or mi', () => {
@@ -25,5 +25,34 @@ describe('units', () => {
     expect(formatDuration(7500)).toBe('2h 05');
     expect(formatDuration(3480)).toBe('58 min');
     expect(formatDuration(-1)).toBe('--');
+  });
+});
+
+describe('formatSpread', () => {
+  it('metres below 100 m, one decimal of km from 100 m up (the demo "0.6 km spread")', () => {
+    expect(formatSpread(60)).toBe('60 m');
+    expect(formatSpread(99)).toBe('100 m');
+    expect(formatSpread(100)).toBe('0.1 km');
+    expect(formatSpread(580)).toBe('0.6 km');
+    expect(formatSpread(1340)).toBe('1.3 km');
+  });
+  it('miles / feet for the mi preference; bad input is a dash', () => {
+    expect(formatSpread(50, 'mi')).toBe('160 ft');
+    expect(formatSpread(1609.344, 'mi')).toBe('1.0 mi');
+    expect(formatSpread(NaN)).toBe('--');
+  });
+});
+
+describe('gapLabel', () => {
+  it('reads km with one decimal from 100 m up and "<100 m" below', () => {
+    expect(gapLabel(410)).toBe('0.4 km');
+    expect(gapLabel(1800)).toBe('1.8 km');
+    expect(gapLabel(100)).toBe('0.1 km');
+    expect(gapLabel(99)).toBe('<100 m');
+    expect(gapLabel(0)).toBe('<100 m');
+  });
+  it('follows the rider\'s unit', () => {
+    expect(gapLabel(1609.344, 'mi')).toBe('1.0 mi');
+    expect(gapLabel(50, 'mi')).toBe('<330 ft');
   });
 });

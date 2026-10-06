@@ -80,14 +80,14 @@ function Body() {
     done.current = true;
     stop();
     useOverlayStore.getState().hide();
-    useToastStore.getState().push('Glad you’re OK · Crew was never alerted', 'success');
+    useToastStore.getState().push('Glad you’re OK ∙ Crew was never alerted', 'success');
   };
 
   const top = Math.max(insets.top, 24);
   return (
     <View style={st.root} testID="overlay-CrashCountdown" accessibilityViewIsModal>
       <HazardStripes style={[StyleSheet.absoluteFill, { opacity: 0.12 }]} />
-      <View style={[st.col, { paddingTop: top + 26, paddingBottom: Math.max(insets.bottom, 12) + 22 }]}>
+      <View style={[st.col, { paddingTop: top + 23, paddingBottom: 34 }]}>
         <Text style={[type.label, { color: INK, letterSpacing: 2.75 }]}>HARD IMPACT DETECTED</Text>
         <Text style={[type.display, { color: INK, fontSize: 54, lineHeight: 54, letterSpacing: -1.9, textAlign: 'center', marginTop: 16 }]} accessibilityRole="header">
           {'Are you\nOK?'}

@@ -25,7 +25,7 @@ export interface ShareCardSheetProps {
 /** One line under the numbers: the real arrival, else the time on the road. */
 export function shareTagline(log: RideLog): string {
   const arrived = log.events.find((e) => e.kind === 'arrived');
-  if (arrived && log.destination?.label) return `Arrived · ${log.destination.label}`;
+  if (arrived && log.destination?.label) return `Arrived ∙ ${log.destination.label}`;
   return `${formatDuration(log.duration_s)} on the road`;
 }
 
@@ -33,7 +33,7 @@ export function shareTagline(log: RideLog): string {
 export function shareText(log: RideLog, units: 'km' | 'mi'): string {
   const together = hasTogetherData(log) ? `${Math.round(log.together_pct)}% together` : null;
   const parts = [formatDistance(log.km, units), together, `${log.riders} ${log.riders === 1 ? 'rider' : 'riders'}`].filter(Boolean);
-  return [`${log.name} · ${formatRideDate(log.started_ms)}`, parts.join(' · '), shareTagline(log), 'Ridden with WeRide'].join('\n');
+  return [`${log.name} ∙ ${formatRideDate(log.started_ms)}`, parts.join(' ∙ '), shareTagline(log), 'Ridden with WeRide'].join('\n');
 }
 
 export default function ShareCardSheet({ visible, onClose, log }: ShareCardSheetProps) {
@@ -74,7 +74,7 @@ export default function ShareCardSheet({ visible, onClose, log }: ShareCardSheet
             style={{ marginTop: 16, backgroundColor: Y.bg, borderRadius: 18, padding: 20 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[type.label, { color: Y.fg, opacity: 0.65, flex: 1 }]} numberOfLines={1}>{`WERIDE · ${formatRideDate(log.started_ms).toUpperCase()}`}</Text>
+              <Text style={[type.label, { color: Y.fg, opacity: 0.65, flex: 1 }]} numberOfLines={1}>{`WERIDE ∙ ${formatRideDate(log.started_ms).toUpperCase()}`}</Text>
               <Logo size={44} />
             </View>
             <Text style={[type.plateTitle, { color: Y.fg, fontSize: 30, lineHeight: 30, marginTop: 16 }]} numberOfLines={3}>{log.name.toUpperCase()}</Text>

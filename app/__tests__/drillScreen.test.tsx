@@ -40,7 +40,7 @@ describe('DrillScreen', () => {
     const t = mount(<DrillScreen navigation={nav()} route={{}} />, id, scheme);
     expect(StyleSheet.flatten(hostById(t, 'screen-Drill').props.style).backgroundColor).toBe(THEMES[id].dark.bg);
     expect(hasTestId(t, 'drill-banner')).toBe(true);
-    expect(hasText(t, 'DRILL · NOBODY IS ALERTED')).toBe(true);
+    expect(hasText(t, 'DRILL ∙ NOBODY IS ALERTED')).toBe(true);
     expect(hasText(t, 'Practice your SOS.')).toBe(true);
     expect(hasText(t, "Hold the button. Keep holding until it fills. That's the whole thing.")).toBe(true);
     expect(hasText(t, "A tap does nothing. Gloves, vibration and a bumpy road can't set it off.")).toBe(true);
@@ -49,14 +49,14 @@ describe('DrillScreen', () => {
     expect(isDisabled(byTestId(t, 'drill-next'))).toBe(true);
   });
 
-  it('a tap does nothing: releasing early shows "RELEASED · NOTHING SENT", resets the ring, then goes back to HOLD', () => {
+  it('a tap does nothing: releasing early shows "RELEASED ∙ NOTHING SENT", resets the ring, then goes back to HOLD', () => {
     const t = mount(<DrillScreen navigation={nav()} route={{}} />);
     down(t);
     expect(hint(t)).toBe('KEEP HOLDING');
     act(() => { jest.advanceTimersByTime(600); });
     expect(ring(t)).toBeGreaterThan(0);
     up(t);
-    expect(hint(t)).toBe('RELEASED · NOTHING SENT');
+    expect(hint(t)).toBe('RELEASED ∙ NOTHING SENT');
     expect(ring(t)).toBe(0);
     expect(isDisabled(byTestId(t, 'drill-next'))).toBe(true);
     act(() => { jest.advanceTimersByTime(1400); });

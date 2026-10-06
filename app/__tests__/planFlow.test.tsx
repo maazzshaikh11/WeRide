@@ -6,6 +6,7 @@ import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import type { Crew, Ride, UserProfile } from '../src/models/domain';
 import { ThemeContext, buildTheme } from '../src/theme/ThemeProvider';
 import { THEMES } from '../src/theme/palettes';
+import { Icon } from '../src/ui';
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -134,7 +135,7 @@ const flush = async (ms = 0) => { await act(async () => { jest.advanceTimersByTi
 describe('PlanWhere', () => {
   it.each(ALL)('%s/%s: renders the step header, search and the start', async (id, scheme) => {
     const { t } = await mount(PlanWhereScreen, nav(), undefined, id, scheme);
-    expect(has(t, 'PLAN A RIDE · 1 OF 3')).toBe(true);
+    expect(has(t, 'PLAN A RIDE ∙ 1 OF 3')).toBe(true);
     expect(has(t, 'Where to?')).toBe(true);
     expect(t.root.findByProps({ testID: 'plan-search' }).props.placeholder).toBe('Search a town, ghat or lake');
     expect(t.root.findAllByProps({ testID: 'step-on' }).filter((n) => typeof n.type === 'string')).toHaveLength(1);
@@ -175,7 +176,7 @@ describe('PlanWhere', () => {
       const { t, navigation } = await mount(PlanWhereScreen);
       expect(has(t, 'POPULAR WITH CREWS NEAR YOU')).toBe(true);
       expect(has(t, 'Lonavala')).toBe(true);
-      expect(has(t, 'Ghat Ghosts · 2 rides')).toBe(true);
+      expect(has(t, 'Ghat Ghosts ∙ 2 rides')).toBe(true);
       expect(has(t, 'Alibag')).toBe(false);
       expect(has(t, 'Pune')).toBe(false);
       expect(has(t, /^~\d+ km$/)).toBe(true);
@@ -268,7 +269,7 @@ describe('PlanRoute', () => {
   it.each(ALL)('%s/%s: shows the server\'s three options with real numbers and no Scenic option', async (id, scheme) => {
     ready();
     const { t } = await mount(PlanRouteScreen, nav(), undefined, id, scheme);
-    expect(has(t, 'PLAN A RIDE · 2 OF 3')).toBe(true);
+    expect(has(t, 'PLAN A RIDE ∙ 2 OF 3')).toBe(true);
     expect(has(t, 'Bandra West → Lonavala')).toBe(true);
     expect(has(t, 'Fastest')).toBe(true);
     expect(has(t, 'Safest')).toBe(true);
@@ -280,7 +281,7 @@ describe('PlanRoute', () => {
     expect(has(t, '78')).toBe(true);
     expect(has(t, '91')).toBe(true);
     expect(has(t, 'Passes 2 reported hazards')).toBe(true);
-    expect(has(t, 'No reported hazards on this route · +7 min')).toBe(true);
+    expect(has(t, 'No reported hazards on this route ∙ +7 min')).toBe(true);
     expect(has(t, 'RECOMMENDED')).toBe(true);
     expect(texts(t).join('|')).not.toMatch(/scenic/i);
     expect(['route-option-0', 'route-option-1', 'route-option-2'].every((id) => t.root.findAllByProps({ testID: id }).length > 0)).toBe(true);
@@ -313,6 +314,20 @@ describe('PlanRoute', () => {
     const map = t.root.findByProps({ testID: 'route-map' });
     expect(map.props.markers).toEqual([{ lat: 18.9, lng: 73.1, kind: 'hazard' }]);
   });
+  it('pre-selects the first option when the server returned no Safest one', async () => {
+    ready();
+    const onlyFast = [alt('a', 'Fastest', 125, 84, 0.78, 2), alt('c', 'Alternative', 150, 102, 0.8, 1)];
+    mockRequestRoute.mockResolvedValue({ route_id: 'a', path_points: onlyFast[0].path_points, distance_km: 84, eta_minutes: 125, safety_score: 0.78, recalculated_at_hlc: 'x', alternatives: onlyFast });
+    const { t } = await mount(PlanRouteScreen);
+    expect(usePlanDraftStore.getState()).toMatchObject({ chosenOption: 0, route: { route_id: 'a' } });
+    expect(has(t, 'RECOMMENDED')).toBe(false);
+  });
+  it('the map pill carries the hazard icon', async () => {
+    ready();
+    const { t } = await mount(PlanRouteScreen);
+    const pill = t.root.findByProps({ testID: 'route-haz-pill' });
+    expect(pill.findAllByType(Icon).some((i: any) => i.props.name === 'haz')).toBe(true);
+  });
   it('no clusters -> "No hazards on route"', async () => {
     ready();
     const { t } = await mount(PlanRouteScreen);
@@ -322,10 +337,12 @@ describe('PlanRoute', () => {
   it('choosing an option changes the map and what "Use this route" saves; then opens PlanWhen', async () => {
     ready();
     const { t, navigation } = await mount(PlanRouteScreen);
-    expect(usePlanDraftStore.getState().route?.route_id).toBe('a');
-    pressId(t, 'route-option-1');
+    // The Safest option (the Recommended card) is pre-selected.
     expect(usePlanDraftStore.getState()).toMatchObject({ chosenOption: 1, route: { route_id: 'b' } });
-    expect(t.root.findAll((n) => n.props.testID === 'route-option-1' && n.props.accessibilityState)[0].props.accessibilityState.selected).toBe(true);
+    expect(has(t, 'RECOMMENDED')).toBe(true);
+    pressId(t, 'route-option-0');
+    expect(usePlanDraftStore.getState()).toMatchObject({ chosenOption: 0, route: { route_id: 'a' } });
+    expect(t.root.findAll((n) => n.props.testID === 'route-option-0' && n.props.accessibilityState)[0].props.accessibilityState.selected).toBe(true);
     pressId(t, 'use-route');
     expect(navigation.navigate).toHaveBeenCalledWith('PlanWhen');
   });
@@ -404,7 +421,7 @@ describe('PlanWhen', () => {
   it.each(ALL)('%s/%s: renders the demo\'s controls', async (id, scheme) => {
     ready();
     const { t } = await mount(PlanWhenScreen, nav(), undefined, id, scheme);
-    expect(has(t, 'PLAN A RIDE · 3 OF 3')).toBe(true);
+    expect(has(t, 'PLAN A RIDE ∙ 3 OF 3')).toBe(true);
     expect(has(t, 'When, and with whom?')).toBe(true);
     for (const l of ['Today', 'Tomorrow', 'Sat 18 Oct', 'Sun 19 Oct']) expect(has(t, l)).toBe(true);
     expect(clockText(t)).toBe('Roll out at 6:30 AM');
@@ -465,13 +482,13 @@ describe('PlanWhen', () => {
       ready();
       const { t } = await mount(PlanWhenScreen);
       expect(usePlanDraftStore.getState()).toMatchObject({ crewId: 'cA', invitees: ['u2', 'u3'], crewTouched: false });
-      expect(has(t, 'CREW · 2 INVITED')).toBe(true);
+      expect(has(t, 'CREW ∙ 2 INVITED')).toBe(true);
       expect(has(t, 'Meera Shah')).toBe(true);
       expect(has(t, 'Kabir Das')).toBe(true);
       expect(has(t, 'Arjun Rao')).toBe(false); // the rider is not one of their own invitees
       pressId(t, 'invitee-u3');
       expect(usePlanDraftStore.getState().invitees).toEqual(['u2']);
-      expect(has(t, 'CREW · 1 INVITED')).toBe(true);
+      expect(has(t, 'CREW ∙ 1 INVITED')).toBe(true);
     });
     it('with several crews a chip row picks the crew (and Solo)', async () => {
       ready([crewA, crewB]);
@@ -524,7 +541,7 @@ describe('PlanWhen', () => {
       expect(limit).toBe(5);
       expect(opts.proximity.lat).toBeCloseTo(18.9, 1); // the middle of the path
       expect(usePlanDraftStore.getState().stops).toEqual([{ id: 'plan-fuel', label: FUEL.label, lat: 18.9, lng: 73.1, icon: '⛽' }]);
-      expect(has(t, /^HP Petrol Pump · after \d+ km$/)).toBe(true);
+      expect(has(t, /^HP Petrol Pump ∙ after \d+ km$/)).toBe(true);
       await act(async () => toggle().props.onPress());
       expect(usePlanDraftStore.getState().stops).toEqual([]);
     });
@@ -632,7 +649,7 @@ describe('PlanDone', () => {
     expect(has(t, 'RIDE CREATED')).toBe(true);
     expect(has(t, 'Your crew will see it in Rides')).toBe(true);
     expect(has(t, 'Lonavala Run')).toBe(true);
-    expect(has(t, 'Tomorrow · 6:30 AM · 84 km · Ghat Ghosts')).toBe(true);
+    expect(has(t, 'Tomorrow ∙ 6:30 AM ∙ 84 km ∙ Ghat Ghosts')).toBe(true);
     expect(has(t, 'INVITE CODE')).toBe(true);
     expect(t.root.findByProps({ testID: 'invite-code' }).props.children).toBe('GHOST7');
     expect(texts(t).join('|')).not.toMatch(/notified/i);
@@ -644,7 +661,7 @@ describe('PlanDone', () => {
     const { t } = await mount(PlanDoneScreen, nav(), { rideId: 'new-ride' });
     expect(t.root.findByProps({ testID: 'invite-code' }).props.children).toBe('RIDE22');
     expect(has(t, 'Share the code to invite riders')).toBe(true);
-    expect(has(t, 'Tomorrow · 6:30 AM · 84 km')).toBe(true);
+    expect(has(t, 'Tomorrow ∙ 6:30 AM ∙ 84 km')).toBe(true);
   });
 
   it('Copy puts the code on the clipboard; Share opens the OS share sheet with it', async () => {

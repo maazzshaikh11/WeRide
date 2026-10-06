@@ -85,15 +85,27 @@ describe('MeetupScreen', () => {
     const t = await mount(id, scheme);
     emit(baseRide());
     const tx = texts(t);
-    expect(tx).toContain('ROLL CALL · SUNRISE GHAT RUN');
+    expect(tx).toContain('ROLL CALL ∙ SUNRISE GHAT RUN');
     expect(tx).toContain('Meetup');
-    expect(tx.some((x) => /^\d+:\d\d · IN (48|49|50) MIN$/i.test(x))).toBe(true);
+    expect(tx.some((x) => /^\d+:\d\d ∙ IN (48|49|50) MIN$/i.test(x))).toBe(true);
     expect(tx).toContain('YOUR READY CHECK');
     ['me', 'lead', 'zoya', 'dev'].forEach((u) => expect(tile(t, u)).toBeDefined());
     expect(tx).toContain('You');
     expect(tx).toContain('Meera Rao');
     expect(byLabel(t, "I'm ready")).toBeDefined();
     expect(byLabel(t, 'Navigate to the meetup point')).toBeDefined();
+  });
+
+  it('the countdown pill is the demo\'s mono ink pill (which also wraps the roll-call title like the demo)', async () => {
+    const t = await mount();
+    emit(baseRide());
+    const pill = t.root.findAll((n) => n.props.testID === 'meetup-countdown' && typeof n.type === 'string')[0];
+    expect(pill).toBeDefined();
+    expect(pill.props.accessibilityLabel).toMatch(/^\d+:\d\d ∙ IN (48|49|50) MIN$/);
+    const label = pill.findAllByType(Text)[0];
+    const st = ([] as any[]).concat(label.props.style).flat(3).filter(Boolean).reduce((a, b) => ({ ...a, ...b }), {});
+    expect(st.fontFamily).toMatch(/Mono/);
+    expect(st.fontSize).toBe(13);
   });
 
   it('shows real roles, and no battery chip or family sharing', async () => {
@@ -141,7 +153,7 @@ describe('MeetupScreen', () => {
     expect(label('voice')).toBe('Voice channel on');
   });
 
-  it('I’m ready writes the roll call; Ready · waiting for N un-readies', async () => {
+  it('I’m ready writes the roll call; Ready ∙ waiting for N un-readies', async () => {
     const t = await mount();
     emit(baseRide());
     act(() => byLabel(t, "I'm ready").props.onPress());

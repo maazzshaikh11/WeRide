@@ -1,5 +1,5 @@
 /**
- * The yellow RIDER PLATE on Me (demo: label, name 27, "bike · style", logo 52). Always road-sign yellow.
+ * The yellow RIDER PLATE on Me (demo: label, name 27, "bike ∙ style", logo 52). Always road-sign yellow.
  */
 import React from 'react';
 import { Text, View } from 'react-native';

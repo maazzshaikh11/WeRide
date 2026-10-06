@@ -1,5 +1,5 @@
 /**
- * RiderPlate — the live yellow "RIDER PLATE" (demo profile): label, the rider's name in plate caps, "Bike · Style",
+ * RiderPlate — the live yellow "RIDER PLATE" (demo profile): label, the rider's name in plate caps, "Bike ∙ Style",
  * and the real logo on its tile. Fixed road-sign yellow in every theme.
  */
 import React from 'react';
@@ -22,7 +22,7 @@ export default function RiderPlate({ name, bike, style }: { name: string; bike: 
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={s.label}>RIDER PLATE</Text>
         <Text style={s.name} numberOfLines={1} testID="plate-name">{shown}</Text>
-        <Text style={s.sub} numberOfLines={1} testID="plate-sub">{`${bike} · ${style}`}</Text>
+        <Text style={s.sub} numberOfLines={1} testID="plate-sub">{`${bike} ∙ ${style}`}</Text>
       </View>
       <LogoTile size={46} />
       <View pointerEvents="none" style={s.rim} />

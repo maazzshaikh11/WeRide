@@ -2,7 +2,7 @@
  * Privacy / FL status line — owned by Person D (spec §4.5).
  * One-line caption rendered INSIDE the map header (under the ride name), not a
  * floating pill over the map. Default: privacy message.
- * FL round completed: "FL round {N} done · {Y} clients" from FlRoundLogger.
+ * FL round completed: "FL round {N} done ∙ {Y} clients" from FlRoundLogger.
  * Information-only, no interaction. A changed message cross-fades in (opacity
  * only, so the header never shifts).
  */

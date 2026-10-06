@@ -72,12 +72,12 @@ function YouAreIn({ joined, onDone }: { joined: Joined; onDone: () => void }) {
           {ridersLabel(joined.count)}
           {joined.next ? (
             <>
-              {joined.kind === 'ride' ? ' · starts ' : ' · next ride '}
+              {joined.kind === 'ride' ? ' ∙ starts ' : ' ∙ next ride '}
               {joined.next.when ? <Text style={{ color: night.ink, fontFamily: t.bodyStrong.fontFamily }}>{joined.next.when}</Text> : null}
               {joined.next.when ? `\n${joined.next.name}` : joined.next.name}
             </>
           ) : joined.kind === 'crew' ? (
-            ' · no ride planned yet'
+            ' ∙ no ride planned yet'
           ) : null}
         </Text>
       </Pressable>

@@ -39,11 +39,11 @@ describe('planWhen', () => {
   });
   it('labels', () => {
     const now = new Date(2025, 9, 11, 5, 41);
-    expect(headerLabel(now)).toBe('SAT 11 OCT · 5:41 AM');
-    expect(whenLabel(new Date(2025, 9, 12, 6, 30).getTime(), now)).toBe('Tomorrow · 6:30 AM');
-    expect(whenLabel(new Date(2025, 9, 11, 18, 0).getTime(), now)).toBe('Today · 6:00 PM');
-    expect(whenLabel(new Date(2025, 9, 18, 6, 0).getTime(), now)).toBe('Sat 18 Oct · 6:00 AM');
-    expect(ticketWhen(new Date(2025, 9, 11, 6, 30).getTime())).toBe('Sat 11 Oct · 6:30 AM');
+    expect(headerLabel(now)).toBe('SAT 11 OCT ∙ 5:41 AM');
+    expect(whenLabel(new Date(2025, 9, 12, 6, 30).getTime(), now)).toBe('Tomorrow ∙ 6:30 AM');
+    expect(whenLabel(new Date(2025, 9, 11, 18, 0).getTime(), now)).toBe('Today ∙ 6:00 PM');
+    expect(whenLabel(new Date(2025, 9, 18, 6, 0).getTime(), now)).toBe('Sat 18 Oct ∙ 6:00 AM');
+    expect(ticketWhen(new Date(2025, 9, 11, 6, 30).getTime())).toBe('Sat 11 Oct ∙ 6:30 AM');
     expect(agoLabel(1000, 1000)).toBe('just now');
     expect(agoLabel(0, 40 * 60_000)).toBe('40 min ago');
     expect(agoLabel(0, 2 * 3_600_000)).toBe('2h ago');
@@ -58,8 +58,8 @@ describe('route options', () => {
     expect(o.map((x) => x.title)).toEqual(['Fastest', 'Safest', 'Alternative']);
     expect(o.map((x) => x.safety)).toEqual([78, 91, 80]);
     expect(o[0].note).toBe('Passes 2 reported hazards');
-    expect(o[1].note).toBe('No reported hazards on this route · +7 min');
-    expect(o[2].note).toBe('Passes 1 reported hazard · +25 min');
+    expect(o[1].note).toBe('No reported hazards on this route ∙ +7 min');
+    expect(o[2].note).toBe('Passes 1 reported hazard ∙ +25 min');
     expect(o.map((x) => x.recommended)).toEqual([false, true, false]);
     expect(hazardNote(0)).toMatch(/No reported/);
   });
@@ -146,7 +146,7 @@ describe('intel', () => {
   it('rail items: nearest first, km along the route only when there is one, safety last', () => {
     const items = intelItems([cluster('b', 'oil_spill', 1, 19, 72.88), cluster('a', 'pothole', 3, 19, 72.82)], path, 1700000000000 + 40 * 60_000, 0.91);
     expect(items.map((i) => i.key)).toEqual(['a', 'b', 'safety']);
-    expect(items[0]).toMatchObject({ tone: 'pri', title: expect.stringMatching(/^Pothole · km \d+$/), sub: '3 reports · first reported 40 min ago' });
+    expect(items[0]).toMatchObject({ tone: 'pri', title: expect.stringMatching(/^Pothole ∙ km \d+$/), sub: '3 reports ∙ first reported 40 min ago' });
     expect(items[1].tone).toBe('bad');
     expect(items[2]).toMatchObject({ tone: 'ok', title: 'Route safety score 91' });
     const noPath = intelItems([cluster('a', 'pothole', 2)], [], 1, null);

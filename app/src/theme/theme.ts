@@ -75,7 +75,7 @@ export const WeRideColors = {
  * in assets/fonts (files are named <PostScriptName>.ttf).
  *
  * Four static weights stand in for the demo's variable-font weights:
- * Medium 500 · Bold 700 (demo 650-750) · ExtraBold 800 (800-850) · Black 900.
+ * Medium 500 ∙ Bold 700 (demo 650-750) ∙ ExtraBold 800 (800-850) ∙ Black 900.
  */
 export const WeRideFonts = {
   medium: 'Overpass-Medium',

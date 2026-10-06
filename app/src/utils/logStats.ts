@@ -1,5 +1,5 @@
 /**
- * Pure maths + formatting for the ride log: season totals, the last-8-weeks bar chart, the "Season · Sep – Oct" label,
+ * Pure maths + formatting for the ride log: season totals, the last-8-weeks bar chart, the "Season ∙ Sep – Oct" label,
  * track decimation and the "did we ever see another rider" rule. Everything takes its clock as an argument.
  */
 import type { RideEventKind, RideLog } from '../models/domain';
@@ -42,13 +42,13 @@ export function weeklyKm(logs: Pick<RideLog, 'km' | 'started_ms'>[], now: number
   return { values, labels: values.map((_, i) => `W${i + 1}`) };
 }
 
-/** 'SEASON · SEP – OCT' (one month: 'SEASON · OCT'); 'YOUR LOG' when there are no rides. */
+/** 'SEASON ∙ SEP – OCT' (one month: 'SEASON ∙ OCT'); 'YOUR LOG' when there are no rides. */
 export function seasonLabel(logs: Pick<RideLog, 'started_ms'>[]): string {
   const ts = logs.map((l) => l.started_ms).filter((t) => Number.isFinite(t) && t > 0);
   if (ts.length === 0) return 'YOUR LOG';
   const a = MONTHS[new Date(Math.min(...ts)).getMonth()];
   const b = MONTHS[new Date(Math.max(...ts)).getMonth()];
-  return a === b ? `SEASON · ${a}` : `SEASON · ${a} – ${b}`;
+  return a === b ? `SEASON ∙ ${a}` : `SEASON ∙ ${a} – ${b}`;
 }
 
 /** 'Sat 4 Oct' (device local time). */

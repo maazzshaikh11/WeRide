@@ -124,8 +124,8 @@ import { greetingFor, dayLabel, timeOfDay, startLabel } from '../src/utils/rides
 describe('date/time labels', () => {
   it('greeting follows the hour', () => {
     const at = (h: number) => greetingFor(new Date(2026, 9, 5, h, 0));
-    expect([at(3), at(9), at(13), at(18), at(22)]).toEqual([
-      'Good night', 'Good morning', 'Good afternoon', 'Good evening', 'Good night',
+    expect([at(3), at(6), at(7), at(9), at(12), at(13), at(18), at(22)]).toEqual([
+      'Early start', 'Early start', 'Good morning', 'Good morning', 'Good afternoon', 'Good afternoon', 'Good evening', 'Good evening',
     ]);
   });
   it('12-hour clock edge cases', () => {
@@ -135,7 +135,7 @@ describe('date/time labels', () => {
   });
   it('day and start labels (Oct 5 2026 is a Monday)', () => {
     expect(dayLabel(new Date(2026, 9, 5))).toBe('MON, OCT 5');
-    expect(startLabel(new Date(2026, 9, 5, 6, 0).getTime())).toBe('MON, OCT 5 · 6:00 AM');
+    expect(startLabel(new Date(2026, 9, 5, 6, 0).getTime())).toBe('MON, OCT 5 ∙ 6:00 AM');
     expect(startLabel(null)).toBeNull();
   });
 });

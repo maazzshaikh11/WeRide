@@ -9,7 +9,7 @@ import type { RiderEntry } from '../../../store/ridersStore';
 import type { PlateTone } from '../../../theme/palettes';
 import type { IconName } from '../../../ui';
 import type { Units } from '../../../models/domain';
-import { formatShortDistance } from '../../../utils/units';
+import { formatShortDistance, formatSpread } from '../../../utils/units';
 import { extractHlcPhysical } from '../overlays/riderMarkerState';
 
 export interface LatLng {
@@ -122,7 +122,6 @@ export interface LiveStatusInput {
 }
 
 const shortId = (id: string) => `Rider ${id.slice(-4)}`;
-const km = (m: number) => (m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
 
 /**
  * The one-glance answer to "is the group OK?" — a single plate.
@@ -142,26 +141,26 @@ export function liveStatus({ own, others, signalLost, sosFrom, hazard, signal, s
   if (hazard) {
     return {
       key: 'hazard', tone: 'yellow', icon: 'haz',
-      title: `${hazard.name} · ${formatShortDistance(Math.max(0, hazard.distanceM), units)}`,
-      subtitle: `${hazard.reportCount > 1 ? `Reported by ${hazard.reportCount} riders` : 'Reported by a rider'} · ease off`,
+      title: `${hazard.name} ∙ ${formatShortDistance(Math.max(0, hazard.distanceM), units)}`,
+      subtitle: `${hazard.reportCount > 1 ? `Reported by ${hazard.reportCount} riders` : 'Reported by a rider'} ∙ ease off`,
     };
   }
   if (signal) {
     return {
       key: 'signal', tone: /^all good$/i.test(signal.label) ? 'green' : 'yellow', icon: 'signal',
-      title: `${signal.name} · ${signal.label}`, subtitle: 'Signal from the crew',
+      title: `${signal.name} ∙ ${signal.label}`, subtitle: 'Signal from the crew',
     };
   }
   if (stop) {
     return {
       key: 'stop-ahead', tone: 'blue', icon: 'cup',
-      title: `${stop.name} · ${formatShortDistance(Math.max(0, stop.distanceM), units)}`, subtitle: 'Pull in together',
+      title: `${stop.name} ∙ ${formatShortDistance(Math.max(0, stop.distanceM), units)}`, subtitle: 'Pull in together',
     };
   }
   if (staleRider) {
     return {
       key: 'rider-no-signal', tone: 'yellow', icon: 'wifioff',
-      title: `${staleRider.name} · No signal`, subtitle: `Last seen ${Math.max(0, Math.round(staleRider.ageS))} s ago · position held`,
+      title: `${staleRider.name} ∙ No signal`, subtitle: `Last seen ${Math.max(0, Math.round(staleRider.ageS))} s ago ∙ position held`,
     };
   }
   if (others.length === 0) {
@@ -174,9 +173,9 @@ export function liveStatus({ own, others, signalLost, sosFrom, hazard, signal, s
   const spread = groupSpreadM([own, ...others.map((r) => r.location)]);
   const count = others.length + 1;
   if (spread > GAP_THRESHOLD_M && far) {
-    return { key: 'gap', tone: 'yellow', icon: 'warn', title: 'Gap', subtitle: `${who(far.riderId)} is ${km(far.distanceM)} away` };
+    return { key: 'gap', tone: 'yellow', icon: 'warn', title: 'Gap', subtitle: `${who(far.riderId)} is ${formatSpread(far.distanceM, units)} away ∙ send Wait up` };
   }
-  return { key: 'together', tone: 'green', icon: 'check', title: 'All together', subtitle: `${count} riders · ${km(spread)} spread` };
+  return { key: 'together', tone: 'green', icon: 'check', title: 'All together', subtitle: `${count} riders ∙ ${formatSpread(spread, units)} spread` };
 }
 
 /** The rider whose marker went GREY most recently, if still plausibly on the ride (stale for under 10 min). */

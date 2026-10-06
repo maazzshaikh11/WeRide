@@ -157,8 +157,8 @@ export function ControlKey({ icon, label, onPress, onPressIn, onPressOut, active
   );
 }
 
-/** "HH:MM" `minutes` from `now` (local time). */
+/** "H:MM" `minutes` from `now` (local time, 24 h, no leading zero on the hour like the demo's "8:01"). */
 export function clockAfter(minutes: number, now: Date = new Date()): string {
   const t = new Date(now.getTime() + Math.max(0, minutes) * 60000);
-  return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+  return `${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}`;
 }

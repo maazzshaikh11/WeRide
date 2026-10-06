@@ -1,6 +1,6 @@
 /**
  * Log tab (demo `log`): the season so far from the rider's own ride logs: big km total, rides and hours, the
- * last-8-weeks bar chart, and a card per ride (sketch of the recorded track, name, date · distance · time, together %).
+ * last-8-weeks bar chart, and a card per ride (sketch of the recorded track, name, date ∙ distance ∙ time, together %).
  */
 import React, { useEffect, useMemo } from 'react';
 import { Text, View } from 'react-native';
@@ -34,7 +34,7 @@ function RideCard({ log, units, index, onPress }: { log: RideLog; units: 'km' | 
   const together = hasTogetherData(log);
   const pct = Math.round(log.together_pct);
   const date = formatRideDate(log.started_ms);
-  const meta = [date, formatDistance(log.km, units), formatDuration(log.duration_s)].filter(Boolean).join(' · ');
+  const meta = [date, formatDistance(log.km, units), formatDuration(log.duration_s)].filter(Boolean).join(' ∙ ');
   return (
     <FadeIn index={index}>
       <PressableScale

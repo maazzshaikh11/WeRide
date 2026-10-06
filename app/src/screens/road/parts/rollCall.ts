@@ -72,7 +72,7 @@ export function readyChecks(input: {
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/** "6:30 · IN 49 MIN" — start time and the countdown to it (demo's pill). */
+/** "6:30 ∙ IN 49 MIN" — start time and the countdown to it (demo's pill). */
 export function countdownLabel(startMs: number | null, now: number): string | null {
   if (startMs == null || !Number.isFinite(startMs)) return null;
   const d = new Date(startMs);
@@ -80,12 +80,12 @@ export function countdownLabel(startMs: number | null, now: number): string | nu
   const clock = `${h}:${pad2(d.getMinutes())}`;
   const mins = Math.round((startMs - now) / 60000);
   if (mins > 0) {
-    if (mins >= 60) return `${clock} · IN ${Math.floor(mins / 60)}H ${pad2(mins % 60)}`;
-    return `${clock} · IN ${mins} MIN`;
+    if (mins >= 60) return `${clock} ∙ IN ${Math.floor(mins / 60)}H ${pad2(mins % 60)}`;
+    return `${clock} ∙ IN ${mins} MIN`;
   }
-  if (mins === 0) return `${clock} · NOW`;
+  if (mins === 0) return `${clock} ∙ NOW`;
   const late = -mins;
-  return late >= 60 ? `${clock} · ${Math.floor(late / 60)}H ${pad2(late % 60)} AGO` : `${clock} · ${late} MIN AGO`;
+  return late >= 60 ? `${clock} ∙ ${Math.floor(late / 60)}H ${pad2(late % 60)} AGO` : `${clock} ∙ ${late} MIN AGO`;
 }
 
 /** Stop screen tile label from a presence state (ready / fuelling / pulling in / on a break). */

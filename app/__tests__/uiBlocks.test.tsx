@@ -6,7 +6,7 @@ import { StyleSheet, Text } from 'react-native';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { Path } from 'react-native-svg';
 
-import { Bars, CodeBoxes, KV, Keypad, LetterKeypad, MapSketch, Rail, Ring, RiderTile, Stepper, Ticket, TopBar } from '../src/ui';
+import { Avatar, Bars, CodeBoxes, KV, Keypad, LetterKeypad, MapSketch, Rail, Ring, RiderTile, Stepper, Ticket, TopBar } from '../src/ui';
 import { ThemeContext, buildTheme } from '../src/theme/ThemeProvider';
 import { THEMES } from '../src/theme/palettes';
 
@@ -29,6 +29,24 @@ function mount(el: React.ReactElement, id: 'demo' | 'ember' = 'demo', scheme: 'l
 const hostStyles = (t: ReactTestRenderer) =>
   t.root.findAll((n) => typeof n.type === 'string' && n.props.style).map((n) => StyleSheet.flatten(n.props.style));
 const texts = (t: ReactTestRenderer) => t.root.findAllByType(Text).map((n) => [n.props.children].flat(3).join(''));
+
+describe('Avatar in an overlapping stack', () => {
+  const padRight = (t: ReactTestRenderer) => hostStyles(t).map((s) => s.paddingRight).find((v) => v !== undefined);
+  it('shifts the initials left by half the covered width (demo .avs .av:not(:last-child){padding-right:9px})', () => {
+    const covered = mount(<Avatar initials="ME" size={28} covered={9} />);
+    expect(padRight(covered)).toBe(9);
+    const last = mount(<Avatar initials="ME" size={28} />);
+    expect(padRight(last)).toBeUndefined();
+  });
+});
+
+describe('KV key lines', () => {
+  it('truncates keys to one line by default and can wrap to two', () => {
+    const lines = (t: ReactTestRenderer) => t.root.findAllByType(Text).find((n) => [n.props.children].flat(3).join('') === 'HAZARDS SHARED')?.props.numberOfLines;
+    expect(lines(mount(<KV items={[{ value: '1', label: 'hazards shared' }]} />))).toBe(1);
+    expect(lines(mount(<KV keyLines={2} items={[{ value: '1', label: 'hazards shared' }]} />))).toBe(2);
+  });
+});
 
 describe('Stepper', () => {
   it('fills `step` of `of` bars with ink', () => {
@@ -96,6 +114,15 @@ describe('KV / Ring / Bars / Rail / RiderTile / Ticket / TopBar / MapSketch', ()
     const t = mount(<RiderTile name="Meera" initials="ME" status="ready" ready />, id, scheme);
     expect(hostStyles(t).some((s) => s.borderColor === THEMES[id][scheme].ok && s.borderWidth === 3)).toBe(true);
     expect(texts(t)).toEqual(expect.arrayContaining(['Meera', 'READY']));
+  });
+  it('RiderTile status line uses the demo .1em tracking and shrinks to fit instead of clipping ("ON A BREAK")', () => {
+    const t = mount(<RiderTile name="You" initials="AR" status="on a break" />);
+    const status = t.root.findAll((n) => typeof n.type === 'string' && n.props.children === 'ON A BREAK')[0];
+    const st = ([] as any[]).concat(status.props.style).flat(3).filter(Boolean).reduce((a, b) => ({ ...a, ...b }), {});
+    expect(st.fontSize).toBe(11);
+    expect(st.letterSpacing).toBeCloseTo(1.1);
+    expect(status.props.numberOfLines).toBe(1);
+    expect(status.props.adjustsFontSizeToFit).toBe(true);
   });
   it('Ticket draws the perforation only with a header', () => {
     const withH = mount(<Ticket header={<Text>H</Text>}><Text>body</Text></Ticket>);

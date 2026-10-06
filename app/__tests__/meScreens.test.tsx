@@ -111,13 +111,13 @@ describe('Me', () => {
     expect(hasText(t, 'ACCOUNT')).toBe(true);
     expect(hasText(t, 'Me')).toBe(true);
     expect(hasText(t, 'ARJUN RAO')).toBe(true);
-    expect(hasText(t, 'Himalayan 450 · Steady')).toBe(true);
+    expect(hasText(t, 'Himalayan 450 ∙ Steady')).toBe(true);
     expect(t.root.findByProps({ testID: 'weride-logo' })).toBeTruthy();
     for (const s of ['SOS & emergency', 'Family sharing', 'Road screen & controls', 'Voice & signals', 'Privacy & learning', 'Permissions', 'Replay onboarding', 'Sign out']) {
       expect(hasText(t, s)).toBe(true);
     }
-    expect(hasText(t, '1 contact · crash detection on')).toBe(true);
-    expect(hasText(t, 'Sunset auto theme · glove mode off')).toBe(true);
+    expect(hasText(t, '1 contact ∙ crash detection on')).toBe(true);
+    expect(hasText(t, 'Sunset auto theme ∙ glove mode off')).toBe(true);
     expect(hasText(t, 'All set')).toBe(true);
     // the plate is always road-sign yellow, the sign-out title uses the theme's `bad`
     expect(hostStyles(t).some((s) => s.backgroundColor === '#FFC20E' && s.borderRadius === 18)).toBe(true);
@@ -135,11 +135,11 @@ describe('Me', () => {
   it('subtitles follow the prefs and contacts', async () => {
     act(() => usePrefsStore.setState({ prefs: { ...DEFAULT_PREFS, road: 'night', glove: true, crash: false }, contacts: [] }));
     const t = await mount(<MeScreen navigation={nav()} />);
-    expect(hasText(t, '0 contacts · crash detection off')).toBe(true);
-    expect(hasText(t, 'Night theme · glove mode on')).toBe(true);
+    expect(hasText(t, '0 contacts ∙ crash detection off')).toBe(true);
+    expect(hasText(t, 'Night theme ∙ glove mode on')).toBe(true);
     act(() => usePrefsStore.setState({ prefs: { ...DEFAULT_PREFS, road: 'day' }, contacts: [{ id: 'a', name: 'A', number: '+911' }, { id: 'b', name: 'B', number: '+912' }] }));
-    expect(hasText(t, '2 contacts · crash detection on')).toBe(true);
-    expect(hasText(t, 'Day theme · glove mode off')).toBe(true);
+    expect(hasText(t, '2 contacts ∙ crash detection on')).toBe(true);
+    expect(hasText(t, 'Day theme ∙ glove mode off')).toBe(true);
   });
 
   it('permissions subtitle comes from the real OS status', async () => {
@@ -218,7 +218,7 @@ describe('Safety', () => {
     expect(hasText(t, /ready-to-send text with your live location/)).toBe(true);
     expect(texts(t).join(' ')).not.toMatch(/SMS to your contacts|Sent instantly/);
     expect(hasText(t, 'Mom')).toBe(true);
-    expect(hasText(t, '+919800021034')).toBe(true);
+    expect(hasText(t, '+91 98•••• 21034')).toBe(true);
     expect(hasText(t, 'Crash detection')).toBe(true);
     expect(hasText(t, 'Run an SOS drill')).toBe(true);
     expect(hostStyles(t).some((s) => s.backgroundColor === THEMES[id][scheme].ink && s.borderRadius === 22)).toBe(true);
@@ -469,7 +469,7 @@ describe('PermsSheet', () => {
     expect(hasText(t, 'Notifications')).toBe(true);
     expect(hasText(t, 'Not allowed')).toBe(true);
     expect(hasText(t, 'Microphone')).toBe(true);
-    expect(hasText(t, 'Off · optional · tap to allow')).toBe(true);
+    expect(hasText(t, 'Off ∙ optional ∙ tap to allow')).toBe(true);
   });
 
   it('only a never-asked row is tappable, and it requests that permission then refreshes', async () => {

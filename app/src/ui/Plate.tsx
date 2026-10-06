@@ -1,7 +1,7 @@
 /**
  * Plate — the road-sign status plate from demo.html: solid colour, an inset
  * rim 4 px in, big uppercase title, small subtitle. Tone carries meaning
- * (green fine · yellow caution · red SOS · blue stop ahead) and is the same in
+ * (green fine ∙ yellow caution ∙ red SOS ∙ blue stop ahead) and is the same in
  * every theme.
  */
 import React from 'react';

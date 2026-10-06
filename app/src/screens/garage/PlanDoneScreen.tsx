@@ -88,7 +88,7 @@ export default function PlanDoneScreen({ navigation, route }: Props) {
     ride?.start_time_ms ? whenLabel(ride.start_time_ms, now) : null,
     stats ? formatDistance(stats.distance_km, units) : null,
     crew?.name ?? null,
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).join(' ∙ ');
 
   return (
     <Screen testID="screen-PlanDone" cta={<Button label="Back to rides" onPress={finish} testID="back-to-rides" />}>

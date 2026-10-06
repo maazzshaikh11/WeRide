@@ -54,9 +54,9 @@ describe('IntelSheet', () => {
     const t = mount(<IntelSheet visible onClose={jest.fn()} clusters={[cluster('pothole', 3, 72.85), cluster('oil_spill', 1, 72.9)]} path={[{ lat: 19, lng: 72.8 }, { lat: 19, lng: 73 }]} safety={0.88} now={1700000000000 + 2 * 3_600_000} />, id, scheme);
     expect(has(t, 'ROUTE INTEL')).toBe(true);
     expect(has(t, 'Before you roll')).toBe(true);
-    expect(has(t, /^Pothole · km \d+$/)).toBe(true);
-    expect(has(t, /^Oil on the road · km \d+$/)).toBe(true);
-    expect(has(t, '3 reports · first reported 2h ago')).toBe(true);
+    expect(has(t, /^Pothole ∙ km \d+$/)).toBe(true);
+    expect(has(t, /^Oil on the road ∙ km \d+$/)).toBe(true);
+    expect(has(t, '3 reports ∙ first reported 2h ago')).toBe(true);
     expect(has(t, 'Route safety score 88')).toBe(true);
     expect(has(t, 'Hazards show up when two riders report the same spot. That keeps one bad tap from crying wolf.')).toBe(true);
   });
@@ -96,21 +96,21 @@ describe('RideInfoSheet', () => {
     usePrefsStore.setState({ prefs: { ...usePrefsStore.getState().prefs, units: 'km' } });
   });
 
-  it.each(ALL)('%s/%s: name, when · distance · riders confirmed, and the map', (id, scheme) => {
+  it.each(ALL)('%s/%s: name, when ∙ distance ∙ riders confirmed, and the map', (id, scheme) => {
     const t = mount(<RideInfoSheet visible onClose={jest.fn()} ride={ride()} />, id, scheme);
     expect(has(t, 'UPCOMING')).toBe(true);
     expect(has(t, 'Mulshi Lake Loop')).toBe(true);
-    expect(has(t, 'Sat 18 Oct · 6:00 AM · 112 km · 2 riders confirmed')).toBe(true);
+    expect(has(t, 'Sat 18 Oct ∙ 6:00 AM ∙ 112 km ∙ 2 riders confirmed')).toBe(true);
     expect(t.root.findAllByProps({ testID: 'rideinfo-map' }).length).toBeGreaterThan(0);
   });
   it('shows miles in miles', () => {
     usePrefsStore.setState({ prefs: { ...usePrefsStore.getState().prefs, units: 'mi' } });
-    expect(has(mount(<RideInfoSheet visible onClose={jest.fn()} ride={ride()} />), /· 70 mi ·/)).toBe(true);
+    expect(has(mount(<RideInfoSheet visible onClose={jest.fn()} ride={ride()} />), /∙ 70 mi ∙/)).toBe(true);
   });
   it('omits the distance when the ride has no saved route', () => {
     const r: any = ride();
     r.route_stats = null;
-    expect(has(mount(<RideInfoSheet visible onClose={jest.fn()} ride={r} />), 'Sat 18 Oct · 6:00 AM · 2 riders confirmed')).toBe(true);
+    expect(has(mount(<RideInfoSheet visible onClose={jest.fn()} ride={r} />), 'Sat 18 Oct ∙ 6:00 AM ∙ 2 riders confirmed')).toBe(true);
   });
   it('"I’m in" writes the RSVP, confirms and closes', () => {
     const onClose = jest.fn();

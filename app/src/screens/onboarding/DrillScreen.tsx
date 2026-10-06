@@ -1,6 +1,6 @@
 /**
  * Drill — the SOS practice (demo `drill`): dark, hazard-striped DRILL banner, the red SOS button inside a progress
- * ring. Hold time is the rider's own `prefs.hold_ms`. Releasing early shows "RELEASED · NOTHING SENT"; a full hold
+ * ring. Hold time is the rider's own `prefs.hold_ms`. Releasing early shows "RELEASED ∙ NOTHING SENT"; a full hold
  * turns everything green with "SOS sent in X s" and what a real SOS would do (naming the rider's real first
  * contact). Nobody is ever alerted. Route param `fromSettings` (Me → Safety): Done goes back; otherwise Continue
  * → CrewStart.
@@ -75,7 +75,7 @@ function DrillBody({ navigation, route }: { navigation: any; route?: { params?: 
     holdingRef.current = false;
     stopTick();
     setProgress(0);
-    setHint('RELEASED · NOTHING SENT');
+    setHint('RELEASED ∙ NOTHING SENT');
     hintTimer.current = setTimeout(() => {
       if (!doneRef.current) setHint('HOLD');
     }, 1400);

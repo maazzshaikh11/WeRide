@@ -68,7 +68,7 @@ const FULL: RideLog = {
     { t_ms: D(2026, 9, 4, 6, 52), kind: 'hazard', text: 'Pothole confirmed' },
     { t_ms: D(2026, 9, 4, 7, 5), kind: 'stop', text: 'Chai Point' },
     { t_ms: D(2026, 9, 4, 7, 20), kind: 'gap', text: 'Gap at the ghat' },
-    { t_ms: D(2026, 9, 4, 7, 32), kind: 'arrived', text: 'Arrived · Worli' },
+    { t_ms: D(2026, 9, 4, 7, 32), kind: 'arrived', text: 'Arrived ∙ Worli' },
   ],
   rating: null, start: { label: 'Gateway', lat: 19, lng: 72.8 }, destination: { label: 'Worli', lat: 19.05, lng: 72.83 },
 };
@@ -99,15 +99,15 @@ describe('Log tab', () => {
     const pal = THEMES[id][scheme];
     const t = mount(<LogScreen navigation={nav()} route={{} as any} />, id, scheme);
     expect(has(t, 'Your log')).toBe(true);
-    expect(has(t, 'SEASON · SEP – OCT')).toBe(true);
+    expect(has(t, 'SEASON ∙ SEP – OCT')).toBe(true);
     expect(has(t, '140')).toBe(true); // 28.4 + 112 = 140.4
     expect(has(t, 'KM THIS SEASON')).toBe(true);
     expect(has(t, '2 rides')).toBe(true);
     expect(has(t, '4 h on the road')).toBe(true); // 14400 s
     expect(has(t, '2 logged')).toBe(true);
     expect(has(t, 'Marine Drive Sunrise')).toBe(true);
-    expect(has(t, 'Sun 4 Oct · 28 km · 58 min')).toBe(true);
-    expect(has(t, 'Sun 27 Sep · 112 km · 3h 02')).toBe(true);
+    expect(has(t, 'Sun 4 Oct ∙ 28 km ∙ 58 min')).toBe(true);
+    expect(has(t, 'Sun 27 Sep ∙ 112 km ∙ 3h 02')).toBe(true);
     expect(byTestId(t, 'bars')).toHaveLength(1);
     const pct = (s: string) => StyleSheet.flatten(t.root.findAll((n) => n.type === Text && deepText(n) === s)[0].props.style);
     expect(pct('96%').color).toBe(pal.ok);
@@ -166,7 +166,7 @@ describe('Log tab', () => {
     const t = mount(<LogScreen navigation={nav()} route={{} as any} />);
     expect(has(t, '87')).toBe(true); // 140.4 km = 87.2 mi
     expect(has(t, 'MI THIS SEASON')).toBe(true);
-    expect(has(t, /· 18 mi ·/)).toBe(true);
+    expect(has(t, /∙ 18 mi ∙/)).toBe(true);
   });
 
   it('watches the rider logs for the signed-in uid', () => {
@@ -187,7 +187,7 @@ describe('Recap', () => {
     expect(has(t, 'SUN 4 OCT')).toBe(true);
     expect(has(t, 'Marine Drive Sunrise')).toBe(true);
     expect(has(t, 'A tight ride.')).toBe(true);
-    expect(has(t, /You stayed within 500 m of the group 96% of the time\. Longest gap: 410 m\./)).toBe(true);
+    expect(has(t, /You stayed within 500 m of the group 96% of the time\. Longest gap: 0\.4 km\./)).toBe(true);
     expect(has(t, '% TOGETHER')).toBe(true);
     expect(has(t, '96')).toBe(true);
     expect(has(t, '28')).toBe(true);
@@ -195,12 +195,13 @@ describe('Recap', () => {
     expect(has(t, '29')).toBe(true);
     expect(has(t, 'AVG KM/H')).toBe(true);
     expect(has(t, 'HAZARDS SHARED')).toBe(true);
+    expect(t.root.findAllByType(Text).find((n: any) => deepText(n) === 'HAZARDS SHARED')?.props.numberOfLines).toBe(2);
     expect(has(t, 'SIGNALS')).toBe(true);
     expect(has(t, 'RIDERS')).toBe(true);
     expect(has(t, 'TIMELINE')).toBe(true);
     expect(has(t, 'Rolled out')).toBe(true);
     expect(has(t, 'Pothole confirmed')).toBe(true);
-    expect(has(t, 'Arrived · Worli')).toBe(true);
+    expect(has(t, 'Arrived ∙ Worli')).toBe(true);
     expect(has(t, '06:34')).toBe(true);
     expect(has(t, 'Rate the route')).toBe(true);
     expect(has(t, 'Share card')).toBe(true);
@@ -409,13 +410,13 @@ describe('ShareCardSheet', () => {
   it.each(ALL)('%s/%s: the yellow plate with the real numbers', (id, scheme) => {
     const t = mount(<ShareCardSheet visible onClose={jest.fn()} log={FULL} />, id, scheme);
     expect(has(t, 'SHARE CARD')).toBe(true);
-    expect(has(t, 'WERIDE · SUN 4 OCT')).toBe(true);
+    expect(has(t, 'WERIDE ∙ SUN 4 OCT')).toBe(true);
     expect(has(t, 'MARINE DRIVE SUNRISE')).toBe(true);
     expect(has(t, '28')).toBe(true);
     expect(has(t, '96%')).toBe(true);
     expect(has(t, '5')).toBe(true);
     expect(has(t, 'TOGETHER')).toBe(true);
-    expect(has(t, 'Arrived · Worli')).toBe(true);
+    expect(has(t, 'Arrived ∙ Worli')).toBe(true);
     expect(has(t, 'Save image')).toBe(false);
     expect(StyleSheet.flatten(byTestId(t, 'share-card')[0].props.style).backgroundColor).toBe('#FFC20E'); // fixed road-sign yellow
   });
@@ -436,9 +437,9 @@ describe('ShareCardSheet', () => {
     await flush();
     expect(spy).toHaveBeenCalledTimes(1);
     const msg = (spy.mock.calls[0][0] as any).message as string;
-    expect(msg).toContain('Marine Drive Sunrise · Sun 4 Oct');
-    expect(msg).toContain('28 km · 96% together · 5 riders');
-    expect(msg).toContain('Arrived · Worli');
+    expect(msg).toContain('Marine Drive Sunrise ∙ Sun 4 Oct');
+    expect(msg).toContain('28 km ∙ 96% together ∙ 5 riders');
+    expect(msg).toContain('Arrived ∙ Worli');
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -453,7 +454,7 @@ describe('ShareCardSheet', () => {
   });
 
   it('text version honours miles and omits together without group data', () => {
-    expect(shareText(FULL, 'mi')).toContain('18 mi · 96% together');
+    expect(shareText(FULL, 'mi')).toContain('18 mi ∙ 96% together');
     expect(shareText(SOLO, 'km')).not.toContain('together');
   });
 });

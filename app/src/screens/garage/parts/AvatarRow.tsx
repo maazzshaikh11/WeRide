@@ -1,9 +1,9 @@
 /** Overlapping rider avatars from real profiles (initials from the profile name; the rider themself in the accent). */
 import React, { useEffect } from 'react';
 import { Text, View } from 'react-native';
-import { avatarColor } from '../../../theme/palettes';
 import { useStyles } from '../../../theme/ThemeProvider';
 import { Avatar } from '../../../ui';
+import { colorForUid } from '../crew/CrewAvatars';
 import { riderInitials, useProfileStore } from '../../../store/profileStore';
 
 export default function AvatarRow({ uids, myUid, size = 28, max = 5 }: { uids: string[]; myUid: string | null; size?: number; max?: number }) {
@@ -26,7 +26,7 @@ export default function AvatarRow({ uids, myUid, size = 28, max = 5 }: { uids: s
   return (
     <View style={styles.row} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" testID="avatar-row">
       {shown.map((u, i) => (
-        <Avatar key={u} size={size} me={u === myUid} initials={riderInitials(byId, u)} color={avatarColor(i + 1)} style={i === 0 ? undefined : { marginLeft: -9 }} />
+        <Avatar key={u} size={size} me={u === myUid} initials={riderInitials(byId, u)} color={colorForUid(u)} covered={i < shown.length - 1 || extra > 0 ? 9 : 0} style={i === 0 ? undefined : { marginLeft: -9 }} />
       ))}
       {extra > 0 ? (
         <View style={styles.more}>

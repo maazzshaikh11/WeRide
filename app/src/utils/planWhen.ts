@@ -52,25 +52,25 @@ export function startMsFor(dayOffset: number, timeMin: number, now: Date): numbe
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, 0, timeMin, 0, 0).getTime();
 }
 
-/** "Tomorrow · 6:30 AM" / "Sat 18 Oct · 6:30 AM" for a ride start, relative to `now`. */
+/** "Tomorrow ∙ 6:30 AM" / "Sat 18 Oct ∙ 6:30 AM" for a ride start, relative to `now`. */
 export function whenLabel(ms: number, now: Date): string {
   const d = new Date(ms);
   const days = Math.round(
     (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86_400_000,
   );
   const day = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : shortDate(d);
-  return `${day} · ${clockLabel(d.getHours() * 60 + d.getMinutes())}`;
+  return `${day} ∙ ${clockLabel(d.getHours() * 60 + d.getMinutes())}`;
 }
 
-/** "SAT 11 OCT · 5:41 AM" (the Ride tab eyebrow). */
+/** "SAT 11 OCT ∙ 5:41 AM" (the Ride tab eyebrow). */
 export function headerLabel(d: Date): string {
-  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} · ${clockLabel(d.getHours() * 60 + d.getMinutes())}`.toUpperCase();
+  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ∙ ${clockLabel(d.getHours() * 60 + d.getMinutes())}`.toUpperCase();
 }
 
-/** "Sat 11 Oct · 6:30 AM" always with the date (ride tickets). */
+/** "Sat 11 Oct ∙ 6:30 AM" always with the date (ride tickets). */
 export function ticketWhen(ms: number): string {
   const d = new Date(ms);
-  return `${shortDate(d)} · ${clockLabel(d.getHours() * 60 + d.getMinutes())}`;
+  return `${shortDate(d)} ∙ ${clockLabel(d.getHours() * 60 + d.getMinutes())}`;
 }
 
 /** "2h ago", "40 min ago", "just now", "3 d ago". */

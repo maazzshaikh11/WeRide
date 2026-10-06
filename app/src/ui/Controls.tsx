@@ -121,8 +121,11 @@ export function Toggle({ value, onChange, accessibilityLabel, testID }: {
 }
 
 /** Rider avatar (demo `.av`): initials on a colour, ringed in the page background. */
-export function Avatar({ initials, color, size = 36, me, ring = true, style }: {
-  initials: string; color?: string; size?: number; me?: boolean; ring?: boolean; style?: StyleProp<ViewStyle>;
+export function Avatar({ initials, color, size = 36, me, ring = true, covered = 0, style }: {
+  initials: string; color?: string; size?: number; me?: boolean; ring?: boolean;
+  /** Px of this avatar hidden by the next one in an overlapping stack: the initials shift left by half of it (demo `.avs .av:not(:last-child){padding-right:9px}`). */
+  covered?: number;
+  style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useTheme();
   const fontSize = Math.round(size * 0.35 * 2) / 2;
@@ -133,6 +136,7 @@ export function Avatar({ initials, color, size = 36, me, ring = true, style }: {
       style={[
         { width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: me ? colors.pri : color ?? colors.card2 },
         ring && { borderWidth: 2.5, borderColor: colors.bg },
+        covered > 0 && { paddingRight: covered },
         style,
       ]}
     >

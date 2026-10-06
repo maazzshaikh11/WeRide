@@ -232,7 +232,7 @@ export default function PlanWhereScreen({ navigation }: Props) {
                 first={i === 0}
                 icon="pin"
                 title={p.short}
-                subtitle={[p.crewName, `${p.rides} ${p.rides === 1 ? 'ride' : 'rides'}`].filter(Boolean).join(' · ')}
+                subtitle={[p.crewName, `${p.rides} ${p.rides === 1 ? 'ride' : 'rides'}`].filter(Boolean).join(' ∙ ')}
                 right={p.kmFromStart != null ? <Text style={styles.km} accessibilityLabel={`About ${formatDistance(p.kmFromStart, units)} in a straight line`}>{`~${formatDistance(p.kmFromStart, units)}`}</Text> : undefined}
                 onPress={() => choose({ label: p.label, lat: p.lat, lng: p.lng })}
                 testID={`popular-${i}`}

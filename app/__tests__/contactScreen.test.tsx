@@ -49,9 +49,10 @@ describe('ContactScreen', () => {
     usePrefsStore.setState({ contacts: [mom, rohan] });
     const t = mount(<ContactScreen navigation={nav()} />);
     expect(hasText(t, 'Mom')).toBe(true);
-    expect(hasText(t, '+919800021034')).toBe(true);
+    expect(hasText(t, '+91 98•••• 21034')).toBe(true);
+    expect(hasText(t, '+919800021034')).toBe(false); // the stored number is never shown in full
     expect(hasText(t, 'Rohan')).toBe(true);
-    expect(texts(t).join(' ')).not.toMatch(/Priya|98••••/);
+    expect(texts(t).join(' ')).not.toMatch(/Priya|\+91 99••••/);
   });
 
   it('with no contacts: an honest empty list with the add row, and Continue disabled', () => {

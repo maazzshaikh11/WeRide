@@ -166,7 +166,7 @@ function Body({ state }: { state: SentState }) {
         delivered.current = true;
         useSosSessionStore.getState().markDelivered(sosId);
         haptic('success');
-        showToast('Signal back · SOS delivered', 'green');
+        showToast('Signal back ∙ SOS delivered', 'green');
       }
     }, 1500);
     return () => clearInterval(t);
@@ -217,13 +217,13 @@ function Body({ state }: { state: SentState }) {
   }
 
   const top = Math.max(insets.top, 24);
-  const helpLabel = auto ? 'CRASH DETECTED · SENT AUTOMATICALLY' : drill ? 'PRACTICE' : 'HELP IS COMING';
+  const helpLabel = auto ? 'CRASH DETECTED ∙ SENT AUTOMATICALLY' : drill ? 'PRACTICE' : 'HELP IS COMING';
   const big = queued ? 'SOS SAVED' : 'SOS SENT';
-  const stamp = `${formatClock(startedMs)} · ${formatFixLine(fix)}`;
+  const stamp = `${formatClock(startedMs)} ∙ ${formatFixLine(fix)}`;
 
   const sentToCrew = crewCount == null ? 'Sent to your crew' : `Sent to ${crewCount} crew`;
   const crewRow = drill
-    ? { kind: 'done' as RowKind, title: 'Crew would be alerted', sub: crewCount == null ? 'Nobody is alerted in a drill' : `${crewCount} crew would get it · nobody is alerted in a drill` }
+    ? { kind: 'done' as RowKind, title: 'Crew would be alerted', sub: crewCount == null ? 'Nobody is alerted in a drill' : `${crewCount} crew would get it ∙ nobody is alerted in a drill` }
     : queued
       ? { kind: 'offline' as RowKind, title: 'Crew alerted', sub: 'Queued on this phone' }
       : { kind: 'done' as RowKind, title: 'Crew alerted', sub: sentToCrew };
@@ -239,7 +239,7 @@ function Body({ state }: { state: SentState }) {
     parts.push(nearest.distanceM != null ? formatShortDistance(nearest.distanceM, units) : nearest.state === 'arrived' ? 'With you' : 'On the way');
     if (nearest.etaMin != null) parts.push(`about ${nearest.etaMin} min away`);
     if (nearest.others > 0) parts.push(`${nearest.others} also responding`);
-    return parts.join(' · ');
+    return parts.join(' ∙ ');
   })();
   const responderRow = drill
     ? { kind: 'done' as RowKind, title: 'The nearest rider would be told', sub: 'Nobody is alerted in a drill' }
@@ -255,22 +255,22 @@ function Body({ state }: { state: SentState }) {
         <View style={{ height: 34, marginTop: top + 6 }} testID="sos-drill-banner">
           <HazardStripes style={StyleSheet.absoluteFill} />
           <View style={st.drillWrap}>
-            <Text style={[st.drillText, { fontFamily: type.plateTitle.fontFamily }]}>DRILL · NOBODY IS ALERTED</Text>
+            <Text style={[st.drillText, { fontFamily: type.plateTitle.fontFamily }]}>DRILL ∙ NOBODY IS ALERTED</Text>
           </View>
         </View>
       ) : null}
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: drill ? 18 : top + 22, paddingBottom: 230 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: drill ? 18 : top + 16, paddingBottom: 230 }} showsVerticalScrollIndicator={false}>
         <Text style={[type.label, { color: FG, opacity: 0.85, letterSpacing: 2.75 }]} testID="sos-label">{helpLabel}</Text>
         <Text style={[type.display, { color: FG, fontSize: 58, lineHeight: 58, letterSpacing: -2.03, marginTop: 8 }]} accessibilityRole="header" testID="sos-big">{big}</Text>
         <Text style={[type.num, { color: FG, fontSize: 14, lineHeight: 18, opacity: 0.9, marginTop: 8 }]} testID="sos-stamp">{stamp}</Text>
 
         {queued ? (
           <View style={{ marginTop: 16 }} testID="sos-offline-plate">
-            <Plate tone="yellow" icon="wifioff" title="No signal · queued" titleSize={22} subtitle="Saved on this phone. It sends itself the moment you have signal." />
+            <Plate tone="yellow" icon="wifioff" title="No signal ∙ queued" titleSize={22} subtitle="Saved on this phone. It sends itself the moment you have signal." />
           </View>
         ) : null}
 
-        <View style={{ marginTop: 16, gap: 12 }}>
+        <View style={{ marginTop: 14, gap: 8 }}>
           <Row {...crewRow} testID="sos-row-crew" />
           {contacts.length === 0 ? (
             <Row kind="none" title="Add an emergency contact in Me" sub="Then SOS can open a text to them for you" testID="sos-row-nocontact" />
@@ -293,7 +293,7 @@ function Body({ state }: { state: SentState }) {
         </View>
       </ScrollView>
 
-      <View style={[st.bottom, { bottom: Math.max(insets.bottom, 12) + 18 }]}>
+      <View style={[st.bottom, { bottom: 30 }]}>
         <PressableScale onPress={call112} accessibilityRole="button" accessibilityLabel="Call 112, emergency services" style={st.call} testID="sos-call112">
           <Icon name="phone" size={28} color={RED} />
           <Text style={[type.button, { color: RED, fontSize: 24, lineHeight: 28 }]}>Call 112</Text>
@@ -304,7 +304,7 @@ function Body({ state }: { state: SentState }) {
           </PressableScale>
         ) : (
           <HoldButton
-            label="I’m OK · hold 2 s to cancel"
+            label="I’m OK ∙ hold 2 s to cancel"
             ms={CANCEL_HOLD_MS}
             onDone={finish}
             onEarlyRelease={() => showToast('Hold 2 s to cancel — so it can’t be cancelled by accident', 'black')}
@@ -324,7 +324,7 @@ function Body({ state }: { state: SentState }) {
 
 const st = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, backgroundColor: RED, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, backgroundColor: CARD, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 16, minHeight: 44 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, backgroundColor: CARD, borderRadius: 18, paddingVertical: 10, paddingHorizontal: 16, minHeight: 44 },
   disk: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   drillWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   drillText: { backgroundColor: Plates.yellow.fg, color: Plates.yellow.bg, paddingVertical: 3, paddingHorizontal: 12, borderRadius: 5, fontSize: 12, lineHeight: 14, letterSpacing: 2.4, overflow: 'hidden' },

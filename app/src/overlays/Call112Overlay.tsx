@@ -5,7 +5,6 @@
  */
 import React, { useCallback, useEffect } from 'react';
 import { Linking, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouteStore } from '@routing/client/routeStore';
 import { Plates } from '../theme/palettes';
 import { useTheme } from '../theme/ThemeProvider';
@@ -18,7 +17,6 @@ export const EMERGENCY_NUMBER = '112';
 
 export default function Call112Overlay({ state }: { state: OverlayState }) {
   const { colors, type } = useTheme();
-  const insets = useSafeAreaInsets();
   const { toast, show } = useOverlayToast(4000);
   const fix = useRouteStore((s) => s.lastValidLocation ?? s.currentLocation);
   const back = state.kind === 'call112' ? state.back : undefined;
@@ -43,7 +41,7 @@ export default function Call112Overlay({ state }: { state: OverlayState }) {
 
   return (
     <View
-      style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: Plates.black.bg, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24, paddingBottom: insets.bottom }}
+      style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: Plates.black.bg, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24 }}
       testID="overlay-Call112"
       accessibilityViewIsModal
     >
@@ -58,7 +56,7 @@ export default function Call112Overlay({ state }: { state: OverlayState }) {
       </PressableScale>
       <Text style={[type.h1, { color: Plates.black.fg }]} accessibilityRole="header">Calling 112</Text>
       <Text style={[type.sm, { color: Plates.black.fg, opacity: 0.75, textAlign: 'center' }]}>
-        Emergency services · tell them where you are
+        Emergency services ∙ tell them where you are
       </Text>
       {where ? <Text style={[type.num, { color: Plates.black.fg, fontSize: 14, lineHeight: 18 }]} testID="call112-where">{where}</Text> : null}
       <PressableScale

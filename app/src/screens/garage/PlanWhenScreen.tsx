@@ -13,7 +13,7 @@ import { PLAN_STOP_ID, usePlanDraftStore } from '../../store/planDraftStore';
 import { riderInitials, riderName, useProfileStore } from '../../store/profileStore';
 import { useSessionStore } from '../../store/sessionStore';
 import { useToastStore } from '../../store/toastStore';
-import { avatarColor } from '../../theme/palettes';
+import { colorForUid } from './crew/CrewAvatars';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
 import { Avatar, Button, Card, Chip, Icon, List, ListItem, PressableScale, Screen, Segmented, Toggle } from '../../ui';
 import { geocodeSearchStrict, geocodingAvailable } from '../../utils/geocode';
@@ -36,7 +36,7 @@ export default function PlanWhenScreen({ navigation }: Props) {
     label: { ...t.label, marginTop: 24, marginBottom: 8 },
     wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     timeCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    stepBtn: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card2, borderWidth: 1.5, borderColor: c.line },
+    stepBtn: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line },
     time: { ...t.num, fontSize: 46, lineHeight: 50, letterSpacing: -1.84 },
     ampm: { fontSize: 20, letterSpacing: 0 },
     err: { ...t.sm, color: c.bad, marginTop: 8 },
@@ -105,7 +105,7 @@ export default function PlanWhenScreen({ navigation }: Props) {
     const stop = draft.stops.find((x) => x.id === PLAN_STOP_ID[kind]);
     if (stop) {
       const km = distanceAlongPathKm(path, stop);
-      return `${shortPlace(stop.label) ?? stop.label}${km != null ? ` · after ${Math.round(km)} km` : ''}`;
+      return `${shortPlace(stop.label) ?? stop.label}${km != null ? ` ∙ after ${Math.round(km)} km` : ''}`;
     }
     return stopMsg[kind] ?? idle;
   };
@@ -212,11 +212,11 @@ export default function PlanWhenScreen({ navigation }: Props) {
           ))}
         </View>
       ) : null}
-      <Text style={styles.label}>{crew ? `CREW · ${draft.invitees.length} INVITED` : 'RIDERS'}</Text>
+      <Text style={styles.label}>{crew ? `CREW ∙ ${draft.invitees.length} INVITED` : 'RIDERS'}</Text>
       {crew ? (
         others.length > 0 ? (
           <View style={styles.wrap}>
-            {others.map((m, i) => {
+            {others.map((m) => {
               const on = draft.invitees.includes(m);
               return (
                 <Chip
@@ -224,7 +224,7 @@ export default function PlanWhenScreen({ navigation }: Props) {
                   label={riderName(byId, m, uid)}
                   on={on}
                   onPress={() => toggleInvitee(m)}
-                  icon={<Avatar size={28} ring={false} initials={riderInitials(byId, m)} color={avatarColor(i + 1)} />}
+                  icon={<Avatar size={28} ring={false} initials={riderInitials(byId, m)} color={colorForUid(m)} />}
                   testID={`invitee-${m}`}
                 />
               );

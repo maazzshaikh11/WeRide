@@ -197,7 +197,7 @@ describe('live ride screen', () => {
     setOwn(ORIGIN, 12.5); // 45 km/h
     expect(text('speed-value')).toBe('45');
     act(() => useRouteStore.setState({ route: { route_id: 'r', path_points: [[18.5, 73.8], [18.6, 73.9]], distance_km: 84.2, eta_minutes: 125, safety_score: 0.9, recalculated_at_hlc: '0:0' } as any }));
-    expect(text('eta-value')).toMatch(/^\d\d:\d\d$/);
+    expect(text('eta-value')).toMatch(/^([0-9]|1[0-9]|2[0-3]):\d\d$/);
     expect(text('remaining-value')).toContain('84');
   });
 

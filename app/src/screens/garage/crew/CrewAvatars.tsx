@@ -1,16 +1,19 @@
 /** Overlapping member avatars for the Crews screens (demo `.avs`): profiles come from profileStore, fetched on demand. */
 import React, { useEffect } from 'react';
 import { Text, View } from 'react-native';
-import { avatarColor } from '../../../theme/palettes';
+import { AvatarColors } from '../../../theme/palettes';
 import { useTheme } from '../../../theme/ThemeProvider';
 import { Avatar } from '../../../ui';
 import { useProfileStore, riderInitials } from '../../../store/profileStore';
 
-/** A stable avatar colour per rider id, the same on every Crews screen. */
+/** Others never get the accent yellow: that is "you" (demo: AR yellow, the rest blue/pink/green/purple/orange). */
+const OTHERS = AvatarColors.slice(0, 5);
+
+/** A stable avatar colour per rider id, the same on every Garage screen. */
 export function colorForUid(uid: string): string {
   let h = 0;
   for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
-  return avatarColor(h);
+  return OTHERS[h % OTHERS.length];
 }
 
 export default function CrewAvatars({ uids, meUid, size = 28, max = 6, overlap = -9, ring = true, testID }: {
@@ -27,7 +30,7 @@ export default function CrewAvatars({ uids, meUid, size = 28, max = 6, overlap =
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }} testID={testID} accessibilityLabel={`${uids.length} riders`}>
       {shown.map((u, i) => (
-        <Avatar key={u} initials={riderInitials(byId, u)} color={colorForUid(u)} size={size} me={u === meUid} ring={ring} style={i === 0 ? undefined : { marginLeft: overlap }} />
+        <Avatar key={u} initials={riderInitials(byId, u)} color={colorForUid(u)} size={size} me={u === meUid} ring={ring} covered={i < shown.length - 1 || extra > 0 ? -overlap : 0} style={i === 0 ? undefined : { marginLeft: overlap }} />
       ))}
       {extra > 0 ? (
         <View style={{ width: size, height: size, borderRadius: size / 2, marginLeft: overlap, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card2, borderWidth: ring ? 2.5 : 0, borderColor: colors.bg }}>

@@ -44,8 +44,8 @@ export function intelItems(clusters: HazardCluster[], path: LatLng[], now: numbe
     return {
       key: c.cluster_id,
       tone: c.hazard_type === 'oil_spill' || c.hazard_type === 'accident' ? 'bad' : 'pri',
-      title: km != null ? `${hazardLabel(c.hazard_type)} · km ${Math.round(km)}` : hazardLabel(c.hazard_type),
-      sub: bits.join(' · '),
+      title: km != null ? `${hazardLabel(c.hazard_type)} ∙ km ${Math.round(km)}` : hazardLabel(c.hazard_type),
+      sub: bits.join(' ∙ '),
     };
   });
   if (safety != null) {

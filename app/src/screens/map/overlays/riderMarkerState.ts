@@ -150,3 +150,34 @@ export function markerColorForState(state: MarkerState, palette: MarkerPalette =
       return palette.ink3;
   }
 }
+
+/** What a rider's map dot looks like: fill, outer ring and initials colour (demo `.ld`, `.ld.stale`, `.ld.sos`, `.ld.str`). */
+export interface MarkerLook {
+  fill: string;
+  ring: string;
+  text: string;
+}
+
+export interface MarkerLookPalette extends MarkerPalette {
+  bg: string;
+  pri: string;
+}
+
+/** Initials colour on a filled dot (demo `.ld .dot`: near-black; white on the red SOS / spoofed fill). */
+export const MARKER_INK_DARK = '#10110E';
+
+/**
+ * Demo look per state, from real data only:
+ *  - normal: the rider's crew colour, dark initials, ring in the page colour
+ *  - stale (GREY): hollow dot — page colour fill, `ink3` ring and initials
+ *  - SOS / spoofed (RED): `bad` fill, white initials
+ *  - far (separated from the crew): crew colour with a `pri` ring
+ */
+export function riderMarkerLook(
+  input: { state: MarkerState; avatar: string; sos?: boolean; far?: boolean },
+  palette: MarkerLookPalette,
+): MarkerLook {
+  if (input.sos || input.state === 'RED') return { fill: palette.bad, ring: palette.bg, text: '#FFFFFF' };
+  if (input.state === 'GREY') return { fill: palette.bg, ring: palette.ink3, text: palette.ink3 };
+  return { fill: input.avatar, ring: input.far ? palette.pri : palette.bg, text: MARKER_INK_DARK };
+}

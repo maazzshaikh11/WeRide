@@ -21,13 +21,13 @@ export function createFlClient(params: Omit<FlClientParams, 'isEnabled'>): FlCli
 }
 
 /**
- * "FL round N done · M clients" from the rounds this phone logged, or null if there is none (or storage is not
+ * "FL round N done ∙ M clients" from the rounds this phone logged, or null if there is none (or storage is not
  * ready). Never invented: no round logged means no line.
  */
 export function flStatusLine(): string | null {
   try {
     const latest = new FlRoundLogger(getFlData()).latestRound();
-    return latest ? `FL round ${latest.roundId} done · ${latest.participants} clients` : null;
+    return latest ? `FL round ${latest.roundId} done ∙ ${latest.participants} clients` : null;
   } catch {
     return null;
   }

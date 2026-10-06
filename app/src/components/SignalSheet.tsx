@@ -13,7 +13,7 @@ import { useToastStore } from '../store/toastStore';
 import { PressableScale, Sheet, haptic } from '../ui';
 
 export const SIGNAL_OPTIONS = [
-  { label: 'Wait for me', hint: 'Slow the whole group', tone: 'yellow' },
+  { label: 'Wait up', hint: 'Slow the whole group', tone: 'yellow' },
   { label: 'Pull over', hint: 'Stop at next safe spot', tone: 'white' },
   { label: 'All good', hint: 'Clear a worry', tone: 'green' },
   { label: 'Need fuel', hint: 'Tell the lead', tone: 'black' },

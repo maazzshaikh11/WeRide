@@ -131,7 +131,7 @@ describe('status plate: new demo states', () => {
     setOwn(north(0));
     useRouteStore.setState({ route: ROUTE, activeClusters: [cluster('h1', 380)] });
     const t = mount();
-    expect(plate(t)).toBe('Pothole · 380 m. Reported by 2 riders · ease off');
+    expect(plate(t)).toBe('Pothole ∙ 380 m. Reported by 2 riders ∙ ease off');
     // behind or beyond 500 m: not shown
     act(() => useRouteStore.setState({ activeClusters: [cluster('far', 900)] }));
     expect(plate(t)).toMatch(/Riding solo/i);
@@ -141,7 +141,7 @@ describe('status plate: new demo states', () => {
     usePrefsStore.setState({ prefs: { ...DEFAULT_PREFS, units: 'mi' } });
     setOwn(north(0));
     useRouteStore.setState({ route: ROUTE, activeClusters: [cluster('h1', 380)] });
-    expect(plate(mount())).toMatch(/^Pothole · 0\.2 mi\./);
+    expect(plate(mount())).toMatch(/^Pothole ∙ 0\.2 mi\./);
   });
 
   it('signal from the crew shows by name for ~15 s, own signals do not', () => {
@@ -149,10 +149,10 @@ describe('status plate: new demo states', () => {
     const t = mount();
     act(() => mockHandlers['signal:received']({ group_id: 'g1', rider_id: 'me', label: 'All good' }));
     expect(plate(t)).toMatch(/Riding solo/i);
-    act(() => mockHandlers['signal:received']({ group_id: 'other', rider_id: 'm', label: 'Wait for me' }));
+    act(() => mockHandlers['signal:received']({ group_id: 'other', rider_id: 'm', label: 'Wait up' }));
     expect(plate(t)).toMatch(/Riding solo/i);
-    act(() => mockHandlers['signal:received']({ group_id: 'g1', rider_id: 'm', label: 'Wait for me' }));
-    expect(plate(t)).toBe('Meera · Wait for me. Signal from the crew');
+    act(() => mockHandlers['signal:received']({ group_id: 'g1', rider_id: 'm', label: 'Wait up' }));
+    expect(plate(t)).toBe('Meera ∙ Wait up. Signal from the crew');
     act(() => { jest.advanceTimersByTime(14_000); });
     expect(plate(t)).toMatch(/^Meera/);
     act(() => { jest.advanceTimersByTime(1_500); });
@@ -164,17 +164,17 @@ describe('status plate: new demo states', () => {
     useRouteStore.setState({ route: ROUTE });
     setOwn(north(1000), 12);
     const t = mount();
-    expect(plate(t)).toBe('Chai Point · 600 m. Pull in together');
+    expect(plate(t)).toBe('Chai Point ∙ 600 m. Pull in together');
     act(() => host(t, 'status-plate').props.onPress?.({}) ?? t.root.findAll((n) => n.props.testID === 'status-plate' && typeof n.props.onPress === 'function')[0].props.onPress({}));
     expect(navigate).toHaveBeenCalledWith('Stop', { groupId: 'g1', stopId: 's1' });
     expect([...visitedStopIds('g1')]).toEqual(['s1']);
   });
 
-  it('a rider with a GREY marker: "<name> · No signal", last seen N s ago', () => {
+  it('a rider with a GREY marker: "<name> ∙ No signal", last seen N s ago', () => {
     setOwn(north(0));
     act(() => useRidersStore.getState().upsertRider({ ...fix('m', north(100)), timestamp_hlc: `${Date.now() - 14_000}:0` }));
     const t = mount();
-    expect(plate(t)).toBe('Meera · No signal. Last seen 14 s ago · position held');
+    expect(plate(t)).toBe('Meera ∙ No signal. Last seen 14 s ago ∙ position held');
   });
 
   it('priority: hazard beats signal beats stop ahead', () => {
@@ -185,7 +185,7 @@ describe('status plate: new demo states', () => {
     act(() => mockHandlers['signal:received']({ group_id: 'g1', rider_id: 'm', label: 'Need fuel' }));
     expect(plate(t)).toMatch(/^Pothole/);
     act(() => useRouteStore.setState({ activeClusters: [] }));
-    expect(plate(t)).toMatch(/^Meera · Need fuel/);
+    expect(plate(t)).toMatch(/^Meera ∙ Need fuel/);
     act(() => { jest.advanceTimersByTime(16_000); });
     expect(plate(t)).toMatch(/^Chai/);
   });

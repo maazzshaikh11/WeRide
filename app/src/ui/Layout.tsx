@@ -93,7 +93,7 @@ export function Screen({ children, cta, tabs, style, contentStyle, testID, onScr
 }
 
 /** Row of value/key stats (demo `.kv`): big mono numerals over an uppercase key. */
-export function KV({ items, style, size = 25 }: { items: { value: string; unit?: string; label: string; color?: string }[]; style?: StyleProp<ViewStyle>; size?: number }) {
+export function KV({ items, style, size = 25, keyLines = 1 }: { items: { value: string; unit?: string; label: string; color?: string }[]; style?: StyleProp<ViewStyle>; size?: number; keyLines?: number }) {
   const { type } = useTheme();
   return (
     <View style={[{ flexDirection: 'row' }, style]}>
@@ -103,7 +103,7 @@ export function KV({ items, style, size = 25 }: { items: { value: string; unit?:
             {it.value}
             {it.unit ? <Text style={{ fontSize: 14 }}> {it.unit}</Text> : null}
           </Text>
-          <Text style={[type.statKey, { marginTop: 6 }]} numberOfLines={1}>{it.label.toUpperCase()}</Text>
+          <Text style={[type.statKey, { marginTop: 6 }]} numberOfLines={keyLines}>{it.label.toUpperCase()}</Text>
         </View>
       ))}
     </View>

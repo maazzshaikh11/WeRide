@@ -102,7 +102,7 @@ describe('StopScreen', () => {
     presence([['lead', 'ready'], ['dev', 'fuel']]);
     const tx = texts(t);
     expect(tx).toContain('Chai Point'.toUpperCase());
-    expect(tx).toContain('CREW · 1 OF 3 READY TO ROLL');
+    expect(tx).toContain('CREW ∙ 1 OF 3 READY TO ROLL');
     expect(tile(t, 'lead').props.accessibilityLabel).toBe('Meera Rao, ✓ ready');
     expect(tile(t, 'dev').props.accessibilityLabel).toBe('Dev Patel, fuelling');
     expect(tile(t, 'me').props.accessibilityLabel).toBe('You, on a break');
@@ -110,6 +110,18 @@ describe('StopScreen', () => {
     expect(t.root.findAll((n) => n.props.testID === 'sos-key').length).toBeGreaterThan(0);
     const root = t.root.findAll((n) => n.props.testID === 'screen-Stop' && typeof n.type === 'string')[0];
     expect(StyleSheet.flatten(root.props.style).backgroundColor).toBe(THEMES[id][scheme].road.bg);
+  });
+
+  it('the SOS / ready row sits 30 pt from the bottom (demo .ctls bottom:30), 26 in glove mode', () => {
+    const bottomOf = () => {
+      const t = mount(stop());
+      const row = t.root.findAll((n) => typeof n.type === 'string' && StyleSheet.flatten(n.props.style)?.position === 'absolute' && StyleSheet.flatten(n.props.style)?.flexDirection === 'row')[0];
+      return StyleSheet.flatten(row.props.style).bottom;
+    };
+    expect(bottomOf()).toBe(30);
+    usePrefsStore.setState({ prefs: { ...usePrefsStore.getState().prefs, glove: true } } as any);
+    expect(bottomOf()).toBe(26);
+    usePrefsStore.setState({ prefs: { ...usePrefsStore.getState().prefs, glove: false } } as any);
   });
 
   it('writes presence "stopped" on arrival, records the stop, and shows the break timer', () => {
@@ -128,8 +140,8 @@ describe('StopScreen', () => {
     useRidePlanStore.setState({ stops: [] });
     const t = mount(stop({ stopId: undefined }));
     const tx = texts(t);
-    expect(tx).toContain('Next leg · Lonavala');
-    expect(tx.some((x) => /^4\.0 km · 40 min$/.test(x))).toBe(true);
+    expect(tx).toContain('Next leg ∙ Lonavala');
+    expect(tx.some((x) => /^4\.0 km ∙ 40 min$/.test(x))).toBe(true);
     expect(tx).toContain('1 hazard on the way');
     expect(tx.some((x) => /Oil at km|Dry/.test(x))).toBe(false);
   });
@@ -193,7 +205,7 @@ describe('ArriveScreen', () => {
     presence([['lead', 'arrived']]);
     const tx = texts(t);
     expect(tx).toContain('ARRIVED');
-    expect(tx.some((x) => /^Lonavala · \d{1,2}:\d\d$/.test(x))).toBe(true);
+    expect(tx.some((x) => /^Lonavala ∙ \d{1,2}:\d\d$/.test(x))).toBe(true);
     expect(tx).toContain('Everyone');
     expect(tx).toContain('home.');
     expect(tile(t, 'lead').props.accessibilityLabel).toBe('Meera Rao, ✓ home');
@@ -205,6 +217,12 @@ describe('ArriveScreen', () => {
     expect(tx).toContain('HOLD TO END RIDE'.charAt(0) + 'old to end ride');
     const root = t.root.findAll((n) => n.props.testID === 'screen-Arrive' && typeof n.type === 'string')[0];
     expect(StyleSheet.flatten(root.props.style).backgroundColor).toBe(THEMES[id][scheme].road.bg);
+  });
+
+  it('the end-ride button sits 30 pt from the bottom like the demo', () => {
+    const t = mount(arrive());
+    const wrap = t.root.findAll((n) => typeof n.type === 'string' && StyleSheet.flatten(n.props.style)?.position === 'absolute' && StyleSheet.flatten(n.props.style)?.left === 14 && StyleSheet.flatten(n.props.style)?.bottom !== undefined)[0];
+    expect(StyleSheet.flatten(wrap.props.style).bottom).toBe(30);
   });
 
   it('writes presence "arrived" on mount', () => {

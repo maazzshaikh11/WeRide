@@ -23,7 +23,7 @@ import type { NavLike } from './parts/SubScreen';
 const ROAD_LABEL = { night: 'Night', day: 'Day', auto: 'Sunset auto' } as const;
 
 export function contactsSubtitle(count: number, crash: boolean): string {
-  return `${count} ${count === 1 ? 'contact' : 'contacts'} · crash detection ${crash ? 'on' : 'off'}`;
+  return `${count} ${count === 1 ? 'contact' : 'contacts'} ∙ crash detection ${crash ? 'on' : 'off'}`;
 }
 
 type Sheet = 'family' | 'voice' | 'perms' | null;
@@ -69,7 +69,7 @@ export default function MeScreen({ navigation }: { navigation?: NavLike }) {
 
   const permsOk = statuses.location === 'granted' && statuses.notifications === 'granted';
   const permsSub = !loaded ? 'Checking…' : permsOk ? 'All set' : 'Needs attention';
-  const detail = me ? [me.bike, me.style].filter(Boolean).join(' · ') : undefined;
+  const detail = me ? [me.bike, me.style].filter(Boolean).join(' ∙ ') : undefined;
 
   return (
     <Screen tabs testID="screen-Me">
@@ -87,7 +87,7 @@ export default function MeScreen({ navigation }: { navigation?: NavLike }) {
 
       <SectionLabel>Riding</SectionLabel>
       <List>
-        <ListItem first icon="map" title="Road screen & controls" subtitle={`${ROAD_LABEL[prefs.road]} theme · glove mode ${prefs.glove ? 'on' : 'off'}`} onPress={() => go('Display')} testID="me-display" />
+        <ListItem first icon="map" title="Road screen & controls" subtitle={`${ROAD_LABEL[prefs.road]} theme ∙ glove mode ${prefs.glove ? 'on' : 'off'}`} onPress={() => go('Display')} testID="me-display" />
         <ListItem icon="mic" title="Voice & signals" subtitle="Push-to-talk, crew signals" onPress={() => setSheet('voice')} testID="me-voice" />
       </List>
 

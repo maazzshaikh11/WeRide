@@ -213,7 +213,7 @@ export class RideRecorder {
     const events = s.events.slice();
     if (!events.some((e) => e.kind === 'arrived')) {
       const dest = s.meta.destination?.label;
-      events.push({ t_ms: now, kind: 'arrived', text: dest ? `Arrived · ${dest}` : 'Ride ended' });
+      events.push({ t_ms: now, kind: 'arrived', text: dest ? `Arrived ∙ ${dest}` : 'Ride ended' });
     }
     // the last accepted position closes the track
     const full = s.track.slice();

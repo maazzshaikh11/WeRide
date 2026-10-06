@@ -51,15 +51,15 @@ function StopBody({ route }: Props) {
   const stopId = route?.params?.stopId;
   const { colors, type } = useTheme();
   const insets = useSafeAreaInsets();
+  const glove = usePrefsStore((st) => st.prefs.glove);
   const s = useStyles(({ colors: c }) => ({
     root: { flex: 1, backgroundColor: c.bg },
     body: { paddingTop: Math.max(insets.top, 24) + 20, paddingHorizontal: 14 },
-    bottom: { position: 'absolute', left: 14, right: 14, bottom: Math.max(insets.bottom, 12) + 18, flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
+    bottom: { position: 'absolute', left: 14, right: 14, bottom: glove ? 26 : 30, flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
   }));
   const uid = useAppStore((st) => st.userId);
   const push = useToastStore((st) => st.push);
   const units = usePrefsStore((st) => st.prefs.units);
-  const glove = usePrefsStore((st) => st.prefs.glove);
   const planStops = useRidePlanStore((st) => st.stops);
   const destination = useRidePlanStore((st) => st.destination);
   const routeData = useRouteStore((st) => st.route);
@@ -166,7 +166,7 @@ function StopBody({ route }: Props) {
   });
   const fuellers = members.filter((m) => !m.me && states.get(m.uid) === 'fuel');
   const legSub = leg
-    ? [leg.km != null ? formatDistance(leg.km, units) : null, leg.minutes != null ? `${Math.max(1, Math.round(leg.minutes))} min` : null].filter(Boolean).join(' · ')
+    ? [leg.km != null ? formatDistance(leg.km, units) : null, leg.minutes != null ? `${Math.max(1, Math.round(leg.minutes))} min` : null].filter(Boolean).join(' ∙ ')
     : '';
   const rollLabel = meReady ? (isLead ? 'Roll out' : allReady ? 'Roll out' : 'Ready ✓') : 'I’m ready to roll';
   const btnH = glove ? 104 : 88;
@@ -177,13 +177,13 @@ function StopBody({ route }: Props) {
         <Plate
           tone="green"
           title={stopName}
-          subtitle={ride ? `Break · ${ride.name}` : 'Break'}
+          subtitle={ride ? `Break ∙ ${ride.name}` : 'Break'}
           titleSize={30}
           style={{ justifyContent: 'space-between' }}
           right={<Text style={[type.num, { fontSize: 38, lineHeight: 40, color: '#FFFFFF', letterSpacing: -0.8 }]} testID="break-timer">{breakClock(now - since.current)}</Text>}
           testID="stop-plate"
         />
-        <Text style={[type.label, { marginTop: 24 }]} testID="crew-ready-label">{`CREW · ${readyCount} OF ${memberIds.length} READY TO ROLL`}</Text>
+        <Text style={[type.label, { marginTop: 24 }]} testID="crew-ready-label">{`CREW ∙ ${readyCount} OF ${memberIds.length} READY TO ROLL`}</Text>
         <TileGrid tiles={tiles} style={{ marginTop: 12 }} testID="stop-tiles" />
 
         {leg ? (
@@ -193,7 +193,7 @@ function StopBody({ route }: Props) {
                 <Icon name="flag" size={20} color={colors.ink} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={type.h3} numberOfLines={1}>{`Next leg · ${leg.name}`}</Text>
+                <Text style={type.h3} numberOfLines={1}>{`Next leg ∙ ${leg.name}`}</Text>
                 {legSub ? <Text style={type.sm}>{legSub}</Text> : null}
               </View>
             </View>

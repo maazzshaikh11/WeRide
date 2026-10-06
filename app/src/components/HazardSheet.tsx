@@ -15,11 +15,18 @@ import { Icon, IconName, PressableScale, Sheet, haptic } from '../ui';
 
 export const HAZARD_SHEET_OPTIONS: { type: HazardType; label: string; icon: IconName }[] = [
   { type: 'pothole', label: 'Pothole', icon: 'pothole' },
-  { type: 'oil_spill', label: 'Oil spill', icon: 'drop' },
+  { type: 'oil_spill', label: 'Oil / gravel', icon: 'drop' },
   { type: 'accident', label: 'Accident', icon: 'crash' },
   { type: 'debris', label: 'Debris', icon: 'debris' },
   { type: 'other', label: 'Other', icon: 'more' },
 ];
+
+const COLUMNS = 3;
+const HAZARD_ROWS = HAZARD_SHEET_OPTIONS.reduce<(typeof HAZARD_SHEET_OPTIONS)[]>((rows, o, i) => {
+  if (i % COLUMNS === 0) rows.push([]);
+  rows[rows.length - 1].push(o);
+  return rows;
+}, []);
 
 interface Props {
   visible: boolean;
@@ -38,8 +45,11 @@ export default function HazardSheet({ visible, onClose, groupId, riderId, locati
   const [busy, setBusy] = useState<HazardType | null>(null);
   const inFlight = useRef(false);
   const s = useStyles(({ colors: c, type: t }) => ({
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    tile: { width: '31.6%', height: 92, borderRadius: 20, backgroundColor: c.card2, borderWidth: 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center', gap: 8 },
+    grid: { gap: 10 },
+    row: { flexDirection: 'row', gap: 10 },
+    // three equal columns (demo `.hz`): flex, not a % width, so three tiles + two gaps always fit one row
+    tile: { flex: 1, height: 92, borderRadius: 20, backgroundColor: c.card2, borderWidth: 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center', gap: 8 },
+    pad: { flex: 1 },
     tileLabel: { ...t.tab, fontSize: 12, lineHeight: 14, letterSpacing: 0.96, color: c.ink },
   }));
 
@@ -71,23 +81,29 @@ export default function HazardSheet({ visible, onClose, groupId, riderId, locati
 
   return (
     <Sheet visible={visible} onClose={onClose} testID="hazard-sheet" accessibilityLabel="Report a hazard">
-      <Text style={[type.label, { marginBottom: 12 }]}>REPORT A HAZARD · HERE, NOW</Text>
-      <View style={s.grid}>
-        {HAZARD_SHEET_OPTIONS.map((o) => (
-          <PressableScale
-            key={o.type}
-            haptic={false}
-            scaleTo={0.95}
-            disabled={busy != null}
-            onPress={() => report(o.type)}
-            accessibilityRole="button"
-            accessibilityLabel={`Report ${o.label}`}
-            accessibilityState={{ busy: busy === o.type, disabled: busy != null }}
-            style={[s.tile, busy === o.type && { borderColor: colors.pri }]}
-          >
-            <Icon name={o.icon} size={32} />
-            <Text style={s.tileLabel}>{o.label.toUpperCase()}</Text>
-          </PressableScale>
+      <Text style={[type.label, { marginBottom: 12 }]}>REPORT A HAZARD ∙ HERE, NOW</Text>
+      <View style={s.grid} testID="hazard-grid">
+        {HAZARD_ROWS.map((row, ri) => (
+          <View key={ri} style={s.row}>
+            {row.map((o) => (
+              <PressableScale
+                key={o.type}
+                haptic={false}
+                scaleTo={0.95}
+                disabled={busy != null}
+                onPress={() => report(o.type)}
+                accessibilityRole="button"
+                accessibilityLabel={`Report ${o.label}`}
+                accessibilityState={{ busy: busy === o.type, disabled: busy != null }}
+                style={[s.tile, busy === o.type && { borderColor: colors.pri }]}
+              >
+                <Icon name={o.icon} size={32} />
+                <Text style={s.tileLabel} numberOfLines={1}>{o.label.toUpperCase()}</Text>
+              </PressableScale>
+            ))}
+            {/* keep the last row's tiles the same width as the full rows */}
+            {Array.from({ length: COLUMNS - row.length }, (_, i) => <View key={`pad${i}`} style={s.pad} />)}
+          </View>
         ))}
       </View>
       <Text style={[type.sm, { textAlign: 'center', marginTop: 16 }]}>

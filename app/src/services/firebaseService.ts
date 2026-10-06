@@ -33,8 +33,8 @@ export async function initFirebase(): Promise<void> {
 export async function saveFcmToken(uid: string, token?: string): Promise<void> {
   const fcmToken = token ?? (await firebaseMessaging.getToken());
   if (!fcmToken) return;
+  // Private on purpose: a push token must not be readable by other riders (users/{uid} is a public profile).
   await firebaseFirestore
-    .collection('users')
-    .doc(uid)
+    .doc(`users/${uid}/private/settings`)
     .set({ fcm_token: fcmToken }, { merge: true });
 }

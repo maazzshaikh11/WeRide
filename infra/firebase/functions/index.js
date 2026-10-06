@@ -21,7 +21,7 @@ exports.onSosCreate = functions.firestore
     const tokens = [];
     for (const uid of memberIds) {
       if (uid === sos.rider_id) continue; // don't notify the sender
-      const userDoc = await admin.firestore().doc(`users/${uid}`).get();
+      const userDoc = await admin.firestore().doc(`users/${uid}/private/settings`).get();
       const token = userDoc.data()?.fcm_token;
       if (token) tokens.push(token);
     }

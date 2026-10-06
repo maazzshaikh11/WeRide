@@ -74,3 +74,85 @@ test('deterministic ids make re-seeding an in-place update', () => {
   assert.equal(groupDocId('a'), groupDocId('a'));
   assert.deepEqual(groups(UID, NOW).map((g) => g.key), defs.map((g) => g.key));
 });
+
+// ─── demo-parity model ────────────────────────────────────────────────────
+const D = require('../teamdsy-data');
+const rideDefs = D.rides(UID, NOW);
+const crewDefs = D.crews(UID, NOW);
+const logDefs = D.logs(UID, NOW);
+
+test('three crews: teamDSY is in each, codes are valid and unique, leads/sweeps are crew members', () => {
+  assert.equal(crewDefs.length, 3);
+  const codes = crewDefs.map((c) => c.code);
+  codes.forEach((c) => assert.match(c, JOIN_CODE_RE));
+  assert.equal(new Set(codes).size, 3);
+  assert.equal(new Set([...codes, ...defs.map((g) => g.code)]).size, 3 + defs.length, 'crew and ride codes never collide');
+  for (const c of crewDefs) {
+    assert.ok(c.member_ids.includes(UID));
+    for (const uid of Object.keys(c.roles)) assert.ok(c.member_ids.includes(uid));
+    assert.ok(['lead', 'sweep'].includes(Object.values(c.roles)[0]));
+  }
+});
+
+test('every ride belongs to a crew that contains all of its members; finished rides are in the past', () => {
+  for (const r of rideDefs) {
+    const crew = crewDefs.find((c) => c.key === r.crew_key);
+    assert.ok(crew, r.key);
+    for (const m of r.member_ids) assert.ok(crew.member_ids.includes(m), `${r.key}: ${m} not in crew ${crew.key}`);
+    assert.equal(r.status === 'finished', r.start_time_ms <= NOW, r.key);
+    if (r.status === 'finished') assert.ok(r.finished_ms > r.started_ms);
+  }
+});
+
+test('crew profiles exist for every seed- id used anywhere', () => {
+  const ids = new Set(D.crewProfiles(NOW).map((p) => p.uid));
+  for (const g of defs) for (const m of g.member_ids) if (m !== UID) assert.ok(ids.has(m), m);
+  for (const p of D.crewProfiles(NOW)) {
+    assert.ok(p.doc.name && p.doc.bike && ['Relaxed', 'Steady', 'Spirited'].includes(p.doc.style));
+    assert.ok(p.doc.stats.rides > 0 && p.doc.stats.together_sum / p.doc.stats.rides <= 100);
+  }
+});
+
+test('ride logs: one per finished ride, flat tracks within the limit, consistent stats and events', () => {
+  assert.equal(logDefs.length, rideDefs.filter((r) => r.status === 'finished').length);
+  for (const l of logDefs) {
+    assert.ok(l.track.length >= 4 && l.track.length % 2 === 0 && l.track.length / 2 <= 600, l.name);
+    assert.ok(l.track.every((n) => typeof n === 'number'), 'flat numbers only (no nested arrays)');
+    assert.ok(l.km > 0 && l.duration_s > 0 && l.avg_kmh > 0 && l.max_kmh >= l.avg_kmh);
+    assert.ok(l.together_pct >= 0 && l.together_pct <= 100);
+    assert.ok(l.ended_ms === l.started_ms + l.duration_s * 1000);
+    assert.equal(l.events[0].kind, 'rolled');
+    assert.equal(l.events[l.events.length - 1].kind, 'arrived');
+    assert.ok(l.events.every((e, i, a) => i === 0 || e.t_ms >= a[i - 1].t_ms), 'events in time order');
+    assert.ok(rideDefs.some((r) => groupDocId(r.key) === l.ride_id));
+  }
+});
+
+test('my public stats equal the sum of the seeded logs', () => {
+  const p = D.myProfile(UID, NOW);
+  assert.equal(p.stats.rides, logDefs.length);
+  assert.equal(p.stats.together_sum, logDefs.reduce((a, l) => a + l.together_pct, 0));
+  assert.ok(Math.abs(p.stats.km - logDefs.reduce((a, l) => a + l.km, 0)) < 0.2);
+  assert.equal(p.name, 'teamDSY');
+});
+
+test('settings open the app in the Garage, with no invented emergency contacts', () => {
+  const s = D.mySettings();
+  assert.equal(s.onboarded, true);
+  assert.equal(s.contacts, undefined);
+  assert.ok([1000, 1500, 2000].includes(s.prefs.hold_ms));
+});
+
+test('RSVPs exist for the upcoming rides only and only from members', () => {
+  const r = D.rsvps(UID, NOW);
+  for (const [key, list] of Object.entries(r)) {
+    const ride = rideDefs.find((x) => x.key === key);
+    assert.equal(ride.status, 'planned');
+    for (const x of list) assert.ok(ride.member_ids.includes(x.uid));
+    assert.ok(['going', 'maybe', 'no'].includes(list[0].status));
+  }
+});
+
+test('tracks are deterministic (re-seeding writes identical logs)', () => {
+  assert.deepEqual(D.logs(UID, NOW).map((l) => l.track), logDefs.map((l) => l.track));
+});

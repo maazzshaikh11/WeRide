@@ -15,20 +15,26 @@ a bare `teamDSY`).
 ## What it writes
 
 - **Auth user** with the email/password above (re-running resets the password and re-enables it).
-- **6 groups** (`groups/seed-teamdsy-*`, a group *is* a ride in this app), all with a real route plan,
-  ride type, start time and join code:
-  - **Sunday Ghat Run**, the next ride (tomorrow 06:30), created by teamDSY, 6 riders;
-  - **Ghat Ghosts Weekend**, a group created by someone else that teamDSY **joined**;
-  - four **past rides**: Lonavala Sunrise Loop (8 days ago), Marine Drive Night Ride (15),
-    Pune Expressway Blast (29), Alibaug Coastal Run (44). They appear under "Earlier".
-- **3 hazard clusters** on the next ride's route (2 active, 1 resolved) for the Alerts tab.
+- **Profile + settings**: public profile (name teamDSY, Himalayan 450, Steady, lifetime stats = the sum of the logs below)
+  and private settings with `onboarded: true`, so the app opens straight in the Garage. **No emergency contacts are
+  invented** — add your own in Me → SOS & emergency (Meetup will show a "No SOS contact" warning until you do).
+- **3 crews**: Ghat Ghosts (6 riders, Meera lead, Kabir sweep), Sunday Slow Rollers (5), Office Bikers (4), each with a join code.
+- **6 rides** (`groups/seed-teamdsy-*`, a ride is a group doc) linked to their crew, with route plans, ride type, pace,
+  join code and status:
+  - **Sunday Ghat Run** (Ghat Ghosts) — the next ride, tomorrow 06:30, `planned`, with RSVPs from the crew;
+  - **Ghat Ghosts Weekend** — created by someone else, teamDSY joined, `planned`, with RSVPs;
+  - four **finished** rides (Lonavala Sunrise Loop, Marine Drive Night Ride, Pune Expressway Blast, Alibaug Coastal Run),
+    8–44 days ago, with everyone's `arrived` presence.
+- **4 recorded ride logs** for the finished rides (km, time, avg/max speed, together %, longest gap, hazards, signals, a
+  240-point track and a timeline of events). **These are synthetic**: the tracks are interpolated along each ride's
+  planned route so the Log and Recap screens have something to show — they are not rides anyone recorded.
+- **3 hazard clusters** on the next ride's route (2 active, 1 resolved).
 
-Crew members are plain ids like `seed-meera`. They are **not** accounts, they cannot log in, and the
-app shows them as "Rider <last 4 of the id>" (it has no profile names). Everything uses fixed
-document ids, so running the script again updates in place and never duplicates.
+Crew members are plain ids like `seed-meera` with a public profile (name, bike, style, stats) so the app shows names;
+they are **not** accounts and cannot log in. Everything uses fixed document ids, so running the script again updates in
+place and never duplicates.
 
-Not seeded on purpose: rider locations (they would show as stale dots) and ride *history* stats
-(the app doesn't store completed-ride stats yet, so there's nothing for them to fill).
+Not seeded on purpose: rider locations (they would show as stale dots) and roll-call state.
 
 ## Run it
 

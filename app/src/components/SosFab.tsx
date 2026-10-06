@@ -1,8 +1,9 @@
 /**
  * SosFab — the SOS control of the live screen (demo.html `.ctl.sos`): a 96×88
- * outlined-red key. It keeps the anti-accidental 2-second press-and-hold; while
- * held, a red fill rises from the bottom and the key flips to solid red.
- * On a complete hold -> opens the SOS confirmation modal (SosModal).
+ * outlined-red key. It keeps the anti-accidental press-and-hold (the rider's
+ * chosen 1.0 / 1.5 / 2.0 s, prefs.hold_ms); while held, a red fill rises from
+ * the bottom and the key flips to solid red.
+ * On a complete hold -> `onHoldComplete` (the SOS is sent straight away, there is no confirm step).
  *
  * Feel:
  *  - the key depresses while held (PressableScale) and springs back on release;
@@ -15,12 +16,17 @@ import React, { useEffect, useRef } from 'react';
 import { Text, Animated } from 'react-native';
 import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { haptic, PressableScale } from '../ui';
+import { usePrefsStore } from '../store/prefsStore';
 
-const HOLD_MS = 2000;
 /** The hold must persist this long before it "registers" (warning haptic). */
 const REGISTER_MS = 200;
 export const SOS_KEY_W = 96;
 export const SOS_KEY_H = 88;
+
+/** "1", "1.5", "2" — the hold time in seconds for labels. */
+export function holdSeconds(ms: number): string {
+  return String(ms / 1000);
+}
 
 interface Props {
   onHoldComplete: () => void;
@@ -29,6 +35,7 @@ interface Props {
 
 export default function SosFab({ onHoldComplete, disabled }: Props) {
   const { colors, type } = useTheme();
+  const holdMs = usePrefsStore((st) => st.prefs.hold_ms);
   const [armed, setArmed] = React.useState(false);
   const styles = useStyles(({ colors: c }) => ({
     key: { width: SOS_KEY_W, height: SOS_KEY_H, borderRadius: 24, borderWidth: 3, borderColor: c.bad, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 4 },
@@ -78,7 +85,7 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
     progress.setValue(0);
     Animated.timing(progress, {
       toValue: 1,
-      duration: HOLD_MS,
+      duration: holdMs,
       useNativeDriver: true,
       easing: (t: number) => t,
     }).start();
@@ -96,10 +103,10 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
       }
       haptic('heavy');
       // Flash the full ring briefly, then clear it (the release may never be
-      // delivered once the modal takes over the touch).
+      // delivered once the SOS screen takes over the touch).
       resetRing(350);
       onHoldComplete();
-    }, HOLD_MS);
+    }, holdMs);
   };
 
   const fg = armed ? '#FFFFFF' : colors.bad;
@@ -113,8 +120,8 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
       scaleTo={0.95}
       style={styles.key}
       testID="sos-key"
-      accessibilityLabel="Hold for 2 seconds to send SOS"
-      accessibilityHint="Press and hold to open the SOS confirmation"
+      accessibilityLabel={`Hold for ${holdSeconds(holdMs)} ${holdMs === 1000 ? 'second' : 'seconds'} to send SOS`}
+      accessibilityHint="Press and hold to send an SOS to your crew"
       accessibilityRole="button"
     >
       <Animated.View

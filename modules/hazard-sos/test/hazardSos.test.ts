@@ -2242,6 +2242,7 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
 
   const {
     triggerSos,
+    triggerSosWithStatus,
     resolveSos,
     subscribeToSosEvents,
     getLocalActiveSosEvents,
@@ -2653,6 +2654,39 @@ describe('Phase 5: Real Service Layer - Firestore Integration', () => {
       // Verify NOT in Firestore
       const firestoreData = firestore._getData();
       expect(firestoreData['sos_events']).toBeUndefined();
+    });
+
+    test('triggerSosWithStatus_online: queued is false once Firestore has the event', async () => {
+      NetInfo._setNetworkState({ isConnected: true });
+      const res = await triggerSosWithStatus('rider-4', 'group-1', 37.1, -122.1);
+      expect(res.queued).toBe(false);
+      expect(typeof res.sosId).toBe('string');
+      expect(firestore._getData()['sos_events'][res.sosId]).toBeDefined();
+      expect(queuePeek(SOS_QUEUE)).toHaveLength(0);
+    });
+
+    test('triggerSosWithStatus_offline: queued is true and the event waits in the queue', async () => {
+      NetInfo._setNetworkState({ isConnected: false });
+      const res = await triggerSosWithStatus('rider-5', 'group-1', 37.2, -122.2);
+      expect(res.queued).toBe(true);
+      const queue = queuePeek(SOS_QUEUE);
+      expect(queue).toHaveLength(1);
+      expect((queue[0].data as any).sos_id).toBe(res.sosId);
+    });
+
+    test('triggerSosWithStatus_write_failure: online but Firestore rejects -> queued true', async () => {
+      NetInfo._setNetworkState({ isConnected: true });
+      firestore._setFailWrites(true);
+      const res = await triggerSosWithStatus('rider-6', 'group-1', 37.3, -122.3);
+      firestore._setFailWrites(false);
+      expect(res.queued).toBe(true);
+      expect(queuePeek(SOS_QUEUE)).toHaveLength(1);
+    });
+
+    test('triggerSos still returns the bare sos_id string', async () => {
+      NetInfo._setNetworkState({ isConnected: true });
+      const id = await triggerSos('rider-7', 'group-1', 37.4, -122.4);
+      expect(typeof id).toBe('string');
     });
 
     test('sos_contract: exact frozen sos_event shape', async () => {

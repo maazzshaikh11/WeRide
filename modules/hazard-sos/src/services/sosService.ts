@@ -58,6 +58,12 @@ export interface SosEventData {
   resolved_at_hlc: string | null;
 }
 
+/** Result of triggerSosWithStatus: `queued` is true when the event was saved to the on-phone queue instead of Firestore. */
+export interface TriggerSosResult {
+  sosId: string;
+  queued: boolean;
+}
+
 /**
  * Trigger SOS with zero-data-loss guarantee.
  * Local OR-Set persistence happens BEFORE any network attempt.
@@ -69,6 +75,19 @@ export async function triggerSos(
   lat: number,
   lng: number
 ): Promise<string> {
+  return (await triggerSosWithStatus(riderId, groupId, lat, lng)).sosId;
+}
+
+/**
+ * Same as triggerSos, but also says whether the event reached Firestore (`queued: false`) or was only saved to the
+ * local queue (offline, or the write failed) and will be sent by the sync worker (`queued: true`).
+ */
+export async function triggerSosWithStatus(
+  riderId: string,
+  groupId: string,
+  lat: number,
+  lng: number
+): Promise<TriggerSosResult> {
   const hlc = HLC.fresh();
   const sosId = uuidv4();
   const createdAtHlc = hlc.now();
@@ -94,6 +113,7 @@ export async function triggerSos(
 
   // Step 4-6: Network attempt (best-effort)
   const online = await isOnline();
+  let queued = false;
 
   if (online) {
     try {
@@ -123,6 +143,7 @@ export async function triggerSos(
         retry_count: 0,
       };
       queueEnqueue(SOS_QUEUE, operation);
+      queued = true;
     }
   } else {
     // Offline - queue for sync worker
@@ -134,9 +155,10 @@ export async function triggerSos(
       retry_count: 0,
     };
     queueEnqueue(SOS_QUEUE, operation);
+    queued = true;
   }
 
-  return sosId;
+  return { sosId, queued };
 }
 
 /**

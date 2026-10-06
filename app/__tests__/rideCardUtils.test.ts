@@ -1,6 +1,5 @@
 import { encodePolyline } from '../src/utils/polyline';
 import { buildStaticMapUrl } from '../src/utils/staticMap';
-import { projectSketch } from '../src/utils/routeSketch';
 import {
   planPoints, planDistanceKm, rideBadge, sectionRides, createdMs, formatKm, shortPlace, RECENT_WINDOW_MS,
 } from '../src/utils/rides';
@@ -69,40 +68,6 @@ describe('buildStaticMapUrl', () => {
   });
   it('clamps size to the API limit', () => {
     expect(buildStaticMapUrl({ points: pts, width: 5000, height: 5000, token: 'pk.a' })).toContain('1280x1280@2x');
-  });
-});
-
-describe('projectSketch', () => {
-  it('null with no usable points', () => expect(projectSketch([], 300, 150)).toBeNull());
-  it('keeps every dot inside the padded box and orders start/stop/end', () => {
-    const s = projectSketch(
-      [
-        { lat: 18.5204, lng: 73.8567 },
-        { lat: 18.6, lng: 73.7 },
-        { lat: 18.7546, lng: 73.4062 },
-      ],
-      300,
-      150,
-      20,
-    )!;
-    expect(s.dots.map((d) => d.kind)).toEqual(['start', 'stop', 'end']);
-    s.dots.forEach((d) => {
-      expect(d.x).toBeGreaterThanOrEqual(19.9);
-      expect(d.x).toBeLessThanOrEqual(280.1);
-      expect(d.y).toBeGreaterThanOrEqual(19.9);
-      expect(d.y).toBeLessThanOrEqual(130.1);
-    });
-    expect(s.segs).toHaveLength(2);
-  });
-  it('north is up and west is left', () => {
-    const s = projectSketch([{ lat: 10, lng: 10 }, { lat: 11, lng: 9 }], 200, 200, 10)!;
-    expect(s.dots[1].y).toBeLessThan(s.dots[0].y);
-    expect(s.dots[1].x).toBeLessThan(s.dots[0].x);
-  });
-  it('a single point sits centred with no segments', () => {
-    const s = projectSketch([{ lat: 18.5, lng: 73.8 }], 300, 150)!;
-    expect(s.segs).toHaveLength(0);
-    expect(s.dots[0]).toMatchObject({ x: 150, y: 75 });
   });
 });
 

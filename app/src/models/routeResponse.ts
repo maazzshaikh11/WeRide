@@ -19,6 +19,19 @@ export interface RouteRequest {
   active_hazards?: RouteRequestHazard[];
 }
 
+/** One route option from POST /route (`alternatives`; the first is the same route as the top-level fields). */
+export interface RouteAlternative {
+  route_id: string;
+  path_points: number[][];
+  distance_km: number;
+  eta_minutes: number;
+  /** 0..1 */
+  safety_score: number;
+  hazard_count: number;
+  /** Only 'Fastest' / 'Safest' when genuinely so, otherwise 'Alternative'. */
+  label: 'Fastest' | 'Safest' | 'Alternative';
+}
+
 export interface RouteResponse {
   route_id: string;
   path_points: number[][];
@@ -26,9 +39,27 @@ export interface RouteResponse {
   eta_minutes: number;
   safety_score: number;
   recalculated_at_hlc: string;
+  /** Optional extension: up to three route options (absent from older servers). */
+  alternatives?: RouteAlternative[];
+}
+
+export function routeAlternativeFromJson(j: Record<string, any>): RouteAlternative {
+  const label = j.label === 'Fastest' || j.label === 'Safest' ? j.label : 'Alternative';
+  return {
+    route_id: String(j.route_id),
+    path_points: ((j.path_points as any[][]) ?? []).map((p) => p.map(Number)),
+    distance_km: Number(j.distance_km),
+    eta_minutes: Number(j.eta_minutes),
+    safety_score: Number(j.safety_score),
+    hazard_count: Number(j.hazard_count) || 0,
+    label,
+  };
 }
 
 export function routeResponseFromJson(j: Record<string, any>): RouteResponse {
+  const alternatives = Array.isArray(j.alternatives)
+    ? j.alternatives.filter((a: any) => a && Array.isArray(a.path_points)).map(routeAlternativeFromJson)
+    : undefined;
   return {
     route_id: j.route_id,
     path_points: (j.path_points as any[][]).map((p) => p.map(Number)),
@@ -36,6 +67,7 @@ export function routeResponseFromJson(j: Record<string, any>): RouteResponse {
     eta_minutes: Number(j.eta_minutes),
     safety_score: Number(j.safety_score),
     recalculated_at_hlc: j.recalculated_at_hlc,
+    ...(alternatives && alternatives.length > 0 ? { alternatives } : {}),
   };
 }
 

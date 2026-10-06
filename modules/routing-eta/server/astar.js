@@ -165,6 +165,76 @@ function generateHlcTimestamp() {
   return hlcTimestamp;
 }
 
+/** Most route options returned from POST /route (Mapbox usually offers 2-3). */
+export const MAX_ALTERNATIVES = 3;
+
+/**
+ * Label options honestly: 'Fastest' only when one option has strictly the lowest
+ * duration, 'Safest' only when one has strictly the highest safety score
+ * (Safest wins when the same option is both). Everything else is 'Alternative'.
+ * With a single option there is nothing to compare, so it is 'Alternative'.
+ *
+ * @param {Array<{eta_minutes:number, safety_score:number}>} opts
+ * @returns {string[]} labels, same order
+ */
+export function labelAlternatives(opts) {
+  const labels = opts.map(() => 'Alternative');
+  if (opts.length < 2) return labels;
+  const minEta = Math.min(...opts.map((o) => o.eta_minutes));
+  const maxSafety = Math.max(...opts.map((o) => o.safety_score));
+  const fastest = opts.filter((o) => o.eta_minutes === minEta);
+  const safest = opts.filter((o) => o.safety_score === maxSafety);
+  if (fastest.length === 1) labels[opts.indexOf(fastest[0])] = 'Fastest';
+  if (safest.length === 1) labels[opts.indexOf(safest[0])] = 'Safest';
+  return labels;
+}
+
+/**
+ * Evaluate each candidate route (safety from real hazard exposure, ETA from the
+ * model) into the `alternatives` array. `chosen` is the already-computed
+ * top-level response and is reused verbatim for the first entry.
+ */
+async function buildAlternatives(chosen, chosenHazardCount, options, hazardsToAvoid, now) {
+  const first = {
+    route_id: chosen.route_id,
+    path_points: chosen.path_points,
+    distance_km: chosen.distance_km,
+    eta_minutes: chosen.eta_minutes,
+    safety_score: chosen.safety_score,
+    hazard_count: chosenHazardCount,
+    label: 'Alternative',
+  };
+  if (!options || options.length === 0) {
+    return [first];
+  }
+  const rest = await Promise.all(
+    options.slice(1).map(async (o) => {
+      const features = extractEtaFeatures(
+        {
+          distance_km: o.distanceKm,
+          turn_count: o.turnCount,
+          hazard_count: o.conflicts,
+          avg_speed_limit: 40,
+        },
+        now
+      );
+      return {
+        route_id: uuidv4(),
+        path_points: o.points.map((p) => [p.lat, p.lng]),
+        distance_km: o.distanceKm,
+        eta_minutes: await predictEta(features),
+        safety_score: calculateSafetyScoreForPoints(o.points, hazardsToAvoid, DEFAULT_HAZARD_RADIUS_M),
+        hazard_count: o.conflicts,
+        label: 'Alternative',
+      };
+    })
+  );
+  const all = [first, ...rest];
+  const labels = labelAlternatives(all);
+  all.forEach((a, i) => { a.label = labels[i]; });
+  return all;
+}
+
 export async function handleRoute(req, res) {
   try {
     // Validate required request fields (T-04.2)
@@ -218,6 +288,10 @@ export async function handleRoute(req, res) {
       console.warn(`[handleRoute] Mapbox request failed, using degraded mode: ${e.message}`);
     }
 
+    // Every route we can offer, best first (the first one is what the top-level
+    // fields describe). Evaluated below into `alternatives`.
+    let options; // [{ points:[{lat,lng}], distanceKm, turnCount, conflicts }]
+
     if (mapboxCandidates && mapboxCandidates.length > 0) {
       // Post-process: pick the candidate with the fewest hazard conflicts
       // (ties broken by shortest distance). This is "reroute around hazards".
@@ -234,6 +308,12 @@ export async function handleRoute(req, res) {
       distanceKm = best.candidate.distanceM / 1000;
       pathPoints = best.candidate.points.map((p) => [p.lat, p.lng]);
       scoringPoints = best.candidate.points;
+      options = scored.slice(0, MAX_ALTERNATIVES).map((x) => ({
+        points: x.candidate.points,
+        distanceKm: x.candidate.distanceM / 1000,
+        turnCount: x.candidate.turnCount,
+        conflicts: x.conflicts,
+      }));
     } else {
       // --- Degraded mode: no Mapbox token (or Mapbox down). ---
       // Straight-line geometry, but hazard scoring and ETA features are real.
@@ -254,6 +334,7 @@ export async function handleRoute(req, res) {
       scoringPoints = densifySegment(origin, destination, 50);
       // Hazard exposure along the straight line, so safety still reflects reality.
       hazardCount = countHazardsNearPoints(scoringPoints, hazardsToAvoid, DEFAULT_HAZARD_RADIUS_M);
+      options = null; // a single option: the response itself
     }
 
     // Safety score from real exposure along the chosen geometry.
@@ -286,6 +367,10 @@ export async function handleRoute(req, res) {
       safety_score: safety_score,
       recalculated_at_hlc: recalculated_at_hlc,
     };
+
+    // Additive: up to three real route options for the Plan flow. The first is
+    // exactly the route described by the fields above.
+    response.alternatives = await buildAlternatives(response, hazardCount, options, hazardsToAvoid, now);
 
     // Validate the response against the contract (§6.4)
     validateRouteResponse(response);

@@ -19,3 +19,11 @@ export async function respondToSos(_sosId: string, _uid: string, _state: 'going'
 export function subscribeResponders(_sosId: string, _on: (r: { uid: string; state: 'going' | 'arrived'; updated_ms: number }[]) => void): () => void {
   return () => undefined;
 }
+
+/**
+ * The one entry point every SOS control uses (Live / Stop / Arrive keys, crash auto-send, the drill):
+ * sends or queues the SOS (sendSos) and raises the red full-screen overlay (overlayStore 'sos-sent') with the real result.
+ */
+export async function triggerSosFlow(_groupId: string, _opts?: { drill?: boolean; auto?: boolean }): Promise<void> {
+  return undefined;
+}

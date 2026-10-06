@@ -8,6 +8,8 @@ import SessionBootstrap from './navigation/SessionBootstrap';
 import RideLifecycleBridge from './navigation/RideLifecycleBridge';
 import { navigationRef } from './navigation/navigationRef';
 import OverlayHost from './overlays/OverlayHost';
+import SosListener from './overlays/SosListener';
+import CrashWatcher from './overlays/CrashWatcher';
 import { ThemeProvider, useTheme } from './theme/ThemeProvider';
 import { initFirebase } from './services/firebaseService';
 import { initStorage } from './services/localStorage';
@@ -82,6 +84,8 @@ export default function App() {
           <SyncBootstrap />
           <RootNavigator />
           <RideLifecycleBridge />
+          <SosListener />
+          <CrashWatcher />
           <OverlayHost />
         </ThemedNavigation>
       </ThemeProvider>

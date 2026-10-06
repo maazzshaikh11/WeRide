@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users. The doc itself is the PUBLIC profile (name, bike, style, ride totals): any signed-in
+    // rider may read it, only its owner writes it. Everything sensitive lives in owner-only subcollections.
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+
+      // prefs, emergency contacts, push token, onboarded flag
+      match /private/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      // the rider's own ride history (tracks, stats)
+      match /ride_logs/{rideId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Crews: the persistent set of people. Readable by signed-in riders (a code is resolved by
+    // querying join_code); created with yourself as a member; joined by adding yourself.
+    match /crews/{crewId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.member_ids.hasAny([request.auth.uid])
+        && request.resource.data.created_by == request.auth.uid;
+      allow update: if request.auth != null
+        && (
+          (request.resource.data.member_ids.hasAll(resource.data.member_ids)
+            && request.resource.data.member_ids.hasAny([request.auth.uid]))
+          || resource.data.member_ids.hasAny([request.auth.uid])
+        );
+      allow delete: if false;
+    }
+
+    // Groups: members can read; any authed user can create/join.
+    // Join = arrayUnion update on member_ids; membership checked on update
+    // so non-members cannot mutate an existing group arbitrarily.
+    match /groups/{groupId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.member_ids.hasAny([request.auth.uid]);
+      allow update: if request.auth != null
+        && (
+          // joining: adding self to member_ids
+          request.resource.data.member_ids.hasAll(resource.data.member_ids)
+          && request.resource.data.member_ids.hasAny([request.auth.uid])
+          || resource.data.member_ids.hasAny([request.auth.uid])
+        );
+
+      // RSVP, roll call and presence: members read; a rider writes only their own doc
+      match /rsvp/{riderId} {
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow write: if request.auth != null && request.auth.uid == riderId
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+      }
+      match /roll_call/{riderId} {
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow write: if request.auth != null && request.auth.uid == riderId
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+      }
+      match /presence/{riderId} {
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow write: if request.auth != null && request.auth.uid == riderId
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+      }
+
+      // Rider locations: only the rider writes their own doc
+      match /locations/{riderId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == riderId;
+      }
+
+      // Hazard reports (raw): group members read/write; create binds the
+      // report to the writer and to this group's path (no cross-group writes).
+      match /reports/{reportId} {
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow create: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids
+          && request.resource.data.rider_id == request.auth.uid
+          && request.resource.data.group_id == groupId;
+        allow update: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow delete: if false;
+      }
+    }
+
+    // Hazard clusters: group members read; any authed rider writes
+    // (clustering runs on-device and batches cluster docs)
+    match /hazards/{clusterId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.group_id is string;
+      allow delete: if false;
+    }
+
+    // SOS events: any rider can trigger; sender can resolve
+    match /sos_events/{sosId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.rider_id == request.auth.uid
+        && request.resource.data.resolved == false;
+      allow update: if request.auth != null
+        && request.resource.data.resolved != null;
+      allow delete: if false;
+
+      // Riders who are coming to help: each writes only their own doc
+      match /responders/{riderId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == riderId;
+      }
+    }
+
+    // Routes: readable by group members; written by server API only
+    match /routes/{routeId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // FL rounds: readable by all; written by aggregation server
+    match /fl_rounds/{roundId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Top-level hazard_reports (legacy path — kept for compatibility)
+    match /hazard_reports/{reportId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+  }
+}

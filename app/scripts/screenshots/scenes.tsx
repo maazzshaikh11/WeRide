@@ -20,9 +20,10 @@ const done = (v: any, cfg: any) => ({ start(cb?: any) { try { v.setValue(cfg.toV
 (Animated as any).parallel = (Animated as any).sequence;
 (Animated as any).delay = () => ({ start(cb?: any) { cb?.({ finished: true }); }, stop() {} });
 
+import { applyTextPolicy } from '@app/theme/textPolicy';
 import { ThemeContext, buildTheme, useTheme } from '@app/theme/ThemeProvider';
 import { THEMES } from '@app/theme/palettes';
-import { GarageTabBar } from '@app/navigation/GarageTabs';
+import { GarageTabBar } from '@app/navigation/GarageTabBar';
 import OverlayHost from '@app/overlays/OverlayHost';
 import ToastContainer from '@app/components/ToastContainer';
 import { useOverlayStore } from '@app/store/overlayStore';
@@ -80,6 +81,8 @@ import AddContactSheet from '@app/sheets/AddContactSheet';
 import { seed, seedLive, hazardCluster, setTheme, fixAt, alongPath, planPath, ME, MEERA, ZOYA, DEV, ISHAN, KABIR, RIDE0, CREW0, rideId } from './seed';
 import T from '../../../infra/firebase/seed/teamdsy-data.js';
 
+applyTextPolicy(); // same global Text policy the app applies in index.js
+
 const nav: any = {
   navigate() {}, goBack() {}, replace() {}, reset() {}, dispatch() {}, setOptions() {}, push() {}, popToTop() {},
   getParent: () => ({ goBack() {}, navigate() {} }), addListener: () => () => {}, canGoBack: () => true, isFocused: () => true,
@@ -111,7 +114,9 @@ const typeInto = (sel: string, text: string, delay = 600) => setTimeout(() => {
 }, delay);
 const later = (fn: () => void, ms: number) => setTimeout(fn, ms);
 
-const W = 390, H = 844;
+// The device under test comes from the page URL (?w=&h=&top=&bottom=&fs=), see shoot.mjs / DEVICES.
+const QS = new URLSearchParams(location.search);
+const W = Number(QS.get('w')) || 390, H = Number(QS.get('h')) || 844;
 const Frame = ({ children, bg }: any) => {
   const { colors } = useTheme();
   return <View style={{ width: W, height: H, backgroundColor: bg ?? colors.bg, overflow: 'hidden' }}>{children}</View>;

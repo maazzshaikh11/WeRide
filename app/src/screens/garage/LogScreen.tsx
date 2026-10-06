@@ -13,6 +13,7 @@ import { useRideLogsStore } from '../../store/rideLogsStore';
 import { usePrefsStore } from '../../store/prefsStore';
 import { useSessionStore } from '../../store/sessionStore';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
+import { CAP } from '../../theme/textPolicy';
 import { Bars, Card, CenterLine, FadeIn, MapSketch, PressableScale, Screen, SectionLabel, Skeleton, pointsFromFlat } from '../../ui';
 import { formatHours, formatRideDate, hasTogetherData, logTotals, seasonLabel, weeklyKm } from '../../utils/logStats';
 import { distanceUnit, formatDistance, formatDuration, toUnitDistance } from '../../utils/units';
@@ -121,13 +122,15 @@ export default function LogScreen({ navigation }: Props) {
       ) : (
         <>
           <Card style={{ marginTop: 24 }} testID="log-totals">
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-              <View style={{ flex: 1, minWidth: 0 }}>
+            {/* wraps: on a narrow screen the rides / hours block drops below the big number instead of squeezing it */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', rowGap: 12 }}>
+              <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 150, minWidth: 0 }}>
                 <Text
                   style={[type.statValue, { fontSize: 52, lineHeight: 47, letterSpacing: -2.6 }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.6}
+                  maxFontSizeMultiplier={CAP.fixed}
                   testID="log-km"
                 >
                   {groupThousands(toUnitDistance(totals.km, units))}

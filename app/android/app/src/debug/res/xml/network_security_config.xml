@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG BUILDS ONLY (this file overrides src/main/res/xml/network_security_config.xml in the debug variant; it is not
+  packaged in release). Cleartext is allowed only for the local dev servers: Metro/Node on the host through
+  `adb reverse` (localhost / 127.0.0.1) and the emulator's host alias (10.0.2.2). Everything else must be HTTPS even in debug.
+  A physical device that reaches Metro over the LAN IP needs `adb reverse tcp:8081 tcp:8081` (and 3000 for the server).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

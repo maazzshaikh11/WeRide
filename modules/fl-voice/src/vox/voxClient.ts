@@ -1,7 +1,9 @@
 /**
  * WebRTC VOX client.
  * Mesh topology: direct peer connection with each rider in the group (cap 8).
- * Signaling via Socket.io /vox namespace. Audio only. VAD-driven voice_active broadcast.
+ * Signaling via Socket.io /vox namespace. Audio only.
+ * The `socket` MUST come from app/src/services/socketService getVoxSocket(): that socket sends the rider's
+ * Firebase ID token in the handshake (`auth.token`, refreshed on every reconnect), which the server requires. VAD-driven voice_active broadcast.
  * Ported from vox_client.dart.
  *
  * TODO: implement full peer connection management, ICE exchange, audio stream.

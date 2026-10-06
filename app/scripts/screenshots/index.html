@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 @font-face{font-family:'Overpass-Medium';src:url('../../assets/fonts/Overpass-Medium.ttf')}
 @font-face{font-family:'Overpass-Bold';src:url('../../assets/fonts/Overpass-Bold.ttf')}
@@ -7,4 +7,4 @@
 @font-face{font-family:'OverpassMono-Bold';src:url('../../assets/fonts/OverpassMono-Bold.ttf')}
 svg{position:relative}
 html,body{margin:0;background:#888;-webkit-font-smoothing:antialiased}
-</style></head><body><div id="root"></div><script src="scenes.js"></script></body></html>
+</style></head><body><div id="root"></div><script>var b=new URLSearchParams(location.search).get("bundle")||"scenes.js";document.write('<script src="'+b+'"><\/script>')</script></body></html>

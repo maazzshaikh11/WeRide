@@ -10,6 +10,8 @@ import { Plates } from '../theme/palettes';
 import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { getLocationSocket } from '../services/socketService';
 import { useToastStore } from '../store/toastStore';
+import { useResponsive } from '../theme/responsive';
+import { CAP } from '../theme/textPolicy';
 import { PressableScale, Sheet, haptic } from '../ui';
 
 export const SIGNAL_OPTIONS = [
@@ -29,10 +31,11 @@ interface Props {
 
 export default function SignalSheet({ visible, groupId, riderId, onSend, onClose }: Props) {
   const { type } = useTheme();
+  const { isCompactWidth } = useResponsive();
   const push = useToastStore((s) => s.push);
   const s = useStyles(() => ({
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    tile: { width: '48.5%', height: 122, borderRadius: 24, paddingHorizontal: 22, justifyContent: 'center', gap: 8, borderWidth: 2, borderColor: 'rgba(0,0,0,0.25)' },
+    tile: { width: '48.5%', minHeight: 122, borderRadius: 24, paddingVertical: 12, justifyContent: 'center', gap: 8, borderWidth: 2, borderColor: 'rgba(0,0,0,0.25)' },
   }));
 
   const send = (label: string) => {
@@ -63,10 +66,10 @@ export default function SignalSheet({ visible, groupId, riderId, onSend, onClose
               onPress={() => send(opt.label)}
               accessibilityLabel={`Send signal: ${opt.label}`}
               accessibilityRole="button"
-              style={[s.tile, { backgroundColor: p.bg }]}
+              style={[s.tile, { backgroundColor: p.bg, paddingHorizontal: isCompactWidth ? 14 : 22 }]}
             >
-              <Text style={[type.plateTitle, { color: p.fg, fontSize: 29, lineHeight: 28, letterSpacing: -0.87 }]}>{opt.label.toUpperCase()}</Text>
-              <Text style={[type.plateSub, { color: p.fg, opacity: 0.8, fontSize: 12.5 }]}>{opt.hint}</Text>
+              <Text style={[type.plateTitle, { color: p.fg, fontSize: isCompactWidth ? 24 : 29, lineHeight: isCompactWidth ? 24 : 28, letterSpacing: -0.87 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={CAP.fixed}>{opt.label.toUpperCase()}</Text>
+              <Text style={[type.plateSub, { color: p.fg, opacity: 0.8, fontSize: 12.5 }]} maxFontSizeMultiplier={CAP.hud}>{opt.hint}</Text>
             </PressableScale>
           );
         })}

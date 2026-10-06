@@ -3,7 +3,8 @@
  * saved again on the next launch / when the rider is signed in. Saving is idempotent per ride id, so a retry that
  * races an earlier success is harmless.
  */
-import { MMKV } from 'react-native-mmkv';
+import type { MMKV } from 'react-native-mmkv';
+import { getEncryptedMMKV } from './secureStorage';
 import type { RideLog } from '../models/domain';
 import { saveRideLog } from './rideLogService';
 import { warn } from '../utils/log';
@@ -18,7 +19,7 @@ export interface PendingLog {
 
 function disk(): MMKV | null {
   try {
-    if (!store) store = new MMKV({ id: 'weride_pending_logs' });
+    if (!store) store = getEncryptedMMKV('weride_pending_logs');
     return store;
   } catch {
     return null;

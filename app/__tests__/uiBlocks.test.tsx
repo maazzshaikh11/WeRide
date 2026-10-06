@@ -41,10 +41,10 @@ describe('Avatar in an overlapping stack', () => {
 });
 
 describe('KV key lines', () => {
-  it('truncates keys to one line by default and can wrap to two', () => {
+  it('lets keys wrap to two lines by default (no clipped labels) and can be held to one', () => {
     const lines = (t: ReactTestRenderer) => t.root.findAllByType(Text).find((n) => [n.props.children].flat(3).join('') === 'HAZARDS SHARED')?.props.numberOfLines;
-    expect(lines(mount(<KV items={[{ value: '1', label: 'hazards shared' }]} />))).toBe(1);
-    expect(lines(mount(<KV keyLines={2} items={[{ value: '1', label: 'hazards shared' }]} />))).toBe(2);
+    expect(lines(mount(<KV items={[{ value: '1', label: 'hazards shared' }]} />))).toBe(2);
+    expect(lines(mount(<KV keyLines={1} items={[{ value: '1', label: 'hazards shared' }]} />))).toBe(1);
   });
 });
 

@@ -1,7 +1,13 @@
-/** crewService against a fake Firestore: create / join / leave / subscribe, the code rules and error mapping. */
+/**
+ * crewService against a fake Firestore: create / join / leave / subscribe, the code rules and error mapping. The fake
+ * plays the part of the security rules where the app depends on them: crews / groups are readable by members only
+ * (a stranger's get() rejects with permission-denied), codes live in `join_codes/{CODE}`.
+ */
 const mockDb = {
   crews: new Map<string, any>(),
   groups: new Map<string, any>(),
+  join_codes: new Map<string, any>(),
+  batches: 0,
   updates: [] as { path: string; data: any }[],
   sets: [] as { path: string; data: any }[],
   failWith: null as null | { code?: string; message?: string },
@@ -43,12 +49,40 @@ jest.mock('@react-native-firebase/firestore', () => {
   const firestore: any = jest.fn(() => ({
     collection: (n: any) => coll(n),
     doc: (path: string) => {
-      const [c, id] = path.split('/') as ['crews' | 'groups', string];
+      const [c, id] = path.split('/') as ['crews' | 'groups' | 'join_codes', string];
       return {
-        get: async () => ({ exists: mockDb[c].has(id), data: () => mockDb[c].get(id) }),
+        path,
+        get: async () => {
+          if (mockDb.failWith) throw mockDb.failWith;
+          const data = mockDb[c].get(id);
+          // rules: crews and groups are readable by their members only
+          if (data && c !== 'join_codes' && !(Array.isArray(data.member_ids) && data.member_ids.includes(mockUid))) {
+            if (!(c === 'groups' && data.crew_id && mockDb.crews.get(data.crew_id)?.member_ids?.includes(mockUid))) {
+              throw { code: 'permission-denied', message: 'denied' };
+            }
+          }
+          return { exists: mockDb[c].has(id), data: () => data };
+        },
         update: async (data: any) => {
           if (mockDb.failWith) throw mockDb.failWith;
           mockDb.updates.push({ path, data });
+          const cur = mockDb[c].get(id);
+          if (cur && data.member_ids?.union) cur.member_ids = [...new Set([...(cur.member_ids ?? []), ...data.member_ids.union])];
+        },
+      };
+    },
+    batch: () => {
+      const ops: { path: string; data: any }[] = [];
+      return {
+        set: (ref: any, data: any) => { ops.push({ path: ref.path, data }); },
+        commit: async () => {
+          if (mockDb.failWith) throw mockDb.failWith;
+          mockDb.batches++;
+          for (const op of ops) {
+            const [c, id] = op.path.split('/') as ['crews' | 'groups' | 'join_codes', string];
+            mockDb.sets.push(op);
+            mockDb[c].set(id, op.data);
+          }
         },
       };
     },
@@ -60,6 +94,13 @@ jest.mock('@react-native-firebase/firestore', () => {
     delete: () => 'DELETE',
   };
   return { __esModule: true, default: firestore };
+});
+
+// The code generator is deterministic here (production uses the platform CSPRNG, see src/utils/joinCode.ts).
+const mockCodes: string[] = [];
+jest.mock('../src/utils/joinCode', () => {
+  const actual = jest.requireActual('../src/utils/joinCode');
+  return { ...actual, generateJoinCode: (r?: () => number) => (r ? actual.generateJoinCode(r) : mockCodes.shift() ?? actual.generateJoinCode(() => Math.random())) };
 });
 
 let mockUid: string | null = 'me';
@@ -75,6 +116,9 @@ import {
 beforeEach(() => {
   mockDb.crews.clear();
   mockDb.groups.clear();
+  mockDb.join_codes.clear();
+  mockDb.batches = 0;
+  mockCodes.length = 0;
   mockDb.updates.length = 0;
   mockDb.sets.length = 0;
   mockDb.lastWhere.length = 0;
@@ -113,15 +157,17 @@ describe('crewFromDoc', () => {
 });
 
 describe('createCrew', () => {
-  it('writes the crew with the creator as member and lead, plus a fresh code', async () => {
+  it('writes the crew (creator as member and lead) and its join_codes doc in ONE batch', async () => {
     const crew = await createCrew('  Tuesday   Throttle ');
     expect(crew.name).toBe('Tuesday Throttle');
     expect(isCrewCode(crew.join_code)).toBe(true);
     expect(crew.member_ids).toEqual(['me']);
     expect(crew.roles).toEqual({ me: 'lead' });
-    expect(mockDb.sets).toHaveLength(1);
-    expect(mockDb.sets[0].data).toMatchObject({ name: 'Tuesday Throttle', created_by: 'me', member_ids: ['me'], roles: { me: 'lead' }, join_code: crew.join_code, created_at: 'SERVER_TS' });
+    expect(mockDb.batches).toBe(1);
+    expect(mockDb.sets).toHaveLength(2);
     expect(mockDb.sets[0].path).toBe(`crews/${crew.id}`);
+    expect(mockDb.sets[0].data).toMatchObject({ name: 'Tuesday Throttle', created_by: 'me', member_ids: ['me'], roles: { me: 'lead' }, join_code: crew.join_code, created_at: 'SERVER_TS' });
+    expect(mockDb.sets[1]).toEqual({ path: `join_codes/${crew.join_code}`, data: { kind: 'crew', target_id: crew.id } });
   });
   it('rejects names shorter than 2 or longer than 22 without touching Firestore', async () => {
     await expect(createCrew('A')).rejects.toMatchObject({ kind: 'bad-name' });
@@ -131,14 +177,19 @@ describe('createCrew', () => {
     await expect(createCrew('ab')).resolves.toBeTruthy();
     await expect(createCrew('x'.repeat(22))).resolves.toBeTruthy();
   });
-  it('checks for a code collision and retries with another code', async () => {
-    const seq = [0, 0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
-    const rnd = jest.spyOn(Math, 'random').mockImplementation(() => seq.shift() ?? 0.9);
-    mockDb.crews.set('other', { join_code: 'AAAAAA' });
+  it('checks join_codes for a collision and uses another code (it never queries crews by code)', async () => {
+    mockCodes.push('AAAAAA', 'BBBBBB');
+    mockDb.join_codes.set('AAAAAA', { kind: 'crew', target_id: 'other' });
     const crew = await createCrew('Fresh');
-    rnd.mockRestore();
-    expect(crew.join_code).not.toBe('AAAAAA');
-    expect(mockDb.lastWhere.filter((w) => w[0] === 'crews' && w[1] === 'join_code').length).toBeGreaterThanOrEqual(2);
+    expect(crew.join_code).toBe('BBBBBB');
+    expect(mockDb.join_codes.get('AAAAAA')).toEqual({ kind: 'crew', target_id: 'other' });
+    expect(mockDb.lastWhere.filter((w) => w[1] === 'join_code')).toHaveLength(0);
+  });
+  it('gives up with a clear error when every code it tries is taken', async () => {
+    mockCodes.push(...Array(10).fill('AAAAAA'));
+    mockDb.join_codes.set('AAAAAA', { kind: 'crew', target_id: 'other' });
+    await expect(createCrew('Stuck')).rejects.toThrow(/join code/i);
+    expect(mockDb.sets).toHaveLength(0);
   });
   it('signed out -> CrewError signed-out; offline -> network', async () => {
     mockUid = null;
@@ -152,11 +203,13 @@ describe('createCrew', () => {
 describe('joinCrewByCode', () => {
   beforeEach(() => {
     mockDb.crews.set('c1', { name: 'Ghat Ghosts', created_by: 'meera', member_ids: ['meera'], roles: { meera: 'lead' }, join_code: 'GHST72' });
+    mockDb.join_codes.set('GHST72', { kind: 'crew', target_id: 'c1' });
   });
-  it('adds me with arrayUnion and returns the crew with me in it', async () => {
+  it('resolves the code via join_codes, adds me with arrayUnion + the per-rider proof, and returns the crew with me in it', async () => {
     const crew = await joinCrewByCode('ghst72');
     expect(crew.member_ids).toEqual(['meera', 'me']);
-    expect(mockDb.updates).toEqual([{ path: 'crews/c1', data: { member_ids: { union: ['me'] } } }]);
+    expect(mockDb.updates).toEqual([{ path: 'crews/c1', data: { member_ids: { union: ['me'] }, join_proof: 'GHST72:me' } }]);
+    expect(mockDb.lastWhere).toHaveLength(0); // crews are never queried by code
   });
   it('already a member: resolves without writing', async () => {
     mockDb.crews.get('c1').member_ids.push('me');
@@ -164,8 +217,10 @@ describe('joinCrewByCode', () => {
     expect(crew.id).toBe('c1');
     expect(mockDb.updates).toHaveLength(0);
   });
-  it('unknown code -> not-found; malformed -> bad-code', async () => {
+  it('unknown code -> not-found; a RIDE code -> not-found; malformed -> bad-code', async () => {
     await expect(joinCrewByCode('K4N9TZ')).rejects.toMatchObject({ kind: 'not-found' });
+    mockDb.join_codes.set('RYDE22', { kind: 'ride', target_id: 'g1' });
+    await expect(joinCrewByCode('RYDE22')).rejects.toMatchObject({ kind: 'not-found' });
     await expect(joinCrewByCode('K4N9')).rejects.toMatchObject({ kind: 'bad-code' });
     await expect(joinCrewByCode('K4N9TZ')).rejects.toBeInstanceOf(CrewError);
     expect(mockDb.updates).toHaveLength(0);
@@ -182,7 +237,7 @@ describe('leaveCrew / getCrew / subscribeMyCrews', () => {
     expect(mockDb.updates).toEqual([{ path: 'crews/c1', data: { member_ids: { remove: ['me'] }, 'roles.me': 'DELETE' } }]);
   });
   it('getCrew returns a crew or null', async () => {
-    mockDb.crews.set('c1', { name: 'A' });
+    mockDb.crews.set('c1', { name: 'A', member_ids: ['me'] });
     expect((await getCrew('c1'))?.name).toBe('A');
     expect(await getCrew('nope')).toBeNull();
   });
@@ -209,10 +264,18 @@ describe('leaveCrew / getCrew / subscribeMyCrews', () => {
 });
 
 describe('ride lookups for Join', () => {
-  it('findRideByCode finds a ride code and ignores malformed input', async () => {
+  it('findRideByCode resolves through join_codes; a stranger only learns the id, a member sees the ride', async () => {
     mockDb.groups.set('g1', { name: 'Sunrise Run', join_code: 'RYDE22', member_ids: ['x'], start_time_ms: 99 });
-    expect(await findRideByCode('ryde22')).toEqual({ id: 'g1', name: 'Sunrise Run', member_ids: ['x'], start_time_ms: 99 });
+    mockDb.join_codes.set('RYDE22', { kind: 'ride', target_id: 'g1' });
+    expect(await findRideByCode('ryde22')).toEqual({ id: 'g1', name: 'Ride', member_ids: [], start_time_ms: null });
+    mockDb.groups.get('g1').member_ids.push('me');
+    expect(await findRideByCode('RYDE22')).toEqual({ id: 'g1', name: 'Sunrise Run', member_ids: ['x', 'me'], start_time_ms: 99 });
+    expect(mockDb.lastWhere).toHaveLength(0);
+  });
+  it('findRideByCode ignores malformed input, unknown codes and crew codes', async () => {
+    mockDb.join_codes.set('GHST72', { kind: 'crew', target_id: 'c1' });
     expect(await findRideByCode('K4N9TZ')).toBeNull();
+    expect(await findRideByCode('GHST72')).toBeNull();
     expect(await findRideByCode('abc')).toBeNull();
   });
   it('getCrewNextRide picks the soonest unfinished ride, ignoring finished and long-past ones', async () => {

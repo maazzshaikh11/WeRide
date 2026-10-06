@@ -40,9 +40,18 @@ export function sosSmsBody(name: string | null | undefined, fix: Fix | null): st
   return `${who}${where} — sent by WeRide SOS.`;
 }
 
+/**
+ * Only digits and an optional leading "+" may reach the URL. The number is user data (contacts sync through Firestore), so
+ * "?", "&", ";", "," or "/" in it must not be able to add sms: parameters or change the body. Same rules as userService.normalizeNumber.
+ */
+export function smsRecipient(number: string): string {
+  const t = String(number ?? '').trim();
+  return (t.startsWith('+') ? '+' : '') + t.replace(/[^\d]/g, '');
+}
+
 /** `sms:<number>?body=<encoded>` — opens the SMS composer prefilled (the app never sends SMS itself). */
 export function smsLink(number: string, name: string | null | undefined, fix: Fix | null): string {
-  return `sms:${number}?body=${encodeURIComponent(sosSmsBody(name, fix))}`;
+  return `sms:${smsRecipient(number)}?body=${encodeURIComponent(sosSmsBody(name, fix))}`;
 }
 
 /** Compass bearing in degrees (0..360) from a to b. */

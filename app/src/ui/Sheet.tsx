@@ -5,8 +5,9 @@
  * screen that owns it. Stays mounted during the close animation.
  */
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+import { GARAGE_COLUMN, useResponsive } from '../theme/responsive';
 import { useStyles } from '../theme/ThemeProvider';
 import { Motion, useReducedMotion } from './motion';
 
@@ -24,18 +25,21 @@ export default function Sheet({ visible, onClose, children, testID, accessibilit
   // Context (not the hook): works without a SafeAreaProvider, e.g. in isolated tests.
   const insets = useContext(SafeAreaInsetsContext);
   const { height } = useWindowDimensions();
+  const { isTablet, gutter } = useResponsive();
   const reduced = useReducedMotion();
   const t = useRef(new Animated.Value(visible ? 1 : 0)).current;
   const [mounted, setMounted] = useState(visible);
   const alive = useRef(true);
   const s = useStyles(({ colors }) => ({
-    root: { ...StyleSheet.absoluteFillObject, zIndex: 120, justifyContent: 'flex-end' },
+    root: { ...StyleSheet.absoluteFillObject, zIndex: 120 },
     scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.scrim },
     sheet: {
       backgroundColor: colors.bg, borderTopLeftRadius: 30, borderTopRightRadius: 30,
-      paddingTop: 12, paddingHorizontal: 20, maxHeight: '88%',
+      paddingTop: 12, maxHeight: '88%',
       borderTopWidth: 1.5, borderLeftWidth: 1.5, borderRightWidth: 1.5, borderColor: colors.line,
     },
+    // Tablets: a centred card (<= 560 pt) instead of a full-width sheet.
+    card: { alignSelf: 'center', width: '100%', maxWidth: GARAGE_COLUMN, borderRadius: 30, borderWidth: 1.5, marginBottom: 24 },
     grabHit: { height: 29, alignItems: 'center', justifyContent: 'flex-start' },
     grab: { width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line2 },
   }));
@@ -66,20 +70,25 @@ export default function Sheet({ visible, onClose, children, testID, accessibilit
   if (!visible && !mounted) return null;
 
   return (
-    <View style={s.root} testID={testID} pointerEvents={visible ? 'auto' : 'none'}>
+    // iOS lifts the sheet above the keyboard (padding); Android resizes the window itself (windowSoftInputMode=adjustResize)
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[s.root, { justifyContent: isTablet ? 'center' : 'flex-end' }]} testID={testID} pointerEvents={visible ? 'auto' : 'none'}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: t }]}>
         <Pressable style={s.scrim} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" testID="sheet-scrim" />
       </Animated.View>
       <Animated.View
         accessibilityViewIsModal
         accessibilityLabel={accessibilityLabel}
-        style={[s.sheet, { paddingBottom: Math.max(insets?.bottom ?? 0, 12) + 26, transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [height, 0] }) }] }]}
+        style={[
+          s.sheet,
+          isTablet && s.card,
+          { paddingHorizontal: gutter, paddingBottom: isTablet ? 26 : Math.max(insets?.bottom ?? 0, 12) + 26, transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [height, 0] }) }] },
+        ]}
       >
-        <Pressable style={s.grabHit} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sheet">
+        <Pressable style={s.grabHit} hitSlop={{ top: 8, bottom: 8 }} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sheet">
           <View style={s.grab} />
         </Pressable>
-        <ScrollView bounces={false} showsVerticalScrollIndicator={false}>{children}</ScrollView>
+        <ScrollView bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{children}</ScrollView>
       </Animated.View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

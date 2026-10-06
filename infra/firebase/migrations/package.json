@@ -1,0 +1,13 @@
+{
+  "name": "weride-firestore-migrations",
+  "private": true,
+  "description": "One-off Firestore data migrations (run BEFORE deploying the hardened rules, see docs/security/firestore.md)",
+  "scripts": {
+    "backfill:dry": "node backfill-join-codes.js --dry-run",
+    "backfill": "node backfill-join-codes.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

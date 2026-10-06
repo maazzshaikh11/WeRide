@@ -92,8 +92,9 @@ export default function RideHero(p: RideHeroProps) {
     title: { ...t.h2, marginTop: 12 },
     route: { ...t.sm, marginTop: 8 },
     kv: { marginTop: 16 },
-    foot: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
-    confirmed: { ...t.smStrong, flexShrink: 1 },
+    // wraps (the pill drops to its own line) instead of squeezing the text to a sliver on narrow screens / large text
+    foot: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 10, marginTop: 16 },
+    confirmed: { ...t.smStrong, flexShrink: 1, minWidth: 72 },
     spacer: { flex: 1 },
     cta: { marginTop: 16 },
   }));

@@ -6,6 +6,7 @@ import { Animated, StyleProp, Text, View, ViewStyle } from 'react-native';
 import { withAlpha } from '../theme/palettes';
 import { WeRideFonts } from '../theme/theme';
 import { useStyles, useTheme } from '../theme/ThemeProvider';
+import { CAP } from '../theme/textPolicy';
 import { Motion, useReducedMotion } from './motion';
 import PressableScale from './PressableScale';
 
@@ -25,7 +26,7 @@ export function Pill({ label, tone = 'default', style }: { label: string; tone?:
   }[tone];
   return (
     <View style={[s.pill, { backgroundColor: look.backgroundColor }, !look.border && { borderWidth: 0 }, style]}>
-      <Text style={[type.pill, { color: look.color }]} numberOfLines={1}>{label.toUpperCase()}</Text>
+      <Text style={[type.pill, { color: look.color }]} numberOfLines={1} maxFontSizeMultiplier={CAP.hud}>{label.toUpperCase()}</Text>
     </View>
   );
 }
@@ -42,7 +43,7 @@ export function Segmented<T extends string>({ options, value, onChange, testID }
   const { colors, type } = useTheme();
   const s = useStyles(({ colors: c }) => ({
     track: { flexDirection: 'row', padding: 4, gap: 2, borderRadius: 16, backgroundColor: c.card2, borderWidth: 1.5, borderColor: c.line },
-    seg: { flex: 1, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    seg: { flex: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   }));
   return (
     <View style={s.track} accessibilityRole="radiogroup" testID={testID}>
@@ -59,7 +60,7 @@ export function Segmented<T extends string>({ options, value, onChange, testID }
             accessibilityLabel={o.label}
             style={[s.seg, on && { backgroundColor: colors.ink }]}
           >
-            <Text style={[type.seg, { color: on ? colors.bg : colors.ink2 }]} numberOfLines={1}>{o.label}</Text>
+            <Text style={[type.seg, { color: on ? colors.bg : colors.ink2 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} maxFontSizeMultiplier={CAP.hud}>{o.label}</Text>
           </PressableScale>
         );
       })}
@@ -72,7 +73,7 @@ export function Chip({ label, on, onPress, icon, style, testID }: {
 }) {
   const { colors, type } = useTheme();
   const s = useStyles(() => ({
-    chip: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 42, paddingHorizontal: 16, borderRadius: 21, borderWidth: 1.5 },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 16, borderRadius: 22, borderWidth: 1.5 },
   }));
   return (
     <PressableScale
@@ -86,7 +87,7 @@ export function Chip({ label, on, onPress, icon, style, testID }: {
       style={[s.chip, on ? { backgroundColor: colors.ink, borderColor: colors.ink } : { backgroundColor: colors.card, borderColor: colors.line2 }, style]}
     >
       {icon}
-      <Text style={[type.chip, { color: on ? colors.bg : colors.ink }]}>{label}</Text>
+      <Text style={[type.chip, { color: on ? colors.bg : colors.ink }]} maxFontSizeMultiplier={CAP.hud}>{label}</Text>
     </PressableScale>
   );
 }
@@ -107,6 +108,7 @@ export function Toggle({ value, onChange, accessibilityLabel, testID }: {
       onPress={() => onChange(!value)}
       haptic="select"
       scaleTo={0.97}
+      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
       accessibilityRole="switch"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: value }}
@@ -140,7 +142,7 @@ export function Avatar({ initials, color, size = 36, me, ring = true, covered = 
         style,
       ]}
     >
-      <Text style={{ fontFamily: WeRideFonts.extraBold, fontSize, lineHeight: fontSize + 2, letterSpacing: fontSize * 0.02, color: me ? colors.priInk : '#10110E' }}>
+      <Text maxFontSizeMultiplier={CAP.fixed} style={{ fontFamily: WeRideFonts.extraBold, fontSize, lineHeight: fontSize + 2, letterSpacing: fontSize * 0.02, color: me ? colors.priInk : '#10110E' }}>
         {initials.slice(0, 2).toUpperCase()}
       </Text>
     </View>

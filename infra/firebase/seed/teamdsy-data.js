@@ -16,7 +16,8 @@
  */
 
 const EMAIL = 'teamdsy@weride.app';
-const PASSWORD = 'teamDSY@123';
+// The owner's requested demo password is the default; set SEED_PASSWORD to use another (never seed this account into a production project).
+const PASSWORD = process.env.SEED_PASSWORD || 'teamDSY@123';
 const DISPLAY_NAME = 'teamDSY';
 
 // Same alphabet GroupService uses (no 0/O/1/I/L).

@@ -11,6 +11,7 @@
 #   compare/INDEX.md       per scene: "rendered ok" or the errors
 # With scene names as arguments only those are re-rendered (scene[:theme:scheme], e.g. 11-home:ember:dark);
 # the compare images are rebuilt for everything that has been rendered.
+# Responsiveness (device matrix, OS font scale, automatic layout check): see matrix.sh and docs/RESPONSIVE.md.
 # Scenes live in scenes.tsx (keys = demo file names); stubs/ holds the native-module stand-ins; seed.ts the data.
 set -e
 cd "$(dirname "$0")"

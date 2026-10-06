@@ -40,7 +40,7 @@ describe('ProfileScreen', () => {
     for (const b of BIKES) expect(hasText(t, b)).toBe(true);
     for (const s of ['Relaxed', 'Steady', 'Spirited']) expect(hasText(t, s)).toBe(true);
     // selected bike chip is an ink pill
-    const on = hostStyles(t).filter((s) => s.backgroundColor === p.ink && s.height === 42);
+    const on = hostStyles(t).filter((s) => s.backgroundColor === p.ink && s.minHeight === 44);
     expect(on).toHaveLength(1);
     // plate: road yellow in every theme, the real logo inside
     expect(hostStyles(t).some((s) => s.backgroundColor === Plates.yellow.bg && s.borderRadius === 18)).toBe(true);

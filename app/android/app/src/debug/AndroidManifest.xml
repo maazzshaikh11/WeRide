@@ -2,8 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <application
-        android:usesCleartextTraffic="true"
-        tools:targetApi="28"
-        tools:ignore="GoogleAppIndexingWarning"/>
+    <!-- Debug builds: no blanket cleartext. The local dev servers (localhost, 127.0.0.1, 10.0.2.2) are allowed by
+         src/debug/res/xml/network_security_config.xml, which overrides the main (HTTPS-only) config. -->
+    <application tools:ignore="GoogleAppIndexingWarning" />
 </manifest>

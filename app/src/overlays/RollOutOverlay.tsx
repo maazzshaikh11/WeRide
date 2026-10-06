@@ -8,6 +8,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useStyles, useTheme } from '../theme/ThemeProvider';
+import { CAP } from '../theme/textPolicy';
 import { withAlpha } from '../theme/palettes';
 import { useReducedMotion } from '../ui';
 import { useOverlayStore } from '../store/overlayStore';
@@ -75,9 +76,9 @@ export default function RollOutOverlay({ state }: { state: OverlayState }) {
 
   return (
     <View style={s.root} testID="overlay-RollOut" accessible accessibilityLiveRegion="polite" accessibilityLabel={`${breakOver ? 'Break over' : 'Rolling out'}. ${n}`}>
-      <Text style={[roadType.label, { color: road.pri, letterSpacing: 3.3, fontSize: 11 }]}>{label}</Text>
-      {breakOver ? null : <Text style={[roadType.h1, { color: road.ink }]}>Rolling out</Text>}
-      <Animated.Text testID="rollout-count" style={[roadType.num, { fontSize: 190, lineHeight: 190, letterSpacing: -11.4, color: road.pri, transform: [{ scale }], opacity }]}>
+      <Text style={[roadType.label, { color: road.pri, letterSpacing: 3.3, fontSize: 11 }]} maxFontSizeMultiplier={CAP.hud}>{label}</Text>
+      {breakOver ? null : <Text style={[roadType.h1, { color: road.ink }]} maxFontSizeMultiplier={CAP.hud}>Rolling out</Text>}
+      <Animated.Text testID="rollout-count" maxFontSizeMultiplier={CAP.fixed} style={[roadType.num, { fontSize: 190, lineHeight: 190, letterSpacing: -11.4, color: road.pri, transform: [{ scale }], opacity }]}>
         {n}
       </Animated.Text>
       {breakOver ? null : <Text style={[roadType.sm, { color: road.ink2 }]}>Phones lock to Road mode</Text>}

@@ -6,6 +6,8 @@ import React, { useEffect } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Plates } from '../../theme/palettes';
+import { useScaleBy } from '../../theme/responsive';
+import { CAP } from '../../theme/textPolicy';
 import { useTheme } from '../../theme/ThemeProvider';
 import DarkScope from './parts/DarkScope';
 import { MovingDashes } from './parts/DashedLine';
@@ -16,6 +18,7 @@ export const SPLASH_MS = 2300;
 function SplashBody({ navigation }: { navigation: { replace: (name: 'Promise') => void } }) {
   const { colors, type } = useTheme();
   const { width } = useWindowDimensions();
+  const sz = useScaleBy();
 
   useEffect(() => {
     const t = setTimeout(() => navigation.replace('Promise'), SPLASH_MS);
@@ -39,7 +42,7 @@ function SplashBody({ navigation }: { navigation: { replace: (name: 'Promise') =
           <LogoTile size={116} />
         </View>
         <View style={{ alignItems: 'center', gap: 10 }}>
-          <Text style={[type.display, { fontSize: 46, lineHeight: 48, letterSpacing: -1.84 }]}>WeRide</Text>
+          <Text style={[type.display, { fontSize: sz(46), lineHeight: sz(48), letterSpacing: -sz(46) * 0.04 }]} maxFontSizeMultiplier={CAP.fixed}>WeRide</Text>
           <Text style={[type.label, { letterSpacing: 3.3, color: colors.ink3 }]}>EVERYONE HOME</Text>
         </View>
       </View>

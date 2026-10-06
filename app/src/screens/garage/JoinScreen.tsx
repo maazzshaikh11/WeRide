@@ -1,6 +1,6 @@
 /**
  * Join (demo `join`): six boxes + the letter pad. "Join crew" resolves the code as a CREW code first and, when no
- * crew has it, as a RIDE code through the existing GroupService.joinGroup (old ride codes keep working).
+ * crew has it, as a RIDE code through the existing GroupService.joinGroup (old ride codes keep working; both resolve via join_codes/{CODE}).
  * Wrong or short code: the boxes shake with the demo's inline message. Success: the full-screen "YOU'RE IN" overlay
  * (2.4 s, tap to skip), then the rider is marked onboarded and lands on the Garage.
  * Reachable during onboarding (from CrewStart) and from the Crews tab; `route.params.code` prefills the boxes.
@@ -180,14 +180,17 @@ export default function JoinScreen({ navigation, route }: Props) {
       }
       await rides().joinGroup(code);
       if (!alive.current) return;
+      // A ride is readable only by its members: before joining we knew just its id, now the real name / riders are readable.
+      const joined = (await findRideByCode(code).catch(() => null)) ?? ride;
+      if (!alive.current) return;
       const uid = useSessionStore.getState().uid;
-      const members = uid && !ride.member_ids.includes(uid) ? [...ride.member_ids, uid] : ride.member_ids;
+      const members = uid && !joined.member_ids.includes(uid) ? [...joined.member_ids, uid] : joined.member_ids;
       succeed({
         kind: 'ride',
-        title: ride.name,
+        title: joined.name,
         uids: members,
         count: members.length,
-        next: { when: ride.start_time_ms != null ? formatWhen(ride.start_time_ms) : null, name: ride.name },
+        next: { when: joined.start_time_ms != null ? formatWhen(joined.start_time_ms) : null, name: joined.name },
       });
     } catch (e) {
       if (!alive.current) return;

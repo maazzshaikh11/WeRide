@@ -67,3 +67,29 @@ jest.mock('@react-native-firebase/messaging', () => {
   const messaging: any = jest.fn(() => ({ requestPermission: jest.fn(), getToken: jest.fn(), onTokenRefresh: jest.fn(), hasPermission: jest.fn() }));
   return { __esModule: true, default: messaging };
 });
+
+
+// Keychain is a native module. Suites that test the key handling (securityStorage.test.ts) supply their own mock.
+jest.mock('react-native-keychain', () => {
+  let stored = null;
+  return {
+    ACCESSIBLE: { AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'AccessibleAfterFirstUnlockThisDeviceOnly' },
+    getGenericPassword: jest.fn(async () => stored),
+    setGenericPassword: jest.fn(async (username, password) => {
+      stored = { username, password, service: 'mock', storage: 'mock' };
+      return { service: 'mock', storage: 'mock' };
+    }),
+    resetGenericPassword: jest.fn(async () => {
+      stored = null;
+      return true;
+    }),
+  };
+});
+
+// Every store opens its MMKV through services/secureStorage. In the suites it is a pass-through to the (mocked) MMKV so they
+// behave exactly as before; __tests__/secureStorage.test.ts un-mocks it and tests the real thing.
+jest.mock('./src/services/secureStorage', () => ({
+  initSecureStorage: jest.fn(async () => undefined),
+  getEncryptedMMKV: jest.fn((id) => new (require('react-native-mmkv').MMKV)({ id })),
+  getSecureStorageStatus: jest.fn(() => 'ready'),
+}));

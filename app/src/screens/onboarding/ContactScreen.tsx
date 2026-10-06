@@ -27,7 +27,6 @@ export default function ContactScreen({ navigation }: any) {
   return (
     <View style={{ flex: 1 }} testID="screen-Contact">
       <Screen
-        contentStyle={{ paddingBottom: 130 }}
         cta={<Button label="Continue" onPress={() => navigation.navigate('Drill')} disabled={contacts.length === 0} testID="contact-continue" />}
       >
         <TopBar onBack={() => navigation.goBack()} />

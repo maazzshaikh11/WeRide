@@ -9,6 +9,8 @@
  * Opening the screen on a `planned` ride opens the roll call (`meetup`).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ROAD_COLUMN } from '../../theme/responsive';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Linking, Text, View } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
@@ -45,6 +47,7 @@ export const AUTO_ROLL_DELAY_MS = 700;
 export default function MeetupScreen({ navigation, route }: Props) {
   const groupId = route?.params?.groupId ?? '';
   const { colors, type } = useTheme();
+  const insets = useSafeAreaInsets();
   const s = useStyles(({ colors: c }) => ({
     mapWrap: { marginTop: 14, borderRadius: 22, overflow: 'hidden', borderWidth: 1.5, borderColor: c.line },
     mapPill: { position: 'absolute', left: 10, top: 10 },
@@ -221,10 +224,11 @@ export default function MeetupScreen({ navigation, route }: Props) {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen testID="screen-Meetup" cta={cta}>
+      <Screen testID="screen-Meetup" cta={cta} column={ROAD_COLUMN}>
         <TopBar onBack={goBack} style={{ marginBottom: 10 }} />
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1, minWidth: 0 }}>
+        {/* wraps: on a narrow screen / large text the countdown pill drops below the title instead of squeezing it */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', rowGap: 10 }}>
+          <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 150, minWidth: 0 }}>
             <Text style={type.label} numberOfLines={2}>{`ROLL CALL ∙ ${(ride?.name ?? '…').toUpperCase()}`}</Text>
             <Text style={[type.h1, { marginTop: 8 }]}>Meetup</Text>
           </View>
@@ -277,7 +281,7 @@ export default function MeetupScreen({ navigation, route }: Props) {
           </>
         )}
       </Screen>
-      <ToastContainer top={64} />
+      <ToastContainer top={Math.max(insets.top, 24) + 16} />
     </View>
   );
 }

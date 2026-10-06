@@ -9,11 +9,17 @@
  */
 
 import { RouteResponse, RouteRequest, routeResponseFromJson, routeRequestToJson } from '@app/models/routeResponse';
+import { authedFetch, getIdToken, TokenSource } from '@app/services/idToken';
 
 export interface RoutingClientParams {
   baseUrl?: string;
   onUpdate?: (route: RouteResponse) => void;
   debounceMs?: number;
+  /**
+   * Firebase ID token source (the server requires `Authorization: Bearer <idToken>` on /route).
+   * Defaults to the signed-in rider's token; override in tests.
+   */
+  getToken?: TokenSource;
 }
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -33,6 +39,7 @@ export class RoutingClient {
   private _debounceTimer?: ReturnType<typeof setTimeout>;
   private _pendingRequest?: Partial<RouteRequest>;
   private _lastRequestOrigin?: { lat: number; lng: number };
+  private _getToken: TokenSource;
 
   constructor(params: RoutingClientParams = {}) {
     // Same default convention as the rest of the app (socketService, RouteOverlay):
@@ -41,6 +48,7 @@ export class RoutingClient {
     this._baseUrl = params.baseUrl ?? 'http://10.0.2.2:3000';
     this._onUpdate = params.onUpdate;
     this.debounce = params.debounceMs ?? 500;
+    this._getToken = params.getToken ?? getIdToken;
   }
 
   /** Request a route (immediate, no debounce). */
@@ -52,11 +60,15 @@ export class RoutingClient {
       avoid_hazard_types: req.avoid_hazard_types ?? [],
       active_hazards: req.active_hazards,
     };
-    const res = await fetch(`${this._baseUrl}/route`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(routeRequestToJson(fullReq)),
-    });
+    const res = await authedFetch(
+      `${this._baseUrl}/route`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(routeRequestToJson(fullReq)),
+      },
+      this._getToken,
+    );
     if (!res.ok) throw new Error(`Route request failed: ${res.status}`);
     const route = routeResponseFromJson(await res.json() as Record<string, any>);
     this._lastRequestOrigin = req.origin;

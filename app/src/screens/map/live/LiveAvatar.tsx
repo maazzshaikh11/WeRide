@@ -8,6 +8,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { useStyles, useTheme } from '../../../theme/ThemeProvider';
+import { CAP } from '../../../theme/textPolicy';
 
 export const GAP_LABEL_W = 68;
 export const LIVE_AVATAR_SIZE = 40;
@@ -39,12 +40,12 @@ export default function LiveAvatar({ label, talking }: { label: string | null; t
       <View style={{ width: LIVE_AVATAR_SIZE + 6, height: LIVE_AVATAR_SIZE + 6, alignItems: 'center', justifyContent: 'center' }}>
         <View style={s.ring} />
         <View style={[s.dot, talking && s.talkRing]} testID={talking ? 'live-avatar-talking' : undefined}>
-          <Text style={[roadType.num, { fontSize: 11.5, lineHeight: 13, color: road.priInk, letterSpacing: 0 }]}>YOU</Text>
+          <Text style={[roadType.num, { fontSize: 11.5, lineHeight: 13, color: road.priInk, letterSpacing: 0 }]} maxFontSizeMultiplier={CAP.fixed}>YOU</Text>
         </View>
       </View>
       <View style={s.labelSlot}>
         {label ? (
-          <Text style={s.label} numberOfLines={1} testID="live-gap-label">
+          <Text style={s.label} numberOfLines={1} testID="live-gap-label" maxFontSizeMultiplier={CAP.fixed}>
             {label}
           </Text>
         ) : null}

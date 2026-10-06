@@ -9,12 +9,12 @@
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { v4 as uuidv4 } from 'uuid';
-import { generateJoinCode } from '../utils/joinCode';
 import { RIDING_STYLES } from '../models/domain';
 import type {
   Place, PresenceDoc, PresenceState, RollCallDoc, RollCallState, Ride, RideStatus, RidingStyle, RsvpDoc, RsvpStatus,
 } from '../models/domain';
 import { P } from '../models/paths';
+import { createWithJoinCode } from './joinCodes';
 import { flattenPath, unflattenPath } from '../utils/routeGeo';
 import type { LatLng } from '../utils/mapFit';
 
@@ -64,6 +64,10 @@ const ROLL_STATES: readonly RollCallState[] = ['ready', 'notready'];
 const PRESENCE_STATES: readonly PresenceState[] = ['riding', 'stopped', 'fuel', 'ready', 'arrived'];
 
 const db = () => firestore();
+/** Longest ride name the Firestore rules accept. */
+export const RIDE_NAME_MAX = 60;
+/** Longest place label the rules accept for a ride's start / destination / meetup. */
+const clip = (label: string) => String(label ?? '').slice(0, 120);
 
 // ── tolerant converters ─────────────────────────────────────────────────────────────
 
@@ -157,65 +161,56 @@ export function sortRides(rides: Ride[]): Ride[] {
 
 // ── ride documents ──────────────────────────────────────────────────────────────────
 
-/** A join code not used by any existing ride (same read-then-write approach as GroupService). */
-async function uniqueJoinCode(): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = generateJoinCode();
-    const taken = await db().collection(P.rides).where('join_code', '==', code).limit(1).get();
-    if (taken.empty) return code;
-  }
-  throw new Error('Could not allocate a join code — try again');
-}
-
 /** Firestore rejects `undefined`; drop it from the (shallow) document. */
 function defined<T extends Record<string, unknown>>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 }
 
-/** Creates the ride (status 'planned') and returns its id. The creator is a member; so are the invitees. */
+/**
+ * Creates the ride (status 'planned') and returns its id. The creator is a member; so are the invitees (the rules accept
+ * invitees only when they are members of the ride's crew). The ride and its `join_codes/{code}` doc are written in one
+ * batch: a code is how others find the ride (rides cannot be queried by code any more).
+ */
 export async function createRide(input: NewRideInput): Promise<string> {
   const uid = auth().currentUser?.uid;
   if (!uid) throw new Error('Sign in to create a ride');
   const id = uuidv4();
-  const joinCode = await uniqueJoinCode();
   const invited = Array.from(new Set((input.invitedIds ?? []).filter((u) => u && u !== uid)));
-  const start = input.start ? { label: input.start.label, lat: input.start.lat, lng: input.start.lng } : null;
-  const destination = { label: input.destination.label, lat: input.destination.lat, lng: input.destination.lng };
+  const start = input.start ? { label: clip(input.start.label), lat: input.start.lat, lng: input.start.lng } : null;
+  const destination = { label: clip(input.destination.label), lat: input.destination.lat, lng: input.destination.lng };
   const meetup = input.meetup ?? input.start;
-  await db()
-    .doc(P.ride(id))
-    .set(
-      defined({
-        name: input.name,
-        created_by: uid,
-        member_ids: [uid, ...invited],
-        created_at: firestore.FieldValue.serverTimestamp(),
-        active_ride_id: null,
-        join_code: joinCode,
-        status: 'planned' as RideStatus,
-        crew_id: input.crewId ?? undefined,
-        ride_type: input.rideType ?? undefined,
-        pace: input.pace ?? undefined,
-        start_time_ms: input.startTimeMs,
-        invited_ids: invited,
-        meetup: meetup ? { label: meetup.label, lat: meetup.lat, lng: meetup.lng } : undefined,
-        ride_plan: {
-          start,
-          destination,
-          stops: input.stops.map((s) => ({ id: s.id, label: s.label, lat: s.lat, lng: s.lng, icon: s.icon })),
-          ...(input.route
-            ? {
-                route: {
-                  distance_km: input.route.distanceKm,
-                  eta_minutes: input.route.etaMinutes,
-                  safety_score: input.route.safetyScore,
-                  path: flattenPath(input.route.path),
-                },
-              }
-            : {}),
-        },
-      }),
-    );
+  await createWithJoinCode('ride', P.ride(id), (joinCode) =>
+    defined({
+      name: input.name.trim().slice(0, RIDE_NAME_MAX),
+      created_by: uid,
+      member_ids: [uid, ...invited],
+      created_at: firestore.FieldValue.serverTimestamp(),
+      active_ride_id: null,
+      join_code: joinCode,
+      status: 'planned' as RideStatus,
+      crew_id: input.crewId ?? undefined,
+      ride_type: input.rideType ?? undefined,
+      pace: input.pace ?? undefined,
+      start_time_ms: input.startTimeMs,
+      invited_ids: invited,
+      meetup: meetup ? { label: clip(meetup.label), lat: meetup.lat, lng: meetup.lng } : undefined,
+      ride_plan: {
+        start,
+        destination,
+        stops: input.stops.map((s) => ({ id: s.id, label: clip(s.label), lat: s.lat, lng: s.lng, icon: s.icon })),
+        ...(input.route
+          ? {
+              route: {
+                distance_km: input.route.distanceKm,
+                eta_minutes: input.route.etaMinutes,
+                safety_score: input.route.safetyScore,
+                path: flattenPath(input.route.path),
+              },
+            }
+          : {}),
+      },
+    }),
+  );
   return id;
 }
 

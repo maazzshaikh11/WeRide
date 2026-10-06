@@ -19,7 +19,7 @@ export default function ToastContainer({ top = 14 }: Props) {
   if (toasts.length === 0) return null;
 
   return (
-    <View pointerEvents="box-none" style={[styles.container, { marginTop: top }]}>
+    <View pointerEvents="box-none" style={[styles.container, { marginTop: top }]} testID="toast-container">
       {toasts.map((t) => (
         <Toast key={t.id} toast={t} onDismiss={dismiss} />
       ))}

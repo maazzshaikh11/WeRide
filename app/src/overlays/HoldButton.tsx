@@ -3,16 +3,18 @@
  * fill grows left to right while held; letting go early resets it and calls `onEarlyRelease`.
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleProp, Text, TextStyle, ViewStyle } from 'react-native';
+import { Animated, StyleProp, Text, TextProps, TextStyle, ViewStyle } from 'react-native';
 import { haptic, PressableScale } from '../ui';
 
-export default function HoldButton({ label, ms, onDone, onEarlyRelease, style, textStyle, fillColor, accessibilityLabel, accessibilityHint, testID }: {
+export default function HoldButton({ label, ms, onDone, onEarlyRelease, style, textStyle, textProps, fillColor, accessibilityLabel, accessibilityHint, testID }: {
   label: string;
   ms: number;
   onDone: () => void;
   onEarlyRelease?: () => void;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
+  /** Extra props for the label (e.g. `maxFontSizeMultiplier`). */
+  textProps?: TextProps;
   fillColor: string;
   accessibilityLabel: string;
   accessibilityHint?: string;
@@ -77,7 +79,7 @@ export default function HoldButton({ label, ms, onDone, onEarlyRelease, style, t
         pointerEvents="none"
         style={{ position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: fillColor, width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }}
       />
-      <Text style={textStyle}>{label}</Text>
+      <Text style={textStyle} {...textProps}>{label}</Text>
     </PressableScale>
   );
 }

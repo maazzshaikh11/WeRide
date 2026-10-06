@@ -17,6 +17,7 @@ import { Text, Animated } from 'react-native';
 import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { haptic, PressableScale } from '../ui';
 import { usePrefsStore } from '../store/prefsStore';
+import { CAP } from '../theme/textPolicy';
 
 /** The hold must persist this long before it "registers" (warning haptic). */
 const REGISTER_MS = 200;
@@ -31,15 +32,18 @@ export function holdSeconds(ms: number): string {
 interface Props {
   onHoldComplete: () => void;
   disabled?: boolean;
+  /** Key size; the Live screen passes its height-aware sizes (default 96 x 88, the demo's). */
+  width?: number;
+  height?: number;
 }
 
-export default function SosFab({ onHoldComplete, disabled }: Props) {
+export default function SosFab({ onHoldComplete, disabled, width = SOS_KEY_W, height = SOS_KEY_H }: Props) {
   const { colors, type } = useTheme();
   const holdMs = usePrefsStore((st) => st.prefs.hold_ms);
   const [armed, setArmed] = React.useState(false);
   const styles = useStyles(({ colors: c }) => ({
-    key: { width: SOS_KEY_W, height: SOS_KEY_H, borderRadius: 24, borderWidth: 3, borderColor: c.bad, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 4 },
-    fill: { position: 'absolute', left: 0, right: 0, bottom: 0, height: SOS_KEY_H, backgroundColor: c.bad },
+    key: { borderRadius: 24, borderWidth: 3, borderColor: c.bad, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: 4 },
+    fill: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: c.bad },
   }));
   const progress = useRef(new Animated.Value(0)).current;
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,7 +122,7 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
       disabled={disabled}
       haptic={false}
       scaleTo={0.95}
-      style={styles.key}
+      style={[styles.key, { width, height }]}
       testID="sos-key"
       accessibilityLabel={`Hold for ${holdSeconds(holdMs)} ${holdMs === 1000 ? 'second' : 'seconds'} to send SOS`}
       accessibilityHint="Press and hold to send an SOS to your crew"
@@ -129,15 +133,16 @@ export default function SosFab({ onHoldComplete, disabled }: Props) {
         style={[
           styles.fill,
           {
+            height,
             transform: [
-              { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [SOS_KEY_H / 2, 0] }) },
+              { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [height / 2, 0] }) },
               { scaleY: progress },
             ],
           },
         ]}
       />
-      <Text style={[type.h2, { color: fg, fontFamily: type.plateTitle.fontFamily, fontSize: 26, lineHeight: 26 }]}>SOS</Text>
-      <Text style={[type.tab, { color: fg, fontSize: 10, lineHeight: 12 }]}>HOLD</Text>
+      <Text style={[type.h2, { color: fg, fontFamily: type.plateTitle.fontFamily, fontSize: 26, lineHeight: 26 }]} maxFontSizeMultiplier={CAP.fixed}>SOS</Text>
+      <Text style={[type.tab, { color: fg, fontSize: 10, lineHeight: 12 }]} maxFontSizeMultiplier={CAP.fixed}>HOLD</Text>
     </PressableScale>
   );
 }

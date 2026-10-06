@@ -16,6 +16,8 @@ exports.onSosCreate = functions.firestore
     // Fetch group members
     const groupDoc = await admin.firestore().doc(`groups/${groupId}`).get();
     const memberIds = groupDoc.data()?.member_ids || [];
+    // Don't trust the event's claims: the sender must belong to the group they're alerting.
+    if (!groupDoc.exists || !memberIds.includes(sos.rider_id)) return;
 
     // Fetch FCM tokens for each member
     const tokens = [];
@@ -39,5 +41,6 @@ exports.onSosCreate = functions.firestore
       tokens: uniqueTokens,
     };
 
-    await admin.messaging().sendMulticast(message);
+    // sendEachForMulticast replaces sendMulticast (removed in firebase-admin 13).
+    await admin.messaging().sendEachForMulticast(message);
   });

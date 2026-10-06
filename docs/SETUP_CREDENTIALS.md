@@ -8,7 +8,7 @@ end-to-end on a device.
 
 | Variable | Where it comes from | Notes |
 |---|---|---|
-| `MAPBOX_ACCESS_TOKEN` | Mapbox account → Tokens | Needs Directions + Maps SDK scopes. Public token is fine in the client; never use a secret token. |
+| `MAPBOX_ACCESS_TOKEN` (server env) / `MAPBOX_TOKEN` (`app/.env`) | Mapbox account → Tokens | Needs Directions + Maps SDK scopes. Public token is fine in the client; never use a secret token. |
 | `ROUTING_URL` | Base URL of the routing server (the app appends `/route`) | e.g. `https://<host>` — do NOT include `/route`. Unset: Android emulator → `http://10.0.2.2:3000`, iOS simulator → `http://localhost:3000`. Physical devices need your machine's LAN address. |
 | `SOCKET_URL` | Same server (Socket.io) | Same host rules as above. |
 | `ETA_SIDECAR_URL` | ETA model sidecar | If unset, the app falls back to server-side ETA. |
@@ -35,3 +35,11 @@ fonts are added/renamed later.
 Location (foreground + background for tracking), microphone (Voice tab).
 Denying either degrades gracefully — tracking and voice show explicit empty
 states rather than crashing.
+
+## Android release signing (never committed)
+
+Release builds are no longer signed with the debug key and fail without credentials. Copy
+`app/android/keystore.properties.example` to `app/android/keystore.properties` (git-ignored), or set the Gradle
+properties / environment variables `WERIDE_RELEASE_STORE_FILE`, `WERIDE_RELEASE_STORE_PASSWORD`,
+`WERIDE_RELEASE_KEY_ALIAS`, `WERIDE_RELEASE_KEY_PASSWORD`. The Mapbox download token is the Gradle property
+`MAPBOX_DOWNLOADS_TOKEN` (`~/.gradle/gradle.properties` or CI secret). See `docs/SECURITY.md`.

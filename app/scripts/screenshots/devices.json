@@ -1,0 +1,14 @@
+{
+  "iphone14":   { "label": "iPhone 14/15 (default)",       "w": 390,  "h": 844,  "top": 47, "bottom": 34, "dpr": 2 },
+  "iphone-se":  { "label": "iPhone SE 375x667",            "w": 375,  "h": 667,  "top": 20, "bottom": 0,  "dpr": 2 },
+  "android-xs": { "label": "Small Android 320x568",        "w": 320,  "h": 568,  "top": 24, "bottom": 48, "dpr": 2 },
+  "android-360x640": { "label": "Short phone 360x640",     "w": 360,  "h": 640,  "top": 24, "bottom": 48, "dpr": 2 },
+  "android-360": { "label": "Common Android 360x800",      "w": 360,  "h": 800,  "top": 24, "bottom": 48, "dpr": 2 },
+  "iphone-pro": { "label": "iPhone Pro 393x852 (59/34)",   "w": 393,  "h": 852,  "top": 59, "bottom": 34, "dpr": 2 },
+  "pixel":      { "label": "Pixel 412x915",                "w": 412,  "h": 915,  "top": 24, "bottom": 48, "dpr": 2 },
+  "iphone-max": { "label": "iPhone Pro Max 430x932",       "w": 430,  "h": 932,  "top": 59, "bottom": 34, "dpr": 2 },
+  "fold":       { "label": "Foldable inner 673x841",       "w": 673,  "h": 841,  "top": 24, "bottom": 0,  "dpr": 2 },
+  "ipad":       { "label": "iPad 768x1024",                "w": 768,  "h": 1024, "top": 0,  "bottom": 0,  "dpr": 2 },
+  "ipad-land":  { "label": "iPad landscape 1024x768",      "w": 1024, "h": 768,  "top": 0,  "bottom": 0,  "dpr": 2 },
+  "inset-0":    { "label": "390x844 insets 0/0",           "w": 390,  "h": 844,  "top": 0,  "bottom": 0,  "dpr": 2 }
+}

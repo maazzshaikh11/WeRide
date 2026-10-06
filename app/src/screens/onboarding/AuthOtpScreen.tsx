@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Text, View } from 'react-native';
 import { CodeBoxes, Keypad, Motion, PressableScale, Screen, Stepper, TopBar, haptic, useReducedMotion } from '../../ui';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
+import { useResponsive } from '../../theme/responsive';
 import { AuthFlowError, confirmPhoneCode, pendingPhoneNumber, startPhoneSignIn } from '../../services/authService';
 import { useSessionStore } from '../../store/sessionStore';
 
@@ -38,6 +39,7 @@ function useCountdown(start: number): [number, () => void] {
 
 export default function AuthOtpScreen({ navigation }: any) {
   const { type } = useTheme();
+  const { isShortHeight } = useResponsive();
   const s = useStyles(({ colors: c, type: t }) => ({
     metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, minHeight: 44 },
     err: { ...t.sm, color: c.bad, marginTop: 4 },
@@ -134,15 +136,16 @@ export default function AuthOtpScreen({ navigation }: any) {
         </View>
       }
     >
-      <TopBar onBack={() => navigation.goBack()} />
-      <Stepper step={2} />
+      {/* short screens: the pinned keypad leaves little room, so the header above the code boxes is tighter */}
+      <TopBar onBack={() => navigation.goBack()} style={isShortHeight ? { marginBottom: 8 } : undefined} />
+      <Stepper step={2} style={isShortHeight ? { marginBottom: 10 } : undefined} />
       <Text style={type.label}>STEP 2 OF 5</Text>
-      <Text style={[type.h1, { marginTop: 12 }]} accessibilityRole="header">Enter the{'\n'}6-digit code.</Text>
-      <Text style={[type.body, { marginTop: 12 }]} testID="sent-to">
+      <Text style={[type.h1, { marginTop: isShortHeight ? 8 : 12 }]} accessibilityRole="header">Enter the{'\n'}6-digit code.</Text>
+      <Text style={[type.body, { marginTop: isShortHeight ? 6 : 12 }]} testID="sent-to">
         Sent to <Text style={type.bodyStrong}>{formatPhone(phone)}</Text>
       </Text>
-      <Animated.View style={{ marginTop: 24, transform: [{ translateX: shake }] }}>
-        <CodeBoxes value={code} length={CODE_LENGTH} error={Boolean(error)} testID="code-boxes" />
+      <Animated.View style={{ marginTop: isShortHeight ? 14 : 24, transform: [{ translateX: shake }] }}>
+        <CodeBoxes value={code} length={CODE_LENGTH} error={Boolean(error)} height={isShortHeight ? 52 : 64} testID="code-boxes" />
       </Animated.View>
       {error ? (
         <Text style={s.err} accessibilityRole="alert" accessibilityLiveRegion="polite" testID="otp-error">{error}</Text>

@@ -3,7 +3,8 @@
  * Also keeps a per-device "mute crew notifications" preference (local only: nothing is written to Firestore).
  */
 import { create } from 'zustand';
-import { MMKV } from 'react-native-mmkv';
+import type { MMKV } from 'react-native-mmkv';
+import { getEncryptedMMKV } from '../services/secureStorage';
 import type { Crew } from '../models/domain';
 import { subscribeMyCrews } from '../services/crewService';
 
@@ -11,7 +12,7 @@ const MUTE_KEY = 'crews.muted.v1';
 let mmkv: MMKV | null = null;
 function disk(): MMKV | null {
   try {
-    if (!mmkv) mmkv = new MMKV({ id: 'weride_prefs' });
+    if (!mmkv) mmkv = getEncryptedMMKV('weride_prefs');
     return mmkv;
   } catch {
     return null;

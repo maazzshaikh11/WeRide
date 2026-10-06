@@ -65,7 +65,8 @@ import { nextNetworkBanner, NetworkTracker } from '../../utils/networkBanner';
 import { fitPointsFor, fitSignature } from './rideGeometry';
 import { useRouteFit } from './useRouteFit';
 import LiveAvatar from './live/LiveAvatar';
-import { ControlKey, CONTROL_GAP, SIDE_BTN, SideButton, SpeedCluster, Vignettes, clockAfter, controlHeight } from './live/LiveChrome';
+import { ControlKey, SideButton, SpeedCluster, Vignettes, clockAfter, useLiveLayout } from './live/LiveChrome';
+import { CONTROL_GAP, HEADER_BAR_H, HEADER_PAD } from './live/liveLayout';
 import { hazardName } from './live/liveRide';
 import { formatGap, freshRiders, groupSpreadM, liveStatus, nearestRider, staleRider } from './live/liveGeometry';
 import { HazardConfirmButtons, TalkPlate } from './live/LiveOverlays';
@@ -86,19 +87,9 @@ import { getLocationSocket } from '../../services/socketService';
 
 MapboxGL.setAccessToken(MAPBOX_TOKEN ?? '');
 
-// Floating-UI footprint the route must stay clear of when the camera frames it.
-// Single source of truth: the header, status plate, side buttons, cluster and
-// controls below are all laid out from these numbers.
-const GUTTER = 14;                                    // screen side gutter (demo: 14)
-const HEADER_PAD = 8;                                 // gap above / below the header row
-const HEADER_BAR_H = 44;                              // back chip / title / live pill row
-const PLATE_H = 82;                                   // status plate (demo min-height 82)
-const TOP_CHROME_H = HEADER_PAD + HEADER_BAR_H + HEADER_PAD + PLATE_H + HEADER_PAD; // below the status-bar inset
-const SIDE_COLUMN_W = SIDE_BTN + GUTTER;              // side buttons + right gutter
-const CLUSTER_H = 132;                                // speed / ETA cluster
-const CONTROLS_BOTTOM = 30;                           // demo `.ctls { bottom: 30px }` (26 in glove mode)
-const GLOVE_CONTROLS_BOTTOM = 26;
-const SIDE_GAP = 12;
+// Floating-UI footprint the route must stay clear of when the camera frames it. The numbers are height-aware and
+// come from liveLayout() (live/liveLayout.ts): the header, status plate, side buttons, cluster and controls below are
+// all laid out from them, so a short screen or glove mode changes them in one place.
 const NETWORK_BANNER_H = 64;                          // reserved height of the banner (toasts stack below it)
 const FOLLOW_ZOOM = 16;
 const GROUP_VIEW_MS = 7000;                           // GROUP button: fit everyone for 7 s, then follow again
@@ -139,20 +130,22 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
   const push = useToastStore((s) => s.push);
   const insets = useSafeAreaInsets();
   const { road, scheme } = useTheme();
+  const layout = useLiveLayout(glove);
+  const hudX = layout.sideMargin + layout.gutter;
+  // Height of the header + plate block as laid out (it grows if the plate wraps); the side column, banner and toasts hang off it.
+  const [topH, setTopH] = useState(0);
   const styles = useStyles(({ road: r, roadType: t }) => ({
     container: { flex: 1, backgroundColor: r.bg },
     map: { flex: 1 },
-    top: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: GUTTER, zIndex: 10 },
+    top: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
     headerRow: { height: HEADER_BAR_H, flexDirection: 'row', alignItems: 'center', gap: 10 },
     iconBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: r.card, borderWidth: 1.5, borderColor: r.line, alignItems: 'center', justifyContent: 'center' },
     titleBox: { flex: 1, minWidth: 0, justifyContent: 'center', paddingHorizontal: 12, height: 44, borderRadius: 14, backgroundColor: r.card, borderWidth: 1.5, borderColor: r.line },
     title: { ...t.h3, fontSize: 16, lineHeight: 20 },
     bannerWrap: { position: 'absolute', left: 0, right: 0, zIndex: 20 },
-    sideColumn: { position: 'absolute', right: GUTTER, gap: SIDE_GAP, zIndex: 30 },
+    sideColumn: { position: 'absolute', zIndex: 30 },
     bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 25 },
-    infoCardsScroll: { maxHeight: 220 },
-    infoCardsContent: { paddingRight: SIDE_COLUMN_W - GUTTER },
-    controls: { position: 'absolute', left: GUTTER, right: GUTTER, bottom: glove ? GLOVE_CONTROLS_BOTTOM : CONTROLS_BOTTOM, flexDirection: 'row', gap: CONTROL_GAP, zIndex: 25 },
+    controls: { position: 'absolute', flexDirection: 'row', gap: CONTROL_GAP, zIndex: 25 },
     noGroup: { flex: 1, backgroundColor: r.bg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8 },
     noGroupTitle: { ...t.h2 },
     noGroupSub: { ...t.body, textAlign: 'center' },
@@ -373,11 +366,11 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
   const padding = useMemo(
     () =>
       fitPadding({
-        headerHeight: insets.top + TOP_CHROME_H,
-        fabColumnWidth: SIDE_COLUMN_W,
-        sheetHeight: (glove ? GLOVE_CONTROLS_BOTTOM : CONTROLS_BOTTOM) + controlHeight(glove) + CLUSTER_H + 8,
+        headerHeight: insets.top + layout.topChromeH,
+        fabColumnWidth: layout.sideColumnW + layout.sideMargin,
+        sheetHeight: layout.controlsBottom + layout.controlH + layout.clusterH + 8,
       }),
-    [insets.top, glove],
+    [insets.top, layout],
   );
   const { fit, markFitted } = useRouteFit({
     cameraRef,
@@ -514,8 +507,8 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
   const etaClock = route && Number.isFinite(route.eta_minutes) ? clockAfter(route.eta_minutes) : null;
   const remainingKm = route && Number.isFinite(route.distance_km) ? route.distance_km : null;
   const toLabel = planDestination?.label?.split(',')[0] ?? null;
-  const ctlH = controlHeight(glove);
-  const controlsBottom = glove ? GLOVE_CONTROLS_BOTTOM : CONTROLS_BOTTOM;
+  const ctlH = layout.controlH;
+  const controlsBottom = layout.controlsBottom;
 
   // Recorder events that start on a transition: a gap opening (> 500 m spread) — once per gap.
   const gapOpen = own != null && others.length > 0 && groupSpreadM([own, ...others.map((r) => r.location)]) > GAP_EVENT_M;
@@ -561,7 +554,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
     );
   }
 
-  const topInset = insets.top + TOP_CHROME_H;
+  const topInset = Math.max(topH, insets.top + layout.topChromeH - HEADER_PAD) + HEADER_PAD;
 
   return (
     <View style={styles.container}>
@@ -611,7 +604,11 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
       {/* Layer 2 — floating UI */}
 
       {/* Header row + the one status plate */}
-      <View style={[styles.top, { paddingTop: insets.top + HEADER_PAD }]} pointerEvents="box-none">
+      <View
+        style={[styles.top, { paddingTop: insets.top + HEADER_PAD, paddingHorizontal: hudX }]}
+        pointerEvents="box-none"
+        onLayout={(e) => setTopH(Math.round(e.nativeEvent.layout.height))}
+      >
         <View style={styles.headerRow}>
           {navigation ? (
             <PressableScale
@@ -646,7 +643,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
               title={status.title}
               subtitle={status.subtitle}
               titleSize={status.title.length > 17 ? 23 : 28}
-              style={{ minHeight: PLATE_H }}
+              style={{ minHeight: layout.plateH }}
               onPress={onPlateTap}
             />
           )}
@@ -668,7 +665,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
       <ToastContainer top={topInset + (networkBanner ? NETWORK_BANNER_H : 0)} />
 
       {/* Side buttons: group view, follow/fit. Route details + Google Maps live behind the speed / ETA cluster. */}
-      <View style={[styles.sideColumn, { top: topInset + SIDE_GAP }]} pointerEvents="box-none">
+      <View style={[styles.sideColumn, { top: topInset + layout.sideGap, right: hudX, gap: layout.sideGap }]} pointerEvents="box-none">
         <SideButton icon="group" label="GROUP" active={groupView} onPress={showGroup} accessibilityLabel="Show the whole group" testID="side-group" />
         <SideButton
           icon={following ? 'gps' : 'target'}
@@ -683,8 +680,8 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
       {/* Info cards (hazard / SOS / rider) sit above the controls */}
       <View style={[styles.bottom, { bottom: controlsBottom + ctlH + 12 }]} pointerEvents="box-none">
         <ScrollView
-          style={styles.infoCardsScroll}
-          contentContainerStyle={styles.infoCardsContent}
+          style={{ maxHeight: layout.infoCardsMaxH, marginHorizontal: layout.sideMargin }}
+          contentContainerStyle={{ paddingRight: layout.sideColumnW - layout.gutter }}
           pointerEvents="box-none"
         >
           {selectedHazard ? (
@@ -717,7 +714,7 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
       </View>
 
       {/* Speed, ETA, distance left — tap for route details */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: controlsBottom + ctlH + 8, zIndex: 20 }} pointerEvents="box-none">
+      <View style={{ position: 'absolute', left: layout.sideMargin, right: layout.sideMargin, bottom: controlsBottom + ctlH + 8, zIndex: 20 }} pointerEvents="box-none">
         <SpeedCluster
           speedKmh={speedKmh}
           etaClock={etaClock}
@@ -730,9 +727,11 @@ export default function MapScreen({ navigation, route: navRoute }: MapScreenProp
       </View>
 
       {/* Control keys: SOS (hold) ∙ Signal ∙ Hazard ∙ Talk (hold) */}
-      <View style={[styles.controls, { alignItems: 'flex-end' }]}>
+      <View style={[styles.controls, { alignItems: 'flex-end', left: hudX, right: hudX, bottom: controlsBottom }]}>
         <View style={{ height: ctlH, justifyContent: 'center' }}>
           <SosFab
+            width={layout.sosKeyW}
+            height={ctlH}
             onHoldComplete={() => {
               rideRecorder.addEvent('sos', 'SOS sent');
               triggerSosFlow(groupId).catch((e: unknown) => warn('[MapScreen] triggerSosFlow failed:', e));

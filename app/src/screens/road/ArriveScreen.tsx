@@ -7,8 +7,8 @@
  * It sits on top of Live (tracking keeps running until the ride ends).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, View } from 'react-native';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
 import { KV, Plate, Icon } from '../../ui';
 import HoldButton from '../../overlays/HoldButton';
@@ -23,7 +23,10 @@ import { finishOwnRide } from '../../services/rideFlow';
 import { leaveRoadToRecap } from '../../navigation/rideLifecycle';
 import { formatDistance, formatDuration } from '../../utils/units';
 import { warn } from '../../utils/log';
+import RoadFrame from './parts/RoadFrame';
 import RoadScope from './parts/RoadScope';
+import { useLiveLayout } from '../map/live/LiveChrome';
+import { CAP } from '../../theme/textPolicy';
 import TileGrid from './parts/TileGrid';
 import { useRideRoom } from './parts/useRideRoom';
 import { presenceMap } from './parts/rollCall';
@@ -50,11 +53,10 @@ function ArriveBody({ route }: Props) {
   const groupId = route?.params?.groupId ?? useAppStore.getState().groupId ?? '';
   const { colors, type } = useTheme();
   const insets = useSafeAreaInsets();
+  const glove = usePrefsStore((st) => st.prefs.glove);
+  const layout = useLiveLayout(glove);
   const s = useStyles(({ colors: c }) => ({
-    root: { flex: 1, backgroundColor: c.bg },
-    body: { paddingTop: Math.max(insets.top, 24) + 20, paddingHorizontal: 14 },
     card: { marginTop: 16, borderRadius: 22, backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line, padding: 18 },
-    bottom: { position: 'absolute', left: 14, right: 14, bottom: 30 },
   }));
   const uid = useAppStore((st) => st.userId);
   const push = useToastStore((st) => st.push);
@@ -104,15 +106,34 @@ function ArriveBody({ route }: Props) {
       warn('[Arrive] finishing the recording failed:', e);
     }
     // 2. the ride is over for everyone (a write that completes when there is signal; do not hold the rider here)
-    setRideStatus(groupId, 'finished').catch((e) => warn('[Arrive] could not mark the ride finished:', e));
+    // (the rules let the status move forward one step only, so a second rider arriving must not write 'finished' again)
+    if (ride?.status !== 'finished') setRideStatus(groupId, 'finished').catch((e) => warn('[Arrive] could not mark the ride finished:', e));
     // 3. Garage, with the Recap on top
     leaveRoadToRecap(groupId);
     push(saved ? 'Ride saved to your log' : hadLog ? 'Ride saved on this phone. It syncs when you are online' : 'Ride ended', saved || !hadLog ? 'success' : 'warn');
   }, [uid, groupId, ride, push]);
 
   return (
-    <View style={s.root} testID="screen-Arrive">
-      <View style={s.body}>
+    <>
+      <RoadFrame
+        testID="screen-Arrive"
+        glove={glove}
+        dock={
+          <HoldButton
+            testID="end-ride"
+            label="Hold to end ride"
+            ms={END_HOLD_MS}
+            onDone={endRide}
+            onEarlyRelease={() => push('Hold to end the ride', 'info')}
+            fillColor="rgba(0,0,0,0.2)"
+            style={{ flex: 1, height: Math.min(layout.controlH + (glove ? 0 : -8), 104), borderRadius: 24, backgroundColor: colors.pri }}
+            textStyle={[type.button, { fontSize: 22, lineHeight: 26, color: colors.priInk }]}
+            textProps={{ maxFontSizeMultiplier: CAP.hud, numberOfLines: 1 }}
+            accessibilityLabel="Hold for 1 second to end the ride"
+            accessibilityHint="Press and hold. Ends the ride for everyone and saves it to your log"
+          />
+        }
+      >
         <Plate
           tone="green"
           title="Arrived"
@@ -122,30 +143,16 @@ function ArriveBody({ route }: Props) {
           style={{ paddingVertical: 22, paddingHorizontal: 20, justifyContent: 'space-between' }}
           testID="arrive-plate"
         />
-        <View style={{ marginTop: 32 }} accessible accessibilityLabel="Everyone home.">
-          <Text style={[type.display, { fontSize: 40, lineHeight: 39 }]}>Everyone</Text>
-          <Text style={[type.display, { fontSize: 40, lineHeight: 39, color: colors.pri }]}>home.</Text>
+        <View style={{ marginTop: layout.tier === 'regular' ? 32 : 20 }} accessible accessibilityLabel="Everyone home.">
+          <Text style={[type.display, { fontSize: 40, lineHeight: 39 }]} maxFontSizeMultiplier={CAP.fixed}>Everyone</Text>
+          <Text style={[type.display, { fontSize: 40, lineHeight: 39, color: colors.pri }]} maxFontSizeMultiplier={CAP.fixed}>home.</Text>
         </View>
         <TileGrid tiles={tiles} style={{ marginTop: 24 }} testID="arrive-tiles" />
         <View style={s.card} testID="arrive-stats">
           <KV items={stats} />
         </View>
-      </View>
-      <View style={s.bottom}>
-        <HoldButton
-          testID="end-ride"
-          label="Hold to end ride"
-          ms={END_HOLD_MS}
-          onDone={endRide}
-          onEarlyRelease={() => push('Hold to end the ride', 'info')}
-          fillColor="rgba(0,0,0,0.2)"
-          style={{ height: 80, borderRadius: 24, backgroundColor: colors.pri }}
-          textStyle={[type.button, { fontSize: 22, lineHeight: 26, color: colors.priInk }]}
-          accessibilityLabel="Hold for 1 second to end the ride"
-          accessibilityHint="Press and hold. Ends the ride for everyone and saves it to your log"
-        />
-      </View>
-      <ToastContainer top={64} />
-    </View>
+      </RoadFrame>
+      <ToastContainer top={Math.max(insets.top, 24) + 16} />
+    </>
   );
 }

@@ -235,25 +235,38 @@ async function buildAlternatives(chosen, chosenHazardCount, options, hazardsToAv
   return all;
 }
 
+// Abuse bounds: a route request is small; reject anything that would make the
+// per-request scoring loops (hazards x route points) expensive.
+const MAX_AVOID_TYPES = 32;
+const MAX_ACTIVE_HAZARDS = 200;
+const isGeoPoint = (p) =>
+  p != null &&
+  typeof p.lat === 'number' && Number.isFinite(p.lat) && p.lat >= -90 && p.lat <= 90 &&
+  typeof p.lng === 'number' && Number.isFinite(p.lng) && p.lng >= -180 && p.lng <= 180;
+
 export async function handleRoute(req, res) {
   try {
     // Validate required request fields (T-04.2)
     const { group_id, origin, destination, avoid_hazard_types, active_hazards } = req.body;
 
-    if (!group_id || typeof group_id !== 'string') {
+    if (!group_id || typeof group_id !== 'string' || group_id.length > 128) {
       return res.status(400).json({ error: 'group_id is required (string)' });
     }
 
-    if (!origin || typeof origin.lat !== 'number' || typeof origin.lng !== 'number') {
+    if (!isGeoPoint(origin)) {
       return res.status(400).json({ error: 'origin must have lat, lng (numbers)' });
     }
 
-    if (!destination || typeof destination.lat !== 'number' || typeof destination.lng !== 'number') {
+    if (!isGeoPoint(destination)) {
       return res.status(400).json({ error: 'destination must have lat, lng (numbers)' });
     }
 
-    if (!Array.isArray(avoid_hazard_types)) {
+    if (!Array.isArray(avoid_hazard_types) || avoid_hazard_types.length > MAX_AVOID_TYPES) {
       return res.status(400).json({ error: 'avoid_hazard_types must be an array' });
+    }
+
+    if (Array.isArray(active_hazards) && active_hazards.length > MAX_ACTIVE_HAZARDS) {
+      return res.status(400).json({ error: 'too many active_hazards' });
     }
 
     // Optional extension (not in the frozen contract — extra fields tolerated):
@@ -377,7 +390,9 @@ export async function handleRoute(req, res) {
 
     res.json(response);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    // Never echo internals (messages can carry paths, URLs with tokens, ...).
+    console.error(`[handleRoute] failed: ${e && e.name ? e.name : 'Error'}`);
+    res.status(500).json({ error: 'internal error' });
   }
 }
 

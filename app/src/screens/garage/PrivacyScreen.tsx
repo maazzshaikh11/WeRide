@@ -34,7 +34,7 @@ export default function PrivacyScreen({ navigation }: { navigation?: NavLike }) 
   const status = useMemo(() => (learn ? flStatusLine() : null), [learn]);
   const s = useStyles(({ colors: c }) => ({
     track: { flexDirection: 'row', padding: 4, gap: 2, borderRadius: 16, backgroundColor: c.card2, borderWidth: 1.5, borderColor: c.line },
-    seg: { flex: 1, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    seg: { flex: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   }));
 
   const learnSub = !learn

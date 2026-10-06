@@ -10,6 +10,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated } from 'react-native';
 import { avatarColor } from '../theme/palettes';
 import { useStyles, useTheme } from '../theme/ThemeProvider';
+import { CAP } from '../theme/textPolicy';
 import { Avatar, Motion, useReducedMotion } from '../ui';
 
 interface Props {
@@ -73,7 +74,7 @@ export default function AvatarStack({ names, max = 4 }: Props) {
       ))}
       {names.length > max ? (
         <View style={s.overflow}>
-          <Text style={[type.pill, { color: colors.ink2, letterSpacing: 0 }]}>+{names.length - max}</Text>
+          <Text style={[type.pill, { color: colors.ink2, letterSpacing: 0 }]} maxFontSizeMultiplier={CAP.fixed}>+{names.length - max}</Text>
         </View>
       ) : null}
     </View>

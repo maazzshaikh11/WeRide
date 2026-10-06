@@ -1,15 +1,29 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Network: HTTPS only in release (res/xml/network_security_config.xml). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Crash detector (react-native-sensors accelerometer/gyro at >200 Hz). -->
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+    <!-- Live ride tracking + SOS location. BACKGROUND is used by react-native-background-geolocation (it already merges it
+         from its own manifest; declared here so the app's permission set is explicit and reviewable). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Group voice (WebRTC). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- SOS / crew push notifications (Android 13+ runtime permission). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Ride tracking foreground service (type: location). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- react-native-keychain merges biometric permissions; we store the MMKV key without a biometric prompt (SOS must
+         work with a gloved hand / no prompt), so they are not needed. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove" />
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
 
     <application
       android:name=".MainApplication"
@@ -17,6 +31,9 @@
       android:icon="@mipmap/ic_launcher"
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
+      android:fullBackupContent="@xml/backup_rules"
+      android:dataExtractionRules="@xml/data_extraction_rules"
+      android:networkSecurityConfig="@xml/network_security_config"
       android:theme="@style/AppTheme">
       <activity
         android:name=".MainActivity"

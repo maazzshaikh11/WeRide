@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and lower auto-backup (also referenced as fullBackupContent). allowBackup is already false; this is
+     defence in depth: if backup is ever switched on, no app storage (MMKV, Keystore-wrapped key blobs, Firebase auth
+     state, background-geolocation DB, shared prefs) leaves the device. -->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>

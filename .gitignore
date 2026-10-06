@@ -44,6 +44,28 @@ GoogleService-Info.plist
 firebase-adminsdk-*.json
 *.keystore
 *.jks
+# Release signing / credentials (see app/android/keystore.properties.example)
+keystore.properties
+**/keystore.properties
+*.p12
+*.p8
+*.pem
+*.mobileprovision
+*.cer
+# Service-account / credential JSON under any name
+service-account*.json
+serviceAccount*.json
+*-service-account*.json
+*-credentials.json
+credentials.json
+google-services*.json
+GoogleService-Info*.plist
+.env.production
+.env.development
+.env.staging
+.env.test
+.xcode.env.local
+local.properties
 
 # Firebase
 .firebase/

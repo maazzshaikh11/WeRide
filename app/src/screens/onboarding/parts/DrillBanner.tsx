@@ -3,13 +3,15 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, Pattern, Rect } from 'react-native-svg';
 import { Plates } from '../../../theme/palettes';
+import { useResponsive } from '../../../theme/responsive';
 import { useTheme } from '../../../theme/ThemeProvider';
 
 export default function DrillBanner() {
   const { type } = useTheme();
+  const { gutter } = useResponsive(); // bleeds into the screen's side gutters (20 pt, 16 pt on compact widths)
   return (
     <View
-      style={{ marginHorizontal: -20, marginTop: -6, height: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+      style={{ marginHorizontal: -gutter, marginTop: -6, height: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
       accessible
       accessibilityLabel="Drill. Nobody is alerted."
       testID="drill-banner"

@@ -37,24 +37,44 @@
 	  <!-- Do not change NSAllowsArbitraryLoads to true, or you will risk app rejection! -->
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
+		<!-- DEV ONLY in intent: lets the simulator/device reach the local Node server over http (localhost, *.local,
+		     bare IPs). It does NOT allow arbitrary internet cleartext. Remove it (or ship a release Info.plist without
+		     it) before App Store submission; see docs/SECURITY.md pre-release checklist. -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>WeRide tracks your location to share your position with your ride group and detect hazards.</string>
+	<string>WeRide uses your location while you ride to show your position to your ride group, give route guidance and send your position if you trigger SOS.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>WeRide keeps sharing your position with your ride group, and can send it if you trigger SOS, while the screen is off or the app is in the background during a ride. Location is only used during an active ride or SOS.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>WeRide keeps sharing your position with your ride group, and can send it if you trigger SOS, while the screen is off or the app is in the background during a ride.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>WeRide needs microphone access for the group voice intercom.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>WeRide uses motion sensors to improve location tracking accuracy.</string>
+	<string>WeRide uses motion sensors to detect a crash (so it can offer to alert your emergency contacts) and to improve location accuracy.</string>
+	<!-- Only what the app really needs: location = ride tracking with the screen off; remote-notification = SOS / crew pushes. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>armv7</string>
 	</array>
+	<!-- Orientation policy (docs/RESPONSIVE.md): phones are portrait-only (the Live HUD is designed for it and a rider's
+	     phone sits in a portrait mount); iPads rotate freely and lay out a centred column. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>

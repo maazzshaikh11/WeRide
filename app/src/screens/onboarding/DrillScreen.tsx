@@ -9,6 +9,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, Ring, Screen, TopBar, haptic, PressableScale } from '../../ui';
 import { Plates } from '../../theme/palettes';
+import { useResponsive } from '../../theme/responsive';
+import { CAP } from '../../theme/textPolicy';
 import { useTheme } from '../../theme/ThemeProvider';
 import { useHoldMs, usePrefsStore } from '../../store/prefsStore';
 import DarkScope from './parts/DarkScope';
@@ -22,6 +24,10 @@ export function holdHint(p: number): string {
 
 function DrillBody({ navigation, route }: { navigation: any; route?: { params?: { fromSettings?: boolean } } }) {
   const { colors, type } = useTheme();
+  const { isShortHeight } = useResponsive();
+  // the practice button is the point of this screen: on a short screen it is smaller, never hidden behind the CTA
+  const ringSize = isShortHeight ? 188 : 236;
+  const buttonSize = Math.round(ringSize * 0.78);
   const holdMs = useHoldMs();
   const firstContact = usePrefsStore((s) => s.contacts[0]?.name);
   const fromSettings = Boolean(route?.params?.fromSettings);
@@ -101,8 +107,8 @@ function DrillBody({ navigation, route }: { navigation: any; route?: { params?: 
       <Text style={[type.h1, { marginTop: 16 }]} accessibilityRole="header">Practice your SOS.</Text>
       <Text style={[type.body, { marginTop: 8 }]}>Hold the button. Keep holding until it fills. That's the whole thing.</Text>
 
-      <View style={{ alignSelf: 'center', marginTop: 38 }} testID="drill-stage">
-        <Ring value={progress} size={236} color={ringColor} stroke={7}>
+      <View style={{ alignSelf: 'center', marginTop: isShortHeight ? 18 : 38 }} testID="drill-stage">
+        <Ring value={progress} size={ringSize} color={ringColor} stroke={7}>
           <PressableScale
             onPressIn={onPressIn}
             onPressOut={onPressOut}
@@ -115,17 +121,17 @@ function DrillBody({ navigation, route }: { navigation: any; route?: { params?: 
             onAccessibilityAction={() => !doneRef.current && complete()}
             testID="drill-button"
             style={{
-              width: 184, height: 184, borderRadius: 92, alignItems: 'center', justifyContent: 'center',
+              width: buttonSize, height: buttonSize, borderRadius: buttonSize / 2, alignItems: 'center', justifyContent: 'center',
               backgroundColor: done ? Plates.green.bg : Plates.red.bg,
             }}
           >
-            <Text style={{ fontFamily: type.display.fontFamily, fontSize: 46, lineHeight: 50, letterSpacing: -1.4, color: '#FFFFFF' }}>SOS</Text>
+            <Text style={{ fontFamily: type.display.fontFamily, fontSize: 46, lineHeight: 50, letterSpacing: -1.4, color: '#FFFFFF' }} maxFontSizeMultiplier={CAP.fixed}>SOS</Text>
             <Text style={[type.label, { color: '#FFFFFF', opacity: 0.85, marginTop: 4 }]} accessibilityLiveRegion="polite" testID="drill-hint">{hint}</Text>
           </PressableScale>
         </Ring>
       </View>
 
-      <View style={{ marginTop: 34, minHeight: 150 }} testID="drill-result">
+      <View style={{ marginTop: isShortHeight ? 20 : 34, minHeight: 150 }} testID="drill-result">
         {done ? (
           <View
             style={{ backgroundColor: Plates.green.bg, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 18 }}

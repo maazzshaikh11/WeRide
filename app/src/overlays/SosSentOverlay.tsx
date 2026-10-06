@@ -6,7 +6,7 @@
  */
 /* eslint-disable no-console -- failures here are logged for diagnostics; the rider is told through the UI */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, BackHandler, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, BackHandler, Linking, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { queuePeek, SOS_QUEUE } from '@hazard/crdt/localQueue';
 import { useRouteStore } from '@routing/client/routeStore';
@@ -26,7 +26,10 @@ import type { SosResponder } from '../services/sosFlowService';
 import { formatClock, formatFixLine, isRealPosition, nearestResponder, smsLink, Fix } from '../services/sosFormat';
 import { useUnits } from '../store/prefsStore';
 import { formatShortDistance } from '../utils/units';
+import { useResponsive, useScaleBy } from '../theme/responsive';
+import { CAP } from '../theme/textPolicy';
 import HazardStripes from './HazardStripes';
+import OverlayFrame from './OverlayFrame';
 import HoldButton from './HoldButton';
 import OverlayToast, { useOverlayToast } from './OverlayToast';
 
@@ -98,6 +101,8 @@ function Row({ kind, title, sub, extra, onPress, testID, accessibilityLabel }: {
 function Body({ state }: { state: SentState }) {
   const { type } = useTheme();
   const insets = useSafeAreaInsets();
+  const { isShortHeight } = useResponsive();
+  const sz = useScaleBy();
   const { toast, show: showToast } = useOverlayToast();
   const drill = !!state.drill;
   const auto = !!state.auto;
@@ -217,6 +222,8 @@ function Body({ state }: { state: SentState }) {
   }
 
   const top = Math.max(insets.top, 24);
+  const callH = isShortHeight ? 64 : 76;
+  const okH = isShortHeight ? 60 : 68;
   const helpLabel = auto ? 'CRASH DETECTED ∙ SENT AUTOMATICALLY' : drill ? 'PRACTICE' : 'HELP IS COMING';
   const big = queued ? 'SOS SAVED' : 'SOS SENT';
   const stamp = `${formatClock(startedMs)} ∙ ${formatFixLine(fix)}`;
@@ -259,14 +266,44 @@ function Body({ state }: { state: SentState }) {
           </View>
         </View>
       ) : null}
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: drill ? 18 : top + 16, paddingBottom: 230 }} showsVerticalScrollIndicator={false}>
+      <OverlayFrame
+        bg={RED}
+        paddingTop={drill ? 18 : top + 16}
+        dock={
+          <>
+            <PressableScale onPress={call112} accessibilityRole="button" accessibilityLabel="Call 112, emergency services" style={[st.call, { height: callH }]} testID="sos-call112">
+              <Icon name="phone" size={28} color={RED} />
+              <Text style={[type.button, { color: RED, fontSize: 24, lineHeight: 28 }]} numberOfLines={1} maxFontSizeMultiplier={CAP.hud}>Call 112</Text>
+            </PressableScale>
+            {drill ? (
+              <PressableScale onPress={finish} accessibilityRole="button" accessibilityLabel="End drill" style={[st.ok, { height: okH }]} testID="sos-end-drill">
+                <Text style={[type.button, { color: FG, fontSize: 18, lineHeight: 22 }]} maxFontSizeMultiplier={CAP.hud}>End drill</Text>
+              </PressableScale>
+            ) : (
+              <HoldButton
+                label="I’m OK ∙ hold 2 s to cancel"
+                ms={CANCEL_HOLD_MS}
+                onDone={finish}
+                onEarlyRelease={() => showToast('Hold 2 s to cancel — so it can’t be cancelled by accident', 'black')}
+                fillColor="rgba(255,255,255,0.32)"
+                style={[st.ok, { height: okH }]}
+                textStyle={[type.button, { color: FG, fontSize: 18, lineHeight: 22 }]}
+                textProps={{ maxFontSizeMultiplier: CAP.hud, numberOfLines: 2, adjustsFontSizeToFit: true, minimumFontScale: 0.75 }}
+                accessibilityLabel="I’m OK. Press and hold for 2 seconds to cancel the SOS"
+                accessibilityHint="Cancels the SOS and tells your crew it was a false alarm"
+                testID="sos-cancel-hold"
+              />
+            )}
+          </>
+        }
+      >
         <Text style={[type.label, { color: FG, opacity: 0.85, letterSpacing: 2.75 }]} testID="sos-label">{helpLabel}</Text>
-        <Text style={[type.display, { color: FG, fontSize: 58, lineHeight: 58, letterSpacing: -2.03, marginTop: 8 }]} accessibilityRole="header" testID="sos-big">{big}</Text>
-        <Text style={[type.num, { color: FG, fontSize: 14, lineHeight: 18, opacity: 0.9, marginTop: 8 }]} testID="sos-stamp">{stamp}</Text>
+        <Text style={[type.display, { color: FG, fontSize: sz(58), lineHeight: sz(58), letterSpacing: -sz(58) * 0.035, marginTop: 8 }]} accessibilityRole="header" testID="sos-big" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} maxFontSizeMultiplier={CAP.fixed}>{big}</Text>
+        <Text style={[type.num, { color: FG, fontSize: 14, lineHeight: 18, opacity: 0.9, marginTop: 8 }]} testID="sos-stamp" maxFontSizeMultiplier={CAP.hud}>{stamp}</Text>
 
         {queued ? (
           <View style={{ marginTop: 16 }} testID="sos-offline-plate">
-            <Plate tone="yellow" icon="wifioff" title="No signal ∙ queued" titleSize={22} subtitle="Saved on this phone. It sends itself the moment you have signal." />
+            <Plate tone="yellow" icon="wifioff" title="No signal ∙ queued" titleSize={22} subtitle="Saved on this phone. It sends itself the moment you have signal." subtitleLines={4} />
           </View>
         ) : null}
 
@@ -291,32 +328,7 @@ function Body({ state }: { state: SentState }) {
           <Row {...trackingRow} title="Live location on" testID="sos-row-live" />
           <Row {...responderRow} testID="sos-row-responder" />
         </View>
-      </ScrollView>
-
-      <View style={[st.bottom, { bottom: 30 }]}>
-        <PressableScale onPress={call112} accessibilityRole="button" accessibilityLabel="Call 112, emergency services" style={st.call} testID="sos-call112">
-          <Icon name="phone" size={28} color={RED} />
-          <Text style={[type.button, { color: RED, fontSize: 24, lineHeight: 28 }]}>Call 112</Text>
-        </PressableScale>
-        {drill ? (
-          <PressableScale onPress={finish} accessibilityRole="button" accessibilityLabel="End drill" style={st.ok} testID="sos-end-drill">
-            <Text style={[type.button, { color: FG, fontSize: 18, lineHeight: 22 }]}>End drill</Text>
-          </PressableScale>
-        ) : (
-          <HoldButton
-            label="I’m OK ∙ hold 2 s to cancel"
-            ms={CANCEL_HOLD_MS}
-            onDone={finish}
-            onEarlyRelease={() => showToast('Hold 2 s to cancel — so it can’t be cancelled by accident', 'black')}
-            fillColor="rgba(255,255,255,0.32)"
-            style={st.ok}
-            textStyle={[type.button, { color: FG, fontSize: 18, lineHeight: 22 }]}
-            accessibilityLabel="I’m OK. Press and hold for 2 seconds to cancel the SOS"
-            accessibilityHint="Cancels the SOS and tells your crew it was a false alarm"
-            testID="sos-cancel-hold"
-          />
-        )}
-      </View>
+      </OverlayFrame>
       <OverlayToast toast={toast} />
     </View>
   );
@@ -328,7 +340,6 @@ const st = StyleSheet.create({
   disk: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   drillWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   drillText: { backgroundColor: Plates.yellow.fg, color: Plates.yellow.bg, paddingVertical: 3, paddingHorizontal: 12, borderRadius: 5, fontSize: 12, lineHeight: 14, letterSpacing: 2.4, overflow: 'hidden' },
-  bottom: { position: 'absolute', left: 14, right: 14, gap: 10 },
-  call: { height: 76, borderRadius: 22, backgroundColor: FG, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  ok: { height: 68, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
+  call: { borderRadius: 22, backgroundColor: FG, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  ok: { minHeight: 60, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
 });

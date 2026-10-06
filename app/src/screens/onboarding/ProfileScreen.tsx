@@ -77,7 +77,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <Kav>
-      <Screen testID="screen-Profile" contentStyle={{ paddingBottom: 130 }} cta={<Button label="Continue" onPress={next} disabled={!ready} loading={busy} testID="profile-continue" />}>
+      <Screen testID="screen-Profile" cta={<Button label="Continue" onPress={next} disabled={!ready} loading={busy} testID="profile-continue" />}>
         <TopBar onBack={() => navigation.goBack()} />
         <Stepper step={3} />
         <Text style={type.label}>STEP 3 OF 5</Text>

@@ -14,7 +14,10 @@ import { useAppStore } from '../store/appStore';
 import { OverlayState, useOverlayStore } from '../store/overlayStore';
 import { useToastStore } from '../store/toastStore';
 import { triggerSosFlow } from '../services/sosFlowService';
+import { useResponsive } from '../theme/responsive';
+import { CAP } from '../theme/textPolicy';
 import HazardStripes from './HazardStripes';
+import OverlayFrame from './OverlayFrame';
 
 export const CRASH_COUNTDOWN_S = 15;
 const INK = Plates.yellow.fg;
@@ -84,37 +87,51 @@ function Body() {
   };
 
   const top = Math.max(insets.top, 24);
+  const { isShortHeight, isCompactWidth, usableHeight } = useResponsive();
+  // short screens: a smaller ring and headline; the two answers stay big, pinned at the bottom
+  const ring = usableHeight < 600 ? 120 : isShortHeight ? 150 : 200;
+  const headline = usableHeight < 600 ? 38 : isShortHeight || isCompactWidth ? 44 : 54;
+  const okH = isShortHeight ? 76 : 92;
+  const sosH = isShortHeight ? 56 : 64;
   return (
     <View style={st.root} testID="overlay-CrashCountdown" accessibilityViewIsModal>
       <HazardStripes style={[StyleSheet.absoluteFill, { opacity: 0.12 }]} />
-      <View style={[st.col, { paddingTop: top + 23, paddingBottom: 34 }]}>
-        <Text style={[type.label, { color: INK, letterSpacing: 2.75 }]}>HARD IMPACT DETECTED</Text>
-        <Text style={[type.display, { color: INK, fontSize: 54, lineHeight: 54, letterSpacing: -1.9, textAlign: 'center', marginTop: 16 }]} accessibilityRole="header">
-          {'Are you\nOK?'}
-        </Text>
-        <View style={{ marginTop: 26 }} accessible accessibilityLabel={`${left} seconds until your SOS is sent automatically`} accessibilityLiveRegion="polite">
-          <Ring size={200} value={(CRASH_COUNTDOWN_S - left) / CRASH_COUNTDOWN_S} color={INK} stroke={7}>
-            <Text style={[type.num, { color: INK, fontSize: 84, lineHeight: 90, letterSpacing: -2.5 }]} testID="crash-seconds">{left}</Text>
-          </Ring>
+      <OverlayFrame
+        bg={YELLOW}
+        paddingTop={top + (isShortHeight ? 8 : 23)}
+        centerContent
+        dock={
+          <>
+            <PressableScale onPress={imOk} disabled={sending} accessibilityRole="button" accessibilityLabel="I’m OK, cancel the countdown" style={[st.ok, { height: okH }]} testID="crash-ok">
+              <Text style={[type.button, { color: YELLOW, fontSize: 30, lineHeight: 34 }]} maxFontSizeMultiplier={CAP.hud}>I’m OK</Text>
+            </PressableScale>
+            <PressableScale onPress={() => send(false)} disabled={sending} accessibilityRole="button" accessibilityLabel="Send SOS now" style={[st.sos, { height: sosH }]} testID="crash-sos">
+              <Text style={[type.button, { color: Plates.red.fg, fontSize: 18, lineHeight: 22 }]} maxFontSizeMultiplier={CAP.hud}>Send SOS now</Text>
+            </PressableScale>
+          </>
+        }
+      >
+        <View style={{ alignItems: 'center' }}>
+          <Text style={[type.label, { color: INK, letterSpacing: 2.75, textAlign: 'center' }]}>HARD IMPACT DETECTED</Text>
+          <Text style={[type.display, { color: INK, fontSize: headline, lineHeight: headline, letterSpacing: -headline * 0.035, textAlign: 'center', marginTop: isShortHeight ? 8 : 16 }]} accessibilityRole="header" maxFontSizeMultiplier={CAP.fixed}>
+            {'Are you\nOK?'}
+          </Text>
+          <View style={{ marginTop: isShortHeight ? 14 : 26 }} accessible accessibilityLabel={`${left} seconds until your SOS is sent automatically`} accessibilityLiveRegion="polite">
+            <Ring size={ring} value={(CRASH_COUNTDOWN_S - left) / CRASH_COUNTDOWN_S} color={INK} stroke={7}>
+              <Text style={[type.num, { color: INK, fontSize: Math.round(ring * 0.42), lineHeight: Math.round(ring * 0.45), letterSpacing: -2.5 }]} testID="crash-seconds" maxFontSizeMultiplier={CAP.fixed}>{left}</Text>
+            </Ring>
+          </View>
+          <Text style={[type.bodyStrong, { color: INK, marginTop: isShortHeight ? 10 : 16, textAlign: 'center' }]}>
+            {sending ? 'Sending your SOS…' : 'SOS sends itself when this hits zero.'}
+          </Text>
         </View>
-        <Text style={[type.bodyStrong, { color: INK, marginTop: 16, textAlign: 'center' }]}>
-          {sending ? 'Sending your SOS…' : 'SOS sends itself when this hits zero.'}
-        </Text>
-        <View style={{ flex: 1 }} />
-        <PressableScale onPress={imOk} disabled={sending} accessibilityRole="button" accessibilityLabel="I’m OK, cancel the countdown" style={st.ok} testID="crash-ok">
-          <Text style={[type.button, { color: YELLOW, fontSize: 30, lineHeight: 34 }]}>I’m OK</Text>
-        </PressableScale>
-        <PressableScale onPress={() => send(false)} disabled={sending} accessibilityRole="button" accessibilityLabel="Send SOS now" style={st.sos} testID="crash-sos">
-          <Text style={[type.button, { color: Plates.red.fg, fontSize: 18, lineHeight: 22 }]}>Send SOS now</Text>
-        </PressableScale>
-      </View>
+      </OverlayFrame>
     </View>
   );
 }
 
 const st = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, backgroundColor: YELLOW, overflow: 'hidden' },
-  col: { flex: 1, paddingHorizontal: 20, alignItems: 'center' },
-  ok: { height: 92, borderRadius: 26, backgroundColor: INK, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
-  sos: { height: 64, borderRadius: 20, backgroundColor: Plates.red.bg, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  ok: { borderRadius: 26, backgroundColor: INK, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
+  sos: { borderRadius: 20, backgroundColor: Plates.red.bg, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
 });

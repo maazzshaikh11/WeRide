@@ -1,138 +1,392 @@
 rules_version = '2';
+// WeRide Firestore rules. Model and rationale: docs/security/firestore.md
+//
+//  * A crew / ride (`crews/*`, `groups/*`) is readable only by its members (a ride is also readable by the members of
+//    the crew it belongs to, so a crew can show its next ride). Nothing here can be enumerated by a stranger.
+//  * Join codes live in `join_codes/{CODE}`: `get` only (you must already know the code), never `list`.
+//  * Joining = the rider adds exactly their own uid to member_ids AND proves they know the code with
+//    `join_proof == "<join_code>:<uid>"`. Nothing else may change in that write.
+//  * Everything else a member can change is a narrow, field-whitelisted transition (leave, ride status step, ...).
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users. The doc itself is the PUBLIC profile (name, bike, style, ride totals): any signed-in
-    // rider may read it, only its owner writes it. Everything sensitive lives in owner-only subcollections.
+    // ---------------------------------------------------------------- helpers
+
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+
+    function groupPath(id) { return /databases/$(database)/documents/groups/$(id); }
+    function crewPath(id) { return /databases/$(database)/documents/crews/$(id); }
+    function sosPath(id) { return /databases/$(database)/documents/sos_events/$(id); }
+
+    // Is the caller a member of ride/group `gid`? (get() on a missing doc errors, which denies.)
+    function isGroupMember(gid) {
+      return signedIn() && gid is string && me() in get(groupPath(gid)).data.member_ids;
+    }
+    function isCrewMember(cid) {
+      return signedIn() && cid is string && me() in get(crewPath(cid)).data.member_ids;
+    }
+
+    function str(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+    function num(v) { return v is number; }
+    function nonNeg(v, max) { return v is number && v >= 0 && v <= max; }
+    function lat(v) { return v is number && v >= -90 && v <= 90; }
+    function lng(v) { return v is number && v >= -180 && v <= 180; }
+    function codeOk(v) { return v is string && v.matches('^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$'); }
+
+    // Which top-level fields does this write change?
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+    // ------------------------------------------------------------------ users
+
+    function validProfile(d) {
+      return d.keys().hasOnly(['name', 'bike', 'style', 'created_ms', 'stats'])
+        && (!('name' in d) || str(d.name, 1, 24))
+        && (!('bike' in d) || (d.bike is string && d.bike.size() <= 40))
+        && (!('style' in d) || d.style in ['Relaxed', 'Steady', 'Spirited'])
+        && (!('created_ms' in d) || num(d.created_ms))
+        && (!('stats' in d) || (
+          d.stats is map
+          && d.stats.keys().hasOnly(['km', 'rides', 'together_sum'])
+          && nonNeg(d.stats.get('km', 0), 10000000)
+          && nonNeg(d.stats.get('rides', 0), 1000000)
+          && nonNeg(d.stats.get('together_sum', 0), 100000000)));
+    }
+
+    // The doc is the PUBLIC profile (name, bike, style, ride totals): any signed-in rider may read it, only its
+    // owner writes it. Everything sensitive lives in owner-only subcollections.
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow read: if signedIn();
+      allow create, update: if signedIn() && me() == userId && validProfile(request.resource.data);
       allow delete: if false;
 
       // prefs, emergency contacts, push token, onboarded flag
       match /private/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if signedIn() && me() == userId;
+        allow create, update: if signedIn() && me() == userId && request.resource.data.keys().size() <= 30;
+        allow delete: if signedIn() && me() == userId;
       }
       // the rider's own ride history (tracks, stats)
       match /ride_logs/{rideId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if signedIn() && me() == userId;
       }
     }
 
-    // Crews: the persistent set of people. Readable by signed-in riders (a code is resolved by
-    // querying join_code); created with yourself as a member; joined by adding yourself.
+    // ------------------------------------------------------------- join codes
+
+    // join_codes/{CODE} = { kind: 'crew' | 'ride', target_id }. A code can be looked up only by someone who already
+    // knows it (`get`); there is no way to list or query the collection. Only the creator of the target can register,
+    // change or remove its code, and a code can only be registered for a target whose `join_code` is that code.
+    function codeTargetPath(kind, id) { return kind == 'crew' ? crewPath(id) : groupPath(id); }
+
+    match /join_codes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && codeOk(code)
+        && request.resource.data.keys().hasOnly(['kind', 'target_id'])
+        && request.resource.data.keys().hasAll(['kind', 'target_id'])
+        && request.resource.data.kind in ['crew', 'ride']
+        && str(request.resource.data.target_id, 1, 128)
+        // getAfter: the target may be created in the same batch
+        && getAfter(codeTargetPath(request.resource.data.kind, request.resource.data.target_id)).data.created_by == me()
+        && getAfter(codeTargetPath(request.resource.data.kind, request.resource.data.target_id)).data.join_code == code
+        && me() in getAfter(codeTargetPath(request.resource.data.kind, request.resource.data.target_id)).data.member_ids;
+      allow update: if signedIn()
+        && get(codeTargetPath(resource.data.kind, resource.data.target_id)).data.created_by == me()
+        && request.resource.data.kind == resource.data.kind
+        && request.resource.data.target_id == resource.data.target_id;
+      allow delete: if signedIn()
+        && get(codeTargetPath(resource.data.kind, resource.data.target_id)).data.created_by == me();
+    }
+
+    // ------------------------------------------------------------------ crews
+
+    function validCrew(d) {
+      return d.keys().hasOnly(['name', 'created_by', 'member_ids', 'roles', 'join_code', 'created_at', 'join_proof'])
+        && str(d.name, 1, 60)
+        && d.created_by is string
+        && d.member_ids is list && d.member_ids.size() >= 1 && d.member_ids.size() <= 100
+        && codeOk(d.join_code)
+        && (!('created_at' in d) || d.created_at is timestamp)
+        && d.get('roles', {}) is map
+        && d.get('roles', {}).size() <= 100
+        && d.get('roles', {}).keys().hasOnly(d.member_ids)
+        && d.get('roles', {}).values().hasOnly(['lead', 'sweep']);
+    }
+
+    // Adding exactly yourself to a crew / ride you are not in, proving you know its code.
+    function joinOk() {
+      return !(me() in resource.data.member_ids)
+        && changed().hasOnly(['member_ids', 'join_proof'])
+        && codeOk(resource.data.get('join_code', null))
+        && request.resource.data.get('join_proof', null) == resource.data.join_code + ':' + me()
+        && request.resource.data.member_ids.hasAll(resource.data.member_ids)
+        && request.resource.data.member_ids.size() == resource.data.member_ids.size() + 1
+        && me() in request.resource.data.member_ids
+        && request.resource.data.member_ids.size() <= 100;
+    }
+
+    // Removing exactly yourself, adding nobody.
+    function leftAlone() {
+      return me() in resource.data.member_ids
+        && !(me() in request.resource.data.member_ids)
+        && request.resource.data.member_ids.hasOnly(resource.data.member_ids)
+        && resource.data.member_ids.toSet().difference(request.resource.data.member_ids.toSet()).hasOnly([me()]);
+    }
+
+    // Crews: the persistent set of people. Members only.
     match /crews/{crewId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.member_ids.hasAny([request.auth.uid])
-        && request.resource.data.created_by == request.auth.uid;
-      allow update: if request.auth != null
-        && (
-          (request.resource.data.member_ids.hasAll(resource.data.member_ids)
-            && request.resource.data.member_ids.hasAny([request.auth.uid]))
-          || resource.data.member_ids.hasAny([request.auth.uid])
-        );
+      allow get, list: if signedIn() && me() in resource.data.member_ids;
+
+      allow create: if signedIn()
+        && validCrew(request.resource.data)
+        && request.resource.data.created_by == me()
+        && request.resource.data.member_ids == [me()]
+        && !('join_proof' in request.resource.data)
+        && request.resource.data.get('roles', {}).keys().hasOnly([me()])
+        && request.resource.data.get('roles', {}).values().hasOnly(['lead']);
+
+      allow update: if signedIn() && (
+        // join by code
+        joinOk()
+        // leave (and drop your own role)
+        || (leftAlone()
+            && changed().hasOnly(['member_ids', 'roles'])
+            && request.resource.data.get('roles', {}).diff(resource.data.get('roles', {})).affectedKeys().hasOnly([me()])
+            && !(me() in request.resource.data.get('roles', {})))
+        // the creator edits the crew's name / roles / code; created_by and members never change this way
+        || (me() == resource.data.created_by
+            && me() in resource.data.member_ids
+            && changed().hasOnly(['name', 'roles', 'join_code'])
+            && validCrew(request.resource.data))
+      );
       allow delete: if false;
     }
 
-    // Groups: members can read; any authed user can create/join.
-    // Join = arrayUnion update on member_ids; membership checked on update
-    // so non-members cannot mutate an existing group arbitrarily.
+    // ----------------------------------------------------------------- groups
+
+    function validPlan(p) {
+      return p is map
+        && p.keys().hasOnly(['start', 'destination', 'stops', 'route'])
+        && (p.get('start', null) == null || (p.start is map && p.start.get('label', '').size() <= 120))
+        && (p.get('destination', null) == null || (p.destination is map && p.destination.get('label', '').size() <= 120))
+        && p.get('stops', []) is list && p.get('stops', []).size() <= 30
+        && (p.get('route', null) == null || (p.route is map && p.route.get('path', []) is list && p.route.get('path', []).size() <= 400));
+    }
+
+    function validGroup(d) {
+      return d.keys().hasOnly(['name', 'created_by', 'member_ids', 'created_at', 'active_ride_id', 'join_code', 'join_proof',
+          'status', 'crew_id', 'ride_type', 'pace', 'start_time_ms', 'started_ms', 'finished_ms', 'meetup', 'ride_plan', 'invited_ids'])
+        && str(d.name, 1, 60)
+        && d.created_by is string
+        && d.member_ids is list && d.member_ids.size() >= 1 && d.member_ids.size() <= 100
+        && codeOk(d.join_code)
+        && (!('created_at' in d) || d.created_at is timestamp)
+        && d.get('status', 'planned') in ['planned', 'meetup', 'live', 'finished']
+        && (d.get('crew_id', null) == null || str(d.crew_id, 1, 128))
+        && (d.get('ride_type', null) == null || str(d.ride_type, 1, 20))
+        && (d.get('pace', null) == null || d.pace in ['Relaxed', 'Steady', 'Spirited'])
+        && (d.get('start_time_ms', null) == null || num(d.start_time_ms))
+        && (d.get('meetup', null) == null || (d.meetup is map && d.meetup.get('label', '').size() <= 120))
+        && (d.get('ride_plan', null) == null || validPlan(d.ride_plan))
+        && d.get('invited_ids', []) is list && d.get('invited_ids', []).size() <= 100
+        && (d.get('active_ride_id', null) == null || str(d.active_ride_id, 1, 128));
+    }
+
+    // At creation a ride holds only its creator, plus (for a crew ride) invitees who are members of that crew.
+    function invitees(d) {
+      return d.member_ids == [me()]
+        || (d.get('crew_id', null) is string
+            && me() in d.member_ids
+            && isCrewMember(d.crew_id)
+            && d.member_ids.toSet().difference(get(crewPath(d.crew_id)).data.member_ids.toSet()).hasOnly([me()]));
+    }
+
+    function nextStatus(s) {
+      return s == 'planned' ? 'meetup' : (s == 'meetup' ? 'live' : (s == 'live' ? 'finished' : 'none'));
+    }
+
+    // Rides: members read (plus the members of the ride's crew). The ride-status flow is a member write, but only
+    // one step forward and only status / started_ms / finished_ms.
     match /groups/{groupId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.member_ids.hasAny([request.auth.uid]);
-      allow update: if request.auth != null
-        && (
-          // joining: adding self to member_ids
-          request.resource.data.member_ids.hasAll(resource.data.member_ids)
-          && request.resource.data.member_ids.hasAny([request.auth.uid])
-          || resource.data.member_ids.hasAny([request.auth.uid])
-        );
+      allow get, list: if signedIn()
+        && (me() in resource.data.member_ids
+            || (resource.data.get('crew_id', null) is string && isCrewMember(resource.data.crew_id)));
+
+      allow create: if signedIn()
+        && validGroup(request.resource.data)
+        && request.resource.data.created_by == me()
+        && (request.resource.data.get('crew_id', null) == null || isCrewMember(request.resource.data.crew_id))
+        && invitees(request.resource.data)
+        && request.resource.data.get('status', 'planned') == 'planned'
+        && !('join_proof' in request.resource.data)
+        && !('started_ms' in request.resource.data)
+        && !('finished_ms' in request.resource.data);
+
+      allow update: if signedIn() && (
+        // join by code
+        joinOk()
+        // leave
+        || (leftAlone() && changed().hasOnly(['member_ids']))
+        // advance the ride status one step
+        || (me() in resource.data.member_ids
+            && changed().hasOnly(['status', 'started_ms', 'finished_ms'])
+            && request.resource.data.get('status', null) == nextStatus(resource.data.get('status', 'planned'))
+            && (!('started_ms' in changed()) || (request.resource.data.status == 'live' && num(request.resource.data.started_ms)))
+            && (!('finished_ms' in changed()) || (request.resource.data.status == 'finished' && num(request.resource.data.finished_ms))))
+        // the creator edits the plan; created_by, crew_id and members never change this way
+        || (me() == resource.data.created_by
+            && me() in resource.data.member_ids
+            && changed().hasOnly(['name', 'join_code', 'ride_plan', 'ride_type', 'pace', 'start_time_ms', 'meetup', 'invited_ids', 'active_ride_id'])
+            && validGroup(request.resource.data))
+      );
+      allow delete: if false;
 
       // RSVP, roll call and presence: members read; a rider writes only their own doc
       match /rsvp/{riderId} {
-        allow read: if request.auth != null
-          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
-        allow write: if request.auth != null && request.auth.uid == riderId
-          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow read: if isGroupMember(groupId);
+        allow create, update: if isGroupMember(groupId) && me() == riderId
+          && request.resource.data.keys().hasOnly(['status', 'updated_ms'])
+          && request.resource.data.status in ['going', 'maybe', 'no']
+          && num(request.resource.data.get('updated_ms', 0));
+        allow delete: if isGroupMember(groupId) && me() == riderId;
       }
       match /roll_call/{riderId} {
-        allow read: if request.auth != null
-          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
-        allow write: if request.auth != null && request.auth.uid == riderId
-          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow read: if isGroupMember(groupId);
+        allow create, update: if isGroupMember(groupId) && me() == riderId
+          && request.resource.data.keys().hasOnly(['state', 'updated_ms'])
+          && request.resource.data.state in ['ready', 'notready']
+          && num(request.resource.data.get('updated_ms', 0));
+        allow delete: if isGroupMember(groupId) && me() == riderId;
       }
       match /presence/{riderId} {
-        allow read: if request.auth != null
-          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
-        allow write: if request.auth != null && request.auth.uid == riderId
-          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow read: if isGroupMember(groupId);
+        allow create, update: if isGroupMember(groupId) && me() == riderId
+          && request.resource.data.keys().hasOnly(['state', 'updated_ms'])
+          && request.resource.data.state in ['riding', 'stopped', 'fuel', 'ready', 'arrived']
+          && num(request.resource.data.get('updated_ms', 0));
+        allow delete: if isGroupMember(groupId) && me() == riderId;
       }
 
-      // Rider locations: only the rider writes their own doc
+      // Live rider positions: members read; a rider writes only their own doc
       match /locations/{riderId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth.uid == riderId;
+        allow read: if isGroupMember(groupId);
+        allow create, update: if isGroupMember(groupId) && me() == riderId
+          && request.resource.data.keys().hasOnly(['rider_id', 'group_id', 'timestamp_hlc', 'lat', 'lng', 'speed_mps',
+              'heading_deg', 'spoof_flag', 'nis_score', 'accuracy_m'])
+          && request.resource.data.get('rider_id', riderId) == me()
+          && request.resource.data.get('group_id', groupId) == groupId
+          && lat(request.resource.data.lat) && lng(request.resource.data.lng);
+        allow delete: if isGroupMember(groupId) && me() == riderId;
       }
 
-      // Hazard reports (raw): group members read/write; create binds the
-      // report to the writer and to this group's path (no cross-group writes).
+      // Hazard reports (raw): members read; a report is bound to its writer and this group, and only its writer can
+      // re-write it (the offline sync worker retries idempotently with .set()).
       match /reports/{reportId} {
-        allow read: if request.auth != null
-          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
-        allow create: if request.auth != null
-          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids
-          && request.resource.data.rider_id == request.auth.uid
-          && request.resource.data.group_id == groupId;
-        allow update: if request.auth != null
-          && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.member_ids;
+        allow read: if isGroupMember(groupId);
+        allow create: if isGroupMember(groupId)
+          && request.resource.data.keys().hasOnly(['report_id', 'rider_id', 'group_id', 'hazard_type', 'lat', 'lng',
+              'timestamp_hlc', 'reported_at_hlc'])
+          && request.resource.data.rider_id == me()
+          && request.resource.data.group_id == groupId
+          && request.resource.data.hazard_type in ['pothole', 'oil_spill', 'accident', 'debris', 'other']
+          && lat(request.resource.data.lat) && lng(request.resource.data.lng)
+          && str(request.resource.data.get('timestamp_hlc', ''), 0, 64)
+          && str(request.resource.data.get('reported_at_hlc', ''), 0, 64);
+        allow update: if isGroupMember(groupId)
+          && resource.data.rider_id == me()
+          && request.resource.data.rider_id == me()
+          && request.resource.data.group_id == groupId
+          && request.resource.data.keys().hasOnly(['report_id', 'rider_id', 'group_id', 'hazard_type', 'lat', 'lng',
+              'timestamp_hlc', 'reported_at_hlc'])
+          && request.resource.data.hazard_type in ['pothole', 'oil_spill', 'accident', 'debris', 'other']
+          && lat(request.resource.data.lat) && lng(request.resource.data.lng);
         allow delete: if false;
       }
     }
 
-    // Hazard clusters: group members read; any authed rider writes
-    // (clustering runs on-device and batches cluster docs)
+    // ---------------------------------------------------------------- hazards
+
+    // Hazard clusters: group members read/write (clustering runs on-device and batches cluster docs). The app queries
+    // `where group_id == X [and status == 'active']`, which the membership check below accepts.
+    function validCluster(d, clusterId) {
+      return d.keys().hasOnly(['cluster_id', 'group_id', 'hazard_type', 'centroid_lat', 'centroid_lng', 'polygon_points',
+          'report_count', 'hazard_score', 'created_at_hlc', 'status', 'gone_votes', 'resolved_at_hlc'])
+        && d.get('cluster_id', clusterId) == clusterId
+        && d.hazard_type in ['pothole', 'oil_spill', 'accident', 'debris', 'other']
+        && lat(d.centroid_lat) && lng(d.centroid_lng)
+        && d.get('polygon_points', []) is list && d.get('polygon_points', []).size() <= 20
+        && nonNeg(d.get('report_count', 0), 100000)
+        && num(d.get('hazard_score', 0))
+        && str(d.get('created_at_hlc', ''), 0, 64)
+        && d.status in ['active', 'resolved']
+        && d.get('gone_votes', []) is list && d.get('gone_votes', []).size() <= 100;
+    }
+
     match /hazards/{clusterId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null
-        && request.resource.data.group_id is string;
+      allow read: if isGroupMember(resource.data.group_id);
+      allow create: if isGroupMember(request.resource.data.group_id)
+        && validCluster(request.resource.data, clusterId);
+      allow update: if isGroupMember(resource.data.group_id)
+        && request.resource.data.group_id == resource.data.group_id
+        && validCluster(request.resource.data, clusterId)
+        // a "gone" vote can only add your own uid (a re-cluster may reset the votes)
+        && request.resource.data.get('gone_votes', []).toSet()
+            .difference(resource.data.get('gone_votes', []).toSet()).hasOnly([me()]);
       allow delete: if false;
     }
 
-    // SOS events: any rider can trigger; sender can resolve
+    // -------------------------------------------------------------------- SOS
+
+    // SOS events: any member of the ride can raise one (as themselves); only the sender can resolve; only the ride's
+    // members can read. The app queries `where group_id == X`.
     match /sos_events/{sosId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.rider_id == request.auth.uid
-        && request.resource.data.resolved == false;
-      allow update: if request.auth != null
-        && request.resource.data.resolved != null;
+      allow read: if isGroupMember(resource.data.group_id);
+      allow create: if isGroupMember(request.resource.data.group_id)
+        && request.resource.data.keys().hasOnly(['sos_id', 'rider_id', 'group_id', 'lat', 'lng', 'created_at_hlc', 'tag',
+            'resolved', 'resolved_at_hlc'])
+        && request.resource.data.rider_id == me()
+        && request.resource.data.resolved == false
+        && request.resource.data.get('sos_id', sosId) == sosId
+        && lat(request.resource.data.lat) && lng(request.resource.data.lng)
+        && str(request.resource.data.get('created_at_hlc', ''), 0, 64)
+        && str(request.resource.data.get('tag', ''), 0, 200);
+      allow update: if signedIn()
+        && resource.data.rider_id == me()
+        && changed().hasOnly(['resolved', 'resolved_at_hlc'])
+        && request.resource.data.resolved is bool;
       allow delete: if false;
 
-      // Riders who are coming to help: each writes only their own doc
+      // Riders who are coming to help: ride members read; each writes only their own doc
       match /responders/{riderId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == riderId;
+        allow read: if isGroupMember(get(sosPath(sosId)).data.group_id);
+        allow create, update: if me() == riderId
+          && isGroupMember(get(sosPath(sosId)).data.group_id)
+          && request.resource.data.keys().hasOnly(['state', 'updated_ms'])
+          && request.resource.data.state in ['going', 'arrived']
+          && num(request.resource.data.get('updated_ms', 0));
+        allow delete: if me() == riderId && isGroupMember(get(sosPath(sosId)).data.group_id);
       }
     }
 
-    // Routes: readable by group members; written by server API only
+    // ----------------------------------------------------------- server-owned
+
+    // Routes: written by the server API only; readable only by members of the ride the route belongs to.
     match /routes/{routeId} {
-      allow read: if request.auth != null;
+      allow read: if isGroupMember(resource.data.get('group_id', null));
       allow write: if false;
     }
 
-    // FL rounds: readable by all; written by aggregation server
+    // FL rounds: aggregate model metadata, nothing personal; written by the aggregation server only.
     match /fl_rounds/{roundId} {
-      allow read: if request.auth != null;
+      allow read: if signedIn();
       allow write: if false;
     }
 
-    // Top-level hazard_reports (legacy path — kept for compatibility)
+    // Top-level hazard_reports (legacy path): no client reads or writes it any more. Closed.
     match /hazard_reports/{reportId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }

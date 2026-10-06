@@ -1,10 +1,11 @@
 /**
  * The rider's private settings: preferences, emergency contacts, onboarded flag.
- * Cached on the device (MMKV) so the Road screens and SOS work with no signal, and synced to
+ * Cached on the device (encrypted MMKV: emergency contacts and phone are PII) so the Road screens and SOS work with no signal, and synced to
  * users/{uid}/private/settings while signed in. Reads are tolerant (see settingsFromDoc).
  */
 import { create } from 'zustand';
-import { MMKV } from 'react-native-mmkv';
+import type { MMKV } from 'react-native-mmkv';
+import { getEncryptedMMKV } from '../services/secureStorage';
 import { DEFAULT_SETTINGS, EmergencyContact, Prefs, PrivateSettings } from '../models/domain';
 import { normalizeNumber, saveContacts, savePrefs, settingsFromDoc, subscribeSettings, markOnboarded } from '../services/userService';
 
@@ -12,7 +13,7 @@ const KEY = 'settings.v1';
 let mmkv: MMKV | null = null;
 function disk(): MMKV | null {
   try {
-    if (!mmkv) mmkv = new MMKV({ id: 'weride_prefs' });
+    if (!mmkv) mmkv = getEncryptedMMKV('weride_prefs');
     return mmkv;
   } catch {
     return null;

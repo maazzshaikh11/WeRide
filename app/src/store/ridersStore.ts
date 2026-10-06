@@ -15,6 +15,7 @@ import { create } from 'zustand';
 import { getLocationSocket } from '../services/socketService';
 import { verifiedLocationFromJson, VerifiedLocation } from '../models/verifiedLocation';
 import { getMarkerState, isValidLocation, MarkerState } from '../screens/map/overlays/riderMarkerState';
+import { warn } from '../utils/log';
 
 export interface RiderEntry {
   location: VerifiedLocation;
@@ -44,6 +45,11 @@ let socketHandler: ((payload: unknown) => void) | null = null;
 let connectHandler: (() => void) | null = null;
 let disconnectHandler: (() => void) | null = null;
 
+/** What to log about a rejected payload: its shape only. The payload carries a rider's position and id (PII). */
+function describeRejected(p: unknown): string {
+  return p && typeof p === 'object' ? `{keys: ${Object.keys(p as object).slice(0, 12).join(',')}}` : typeof p;
+}
+
 export const useRidersStore = create<RidersState>((set, get) => ({
   riders: new Map(),
   connected: false,
@@ -53,7 +59,7 @@ export const useRidersStore = create<RidersState>((set, get) => ({
 
   upsertRider: (rawPayload: unknown) => {
     if (!isValidLocation(rawPayload)) {
-      console.warn('[ridersStore] Rejected malformed location:update payload:', rawPayload);
+      warn('[ridersStore] Rejected malformed location:update payload', describeRejected(rawPayload));
       return;
     }
 
@@ -141,7 +147,7 @@ export const useRidersStore = create<RidersState>((set, get) => ({
 
     socketHandler = (payload: unknown) => {
       if (!isValidLocation(payload)) {
-        console.warn('[ridersStore] Rejected malformed location:update payload:', payload);
+        warn('[ridersStore] Rejected malformed location:update payload', describeRejected(payload));
         return;
       }
       const location = verifiedLocationFromJson(payload);

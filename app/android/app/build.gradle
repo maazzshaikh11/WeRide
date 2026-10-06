@@ -53,9 +53,43 @@ react {
 }
 
 /**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ * Run R8 (code shrinking + obfuscation) and resource shrinking on Release builds.
+ * Keep rules for the native libraries live in proguard-rules.pro; see docs/SECURITY.md for what to verify on a device
+ * after changing either.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
+
+/**
+ * Release signing. The release build is signed with YOUR upload/release key, never the debug key.
+ * Credentials come from (first match wins), none of which is committed to git:
+ *   1. android/keystore.properties (git-ignored; copy keystore.properties.example)
+ *   2. Gradle properties, e.g. ~/.gradle/gradle.properties:  WERIDE_RELEASE_STORE_FILE=... etc.
+ *   3. Environment variables (CI):                           WERIDE_RELEASE_STORE_FILE=... etc.
+ * Keys: STORE_FILE, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD. If any is missing, any build that includes a release task FAILS.
+ */
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def releaseSigningValue = { String key ->
+    def v = keystoreProperties.getProperty(key) ?: project.findProperty("WERIDE_RELEASE_" + key) ?: System.getenv("WERIDE_RELEASE_" + key)
+    return (v == null || v.toString().trim().isEmpty()) ? null : v.toString().trim()
+}
+def releaseStoreFile = releaseSigningValue("STORE_FILE")
+def hasReleaseSigning = ["STORE_FILE", "STORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD"].every { releaseSigningValue(it) != null } &&
+        rootProject.file(releaseStoreFile ?: "missing").exists()
+
+gradle.taskGraph.whenReady { graph ->
+    def releaseRequested = graph.allTasks.any { it.path.startsWith(project.path + ":") && it.name =~ /(?i)release/ }
+    if (releaseRequested && !hasReleaseSigning) {
+        throw new GradleException(
+            "Release signing is not configured, refusing to build a release (it would be signed with the debug key).\n" +
+            "Create android/keystore.properties (see keystore.properties.example) or set WERIDE_RELEASE_STORE_FILE, " +
+            "WERIDE_RELEASE_STORE_PASSWORD, WERIDE_RELEASE_KEY_ALIAS, WERIDE_RELEASE_KEY_PASSWORD as Gradle properties or environment variables, " +
+            "and make sure the keystore file exists.")
+    }
+}
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -90,16 +124,26 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // Only populated when all four values are present; otherwise the taskGraph check above stops release builds.
+            if (hasReleaseSigning) {
+                storeFile rootProject.file(releaseStoreFile)
+                storePassword releaseSigningValue("STORE_PASSWORD")
+                keyAlias releaseSigningValue("KEY_ALIAS")
+                keyPassword releaseSigningValue("KEY_PASSWORD")
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // NEVER signingConfigs.debug here: the debug key is public, anyone could ship an "update" to our users.
+            signingConfig signingConfigs.release
+            debuggable false
             minifyEnabled enableProguardInReleaseBuilds
+            shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }

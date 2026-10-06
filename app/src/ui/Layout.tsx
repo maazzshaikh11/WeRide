@@ -3,10 +3,12 @@
  * (the 60/20 scroller with an optional CTA pinned to the bottom and the content fading under it),
  * KV (value/key stat row), Ring (circular progress), Bars (the weekly bar chart), Rail (the dashed waypoint rail).
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleProp, Text, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { GARAGE_COLUMN, useResponsive } from '../theme/responsive';
+import { CAP } from '../theme/textPolicy';
 import { useStyles, useTheme } from '../theme/ThemeProvider';
 import Icon from './Icon';
 import PressableScale from './PressableScale';
@@ -44,37 +46,45 @@ export function Stepper({ step, of = 5, style }: { step: number; of?: number; st
 }
 
 /**
- * The standard screen: scrolls under a status-bar-aware 60 px top pad with 20 px gutters. `cta` is pinned
- * to the bottom (44 px above the home bar, like the demo) and the scrolling content fades beneath it.
+ * The standard screen: scrolls under a status-bar-aware top pad with 20 pt gutters (16 on compact widths). `cta` is
+ * pinned to the bottom (above the home bar, like the demo) and the scrolling content fades beneath it.
+ * On tablets the content (and the pinned CTA) sit in a centred column of at most `column` pt (garage 560, road 640)
+ * while the page background fills the screen.
  */
-export function Screen({ children, cta, tabs, style, contentStyle, testID, onScroll }: {
+export function Screen({ children, cta, tabs, style, contentStyle, testID, onScroll, column = GARAGE_COLUMN }: {
   children: React.ReactNode; cta?: React.ReactNode; tabs?: boolean; style?: StyleProp<ViewStyle>; contentStyle?: StyleProp<ViewStyle>; testID?: string;
-  onScroll?: (y: number) => void;
+  onScroll?: (y: number) => void; column?: number;
 }) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { gutter, isShortHeight } = useResponsive();
   const s = useStyles(({ colors: c }) => ({
     root: { flex: 1, backgroundColor: c.bg },
-    cta: { position: 'absolute', left: 20, right: 20, paddingBottom: 0 },
+    cta: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
     fade: { position: 'absolute', left: 0, right: 0 },
   }));
-  const top = Math.max(insets.top, 24) + 16;
-  const bottomGap = cta ? 120 + insets.bottom : tabs ? 24 : 40 + insets.bottom;
+  const top = Math.max(insets.top, 24) + (isShortHeight ? 8 : 16);
+  // The pinned CTA can be taller than one button (two buttons, a keypad): the scroller reserves its *measured* height so the
+  // last row of content can always be scrolled clear of it (never less than the demo's 120 + inset).
+  const [ctaH, setCtaH] = useState(0);
+  const ctaBottom = Math.max(insets.bottom, 12) + 20;
+  const bottomGap = cta ? Math.max(120 + insets.bottom, ctaH + ctaBottom + 28) : tabs ? 24 : 40 + insets.bottom;
   return (
     <View style={[s.root, style]} testID={testID}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[{ paddingTop: top, paddingHorizontal: 20, paddingBottom: bottomGap }, contentStyle]}
+        contentContainerStyle={[{ paddingTop: top, paddingHorizontal: gutter, paddingBottom: bottomGap, alignItems: 'center' }, contentStyle]}
         onScroll={onScroll ? (e) => onScroll(e.nativeEvent.contentOffset.y) : undefined}
         scrollEventThrottle={onScroll ? 32 : undefined}
       >
-        {children}
+        <View style={{ width: '100%', maxWidth: column }}>{children}</View>
       </ScrollView>
       {cta ? (
         <>
           {/* content fades out underneath the pinned button (demo `.has-cta`) */}
-          <View pointerEvents="none" style={[s.fade, { bottom: 0, height: 150 + insets.bottom }]}>
+          <View pointerEvents="none" style={[s.fade, { bottom: 0, height: Math.max(150 + insets.bottom, ctaH + ctaBottom + 56) }]}>
             <Svg width="100%" height="100%" preserveAspectRatio="none">
               <Defs>
                 <LinearGradient id="ctafade" x1="0" y1="1" x2="0" y2="0">
@@ -85,7 +95,9 @@ export function Screen({ children, cta, tabs, style, contentStyle, testID, onScr
               <Rect x="0" y="0" width="100%" height="100%" fill="url(#ctafade)" />
             </Svg>
           </View>
-          <View style={[s.cta, { bottom: Math.max(insets.bottom, 12) + 20 }]}>{cta}</View>
+          <View style={[s.cta, { bottom: ctaBottom, paddingHorizontal: gutter }]} pointerEvents="box-none">
+            <View style={{ width: '100%', maxWidth: column }} onLayout={(e) => setCtaH(Math.round(e.nativeEvent.layout.height))}>{cta}</View>
+          </View>
         </>
       ) : null}
     </View>
@@ -93,17 +105,17 @@ export function Screen({ children, cta, tabs, style, contentStyle, testID, onScr
 }
 
 /** Row of value/key stats (demo `.kv`): big mono numerals over an uppercase key. */
-export function KV({ items, style, size = 25, keyLines = 1 }: { items: { value: string; unit?: string; label: string; color?: string }[]; style?: StyleProp<ViewStyle>; size?: number; keyLines?: number }) {
+export function KV({ items, style, size = 25, keyLines = 2 }: { items: { value: string; unit?: string; label: string; color?: string }[]; style?: StyleProp<ViewStyle>; size?: number; keyLines?: number }) {
   const { type } = useTheme();
   return (
     <View style={[{ flexDirection: 'row' }, style]}>
       {items.map((it) => (
         <View key={it.label} style={{ flex: 1, minWidth: 0 }}>
-          <Text style={[type.statValue, { fontSize: size, lineHeight: size }, it.color ? { color: it.color } : null]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+          <Text style={[type.statValue, { fontSize: size, lineHeight: size }, it.color ? { color: it.color } : null]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} maxFontSizeMultiplier={CAP.fixed}>
             {it.value}
-            {it.unit ? <Text style={{ fontSize: 14 }}> {it.unit}</Text> : null}
+            {it.unit ? <Text style={{ fontSize: 14 }} maxFontSizeMultiplier={CAP.fixed}> {it.unit}</Text> : null}
           </Text>
-          <Text style={[type.statKey, { marginTop: 6 }]} numberOfLines={keyLines}>{it.label.toUpperCase()}</Text>
+          <Text style={[type.statKey, { marginTop: 6 }]} numberOfLines={keyLines} maxFontSizeMultiplier={CAP.hud}>{it.label.toUpperCase()}</Text>
         </View>
       ))}
     </View>

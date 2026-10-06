@@ -9,6 +9,7 @@
 import React from 'react';
 import { ActivityIndicator, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
+import { CAP } from '../theme/textPolicy';
 import PressableScale, { PressableScaleProps } from './PressableScale';
 
 export type ButtonVariant = 'primary' | 'dark' | 'ghost' | 'soft' | 'secondary' | 'danger' | 'ok';
@@ -16,7 +17,7 @@ export type ButtonVariant = 'primary' | 'dark' | 'ghost' | 'soft' | 'secondary' 
 export interface ButtonProps extends Omit<PressableScaleProps, 'style' | 'children'> {
   label: string;
   variant?: ButtonVariant;
-  /** 'md' = 58pt (demo .btn), 'sm' = 44pt (minimum touch target), 'xs' = 36pt. */
+  /** 'md' = 58pt (demo .btn), 'sm' = 44pt (minimum touch target), 'xs' = 36pt (+4 pt hit slop = 44). */
   size?: 'md' | 'sm' | 'xs';
   loading?: boolean;
   /** Content before the label (an Icon). */
@@ -38,6 +39,7 @@ export default function Button({
   disabled,
   leading,
   style,
+  hitSlop,
   haptic = variant === 'danger' ? 'warning' : 'select',
   accessibilityLabel,
   ...rest
@@ -62,6 +64,7 @@ export default function Button({
     <PressableScale
       {...rest}
       haptic={haptic}
+      hitSlop={hitSlop ?? (size === 'xs' ? { top: 4, bottom: 4, left: 4, right: 4 } : undefined)}
       disabled={inactive}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
@@ -71,7 +74,7 @@ export default function Button({
       {/* Label stays in layout (hidden while loading) so the width never changes. */}
       <View style={[styles.content, loading && styles.hidden]}>
         {leading}
-        <Text style={labelStyle} numberOfLines={1}>{label}</Text>
+        <Text style={labelStyle} numberOfLines={1} maxFontSizeMultiplier={CAP.hud}>{label}</Text>
       </View>
       {loading ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">

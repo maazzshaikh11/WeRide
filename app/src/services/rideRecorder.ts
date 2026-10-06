@@ -4,7 +4,7 @@
  * (track downsampled to MAX_TRACK_POINTS, cohesion over the 500 m rule, longest gap, avg/max speed, events).
  *
  * Pure and deterministic: every clock is passed in (`now`, ms). The one side effect is persisting the in-progress recording
- * to MMKV about every 10 s, so an app restart mid-ride does not lose the ride (restored by `start()` for the same ride id).
+ * to (encrypted) MMKV about every 10 s, so an app restart mid-ride does not lose the ride (restored by `start()` for the same ride id).
  *
  * Rules
  *  - Own fixes with accuracy > 50 m, a spoof flag or non-finite coordinates are ignored. A fix that would need more than
@@ -68,9 +68,9 @@ export interface RecorderStorage {
 
 function defaultStorage(): RecorderStorage | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy: keeps importing this file free of the native module
-    const { MMKV } = require('react-native-mmkv');
-    return new MMKV({ id: 'ride_recorder' });
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy: keeps importing this file free of the native modules
+    const { getEncryptedMMKV } = require('./secureStorage');
+    return getEncryptedMMKV('ride_recorder'); // encrypted: the recording is a GPS trail
   } catch {
     return null;
   }

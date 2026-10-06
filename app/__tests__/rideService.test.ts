@@ -8,6 +8,9 @@ let mockUid: string | null = 'me';
 
 function mockDoc(path: string) {
   return {
+    path,
+    // join_codes/{CODE}: "exists" when the test marked the code as taken
+    get: jest.fn(async () => ({ exists: path.startsWith('join_codes/') && mockCodeTaken.includes(path.split('/')[1]), data: () => undefined })),
     set: jest.fn(async (data: any) => { mockCalls.push({ op: 'set', path, data }); }),
     update: jest.fn(async (data: any) => { mockCalls.push({ op: 'update', path, data }); }),
     onSnapshot: jest.fn((next: any, error: any) => { mockListeners.push({ path, next, error }); return jest.fn(); }),
@@ -22,8 +25,22 @@ function mockCollection(path: string, wheres: any[] = []) {
   };
   return q;
 }
+// The code generator is deterministic here (production uses the platform CSPRNG, see src/utils/joinCode.ts).
+const mockCodes: string[] = [];
+jest.mock('../src/utils/joinCode', () => {
+  const actual = jest.requireActual('../src/utils/joinCode');
+  return { ...actual, generateJoinCode: (r?: () => number) => (r ? actual.generateJoinCode(r) : mockCodes.shift() ?? actual.generateJoinCode(() => Math.random())) };
+});
+
 jest.mock('@react-native-firebase/firestore', () => {
-  const firestore: any = jest.fn(() => ({ doc: (p: string) => mockDoc(p), collection: (p: string) => mockCollection(p) }));
+  const mockBatch = () => {
+    const ops: { path: string; data: any }[] = [];
+    return {
+      set: (ref: { path: string }, data: any) => { ops.push({ path: ref.path, data }); },
+      commit: jest.fn(async () => { ops.forEach((o) => mockCalls.push({ op: 'set', path: o.path, data: o.data })); mockCalls.push({ op: 'commit', path: `${ops.length} writes` }); }),
+    };
+  };
+  const firestore: any = jest.fn(() => ({ doc: (p: string) => mockDoc(p), collection: (p: string) => mockCollection(p), batch: mockBatch }));
   firestore.FieldValue = { serverTimestamp: () => 'SERVER_TS' };
   return { __esModule: true, default: firestore };
 });
@@ -38,6 +55,7 @@ beforeEach(() => {
   mockCalls.length = 0;
   mockListeners.length = 0;
   mockCodeTaken = [];
+  mockCodes.length = 0;
   mockUid = 'me';
 });
 
@@ -117,7 +135,7 @@ describe('writes', () => {
       route: { distanceKm: 84, etaMinutes: 125, safetyScore: 0.9, path: [{ lat: 19, lng: 72.8 }, { lat: 18.75, lng: 73.4 }] },
     });
     expect(typeof id).toBe('string');
-    const w = mockCalls.find((c) => c.op === 'set')!;
+    const w = mockCalls.find((c) => c.op === 'set' && c.path.startsWith('groups/'))!;
     expect(w.path).toBe(`groups/${id}`);
     expect(w.data).toMatchObject({
       name: 'Lonavala Run', created_by: 'me', member_ids: ['me', 'u2', 'u3'], invited_ids: ['u2', 'u3'], crew_id: 'c1', pace: 'Steady', status: 'planned',
@@ -130,13 +148,16 @@ describe('writes', () => {
       },
     });
     expect(w.data.join_code).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/);
+    // the ride and its join_codes/{CODE} doc go out in ONE batch (the rules verify the target in the same batch)
+    expect(mockCalls.filter((c) => c.op === 'commit')).toHaveLength(1);
+    expect(mockCalls.find((c) => c.path === `join_codes/${w.data.join_code}`)).toMatchObject({ op: 'set', data: { kind: 'ride', target_id: id } });
     // Firestore rejects undefined: optional fields that are unset are simply absent
     expect('ride_type' in w.data).toBe(false);
   });
 
   it('createRide for a solo ride omits crew_id and still lists only the creator', async () => {
     await createRide({ name: 'Solo Run', crewId: null, start: null, destination: { label: 'X', lat: 1, lng: 2 }, stops: [], startTimeMs: 5 });
-    const d = mockCalls.find((c) => c.op === 'set')!.data;
+    const d = mockCalls.find((c) => c.op === 'set' && c.path.startsWith('groups/'))!.data;
     expect(d.member_ids).toEqual(['me']);
     expect('crew_id' in d).toBe(false);
     expect('meetup' in d).toBe(false);
@@ -150,13 +171,29 @@ describe('writes', () => {
     expect(mockCalls).toHaveLength(0);
   });
 
-  it('createRide never reuses a join code that is already taken', async () => {
-    const spy = jest.spyOn(Math, 'random');
-    spy.mockReturnValue(0); // always "AAAAAA"
+  it('createRide never reuses a join code that is already taken (checked in join_codes, never by querying rides)', async () => {
+    mockCodes.push('AAAAAA', 'BBBBBB');
+    mockCodeTaken = ['AAAAAA'];
+    const id = await createRide({ name: 'x', crewId: null, start: null, destination: { label: 'X', lat: 1, lng: 2 }, stops: [], startTimeMs: 5 });
+    expect(mockCalls.find((c) => c.path === `groups/${id}`)!.data.join_code).toBe('BBBBBB');
+    expect(mockCalls.some((c) => c.path === 'join_codes/AAAAAA')).toBe(false);
+    expect(mockListeners).toHaveLength(0);
+  });
+
+  it('createRide gives up with a clear error when every code it tries is taken, writing nothing', async () => {
+    mockCodes.push(...Array(10).fill('AAAAAA'));
     mockCodeTaken = ['AAAAAA'];
     await expect(createRide({ name: 'x', crewId: null, start: null, destination: { label: 'X', lat: 1, lng: 2 }, stops: [], startTimeMs: 5 })).rejects.toThrow(/join code/i);
     expect(mockCalls).toHaveLength(0);
-    spy.mockRestore();
+  });
+
+  it('createRide keeps the name and place labels inside the limits the Firestore rules enforce', async () => {
+    const id = await createRide({ name: 'N'.repeat(200), crewId: null, start: { label: 'S'.repeat(300), lat: 1, lng: 2 }, destination: { label: 'D'.repeat(300), lat: 1, lng: 2 }, stops: [], startTimeMs: 5 });
+    const d = mockCalls.find((c) => c.path === `groups/${id}`)!.data;
+    expect(d.name).toHaveLength(60);
+    expect(d.ride_plan.start.label).toHaveLength(120);
+    expect(d.ride_plan.destination.label).toHaveLength(120);
+    expect(d.meetup.label).toHaveLength(120);
   });
 
   it('setRideStatus stamps started_ms / finished_ms only where they apply', async () => {

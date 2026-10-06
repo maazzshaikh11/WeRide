@@ -6,9 +6,10 @@
  * countdown opens Live again. It sits on top of Live (which keeps tracking underneath).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, View } from 'react-native';
 import { useRouteStore } from '@routing/client/routeStore';
-import { useStyles, useTheme } from '../../theme/ThemeProvider';
+import { useTheme } from '../../theme/ThemeProvider';
 import { Button, Chip, Icon, Plate } from '../../ui';
 import SosFab from '../../components/SosFab';
 import ToastContainer from '../../components/ToastContainer';
@@ -24,8 +25,10 @@ import { markStopVisited, visitedStopIds } from '../../services/rideFlow';
 import { formatDistance } from '../../utils/units';
 import { haversineMeters } from '../../utils/geoUtils';
 import { warn } from '../../utils/log';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import RoadFrame from './parts/RoadFrame';
 import RoadScope from './parts/RoadScope';
+import { useLiveLayout } from '../map/live/LiveChrome';
+import { CAP } from '../../theme/textPolicy';
 import TileGrid from './parts/TileGrid';
 import { useRideRoom } from './parts/useRideRoom';
 import { breakClock, nextLeg, shouldRoll } from './parts/leg';
@@ -52,11 +55,6 @@ function StopBody({ route }: Props) {
   const { colors, type } = useTheme();
   const insets = useSafeAreaInsets();
   const glove = usePrefsStore((st) => st.prefs.glove);
-  const s = useStyles(({ colors: c }) => ({
-    root: { flex: 1, backgroundColor: c.bg },
-    body: { paddingTop: Math.max(insets.top, 24) + 20, paddingHorizontal: 14 },
-    bottom: { position: 'absolute', left: 14, right: 14, bottom: glove ? 26 : 30, flexDirection: 'row', gap: 10, alignItems: 'flex-end' },
-  }));
   const uid = useAppStore((st) => st.userId);
   const push = useToastStore((st) => st.push);
   const units = usePrefsStore((st) => st.prefs.units);
@@ -169,18 +167,38 @@ function StopBody({ route }: Props) {
     ? [leg.km != null ? formatDistance(leg.km, units) : null, leg.minutes != null ? `${Math.max(1, Math.round(leg.minutes))} min` : null].filter(Boolean).join(' ∙ ')
     : '';
   const rollLabel = meReady ? (isLead ? 'Roll out' : allReady ? 'Roll out' : 'Ready ✓') : 'I’m ready to roll';
-  const btnH = glove ? 104 : 88;
+  const layout = useLiveLayout(glove);
+  const btnH = layout.controlH;
 
   return (
-    <View style={s.root} testID="screen-Stop">
-      <View style={s.body}>
+    <>
+      <RoadFrame
+        testID="screen-Stop"
+        glove={glove}
+        dock={
+          <>
+            <View style={{ height: btnH, justifyContent: 'center' }}>
+              <SosFab width={layout.sosKeyW} height={btnH} onHoldComplete={() => { rideRecorder.addEvent('sos', 'SOS sent'); triggerSosFlow(groupId).catch((e: unknown) => warn('[Stop] SOS flow failed:', e)); }} />
+            </View>
+            <Button
+              testID="btn-ready"
+              label={rollLabel}
+              variant={meReady && !(isLead || allReady) ? 'ok' : 'primary'}
+              accessibilityLabel={meReady ? (isLead || allReady ? 'Roll out' : 'Ready. Tap to cancel') : 'I am ready to roll'}
+              onPress={meReady && (isLead || allReady) ? breakOver : onReady}
+              style={{ flex: 1, height: btnH, borderRadius: 24 }}
+            />
+          </>
+        }
+      >
         <Plate
           tone="green"
           title={stopName}
           subtitle={ride ? `Break ∙ ${ride.name}` : 'Break'}
           titleSize={30}
+          titleLines={2}
           style={{ justifyContent: 'space-between' }}
-          right={<Text style={[type.num, { fontSize: 38, lineHeight: 40, color: '#FFFFFF', letterSpacing: -0.8 }]} testID="break-timer">{breakClock(now - since.current)}</Text>}
+          right={<Text style={[type.num, { fontSize: 38, lineHeight: 40, color: '#FFFFFF', letterSpacing: -0.8 }]} testID="break-timer" numberOfLines={1} maxFontSizeMultiplier={CAP.fixed}>{breakClock(now - since.current)}</Text>}
           testID="stop-plate"
         />
         <Text style={[type.label, { marginTop: 24 }]} testID="crew-ready-label">{`CREW ∙ ${readyCount} OF ${memberIds.length} READY TO ROLL`}</Text>
@@ -193,7 +211,7 @@ function StopBody({ route }: Props) {
                 <Icon name="flag" size={20} color={colors.ink} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={type.h3} numberOfLines={1}>{`Next leg ∙ ${leg.name}`}</Text>
+                <Text style={type.h3} numberOfLines={2}>{`Next leg ∙ ${leg.name}`}</Text>
                 {legSub ? <Text style={type.sm}>{legSub}</Text> : null}
               </View>
             </View>
@@ -209,34 +227,20 @@ function StopBody({ route }: Props) {
         <View style={{ flexDirection: 'row', marginTop: 16 }}>
           <Chip label="I’m fuelling" on={fuelling} onPress={onFuel} icon={<Icon name="fuel" size={18} color={fuelling ? colors.bg : colors.ink} />} testID="chip-fuel" />
         </View>
-      </View>
-
-      <View style={s.bottom}>
-        <View style={{ height: btnH, justifyContent: 'center' }}>
-          <SosFab onHoldComplete={() => { rideRecorder.addEvent('sos', 'SOS sent'); triggerSosFlow(groupId).catch((e: unknown) => warn('[Stop] SOS flow failed:', e)); }} />
-        </View>
-        <Button
-          testID="btn-ready"
-          label={rollLabel}
-          variant={meReady && !(isLead || allReady) ? 'ok' : 'primary'}
-          accessibilityLabel={meReady ? (isLead || allReady ? 'Roll out' : 'Ready. Tap to cancel') : 'I am ready to roll'}
-          onPress={meReady && (isLead || allReady) ? breakOver : onReady}
-          style={{ flex: 1, height: btnH, borderRadius: 24 }}
-        />
-      </View>
-      <ToastContainer top={64} />
-    </View>
+      </RoadFrame>
+      <ToastContainer top={Math.max(insets.top, 24) + 16} />
+    </>
   );
 }
 
 function LegChip({ icon, text }: { icon: 'fuel' | 'haz'; text: string }) {
   const { colors, type } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 34, paddingLeft: 8, paddingRight: 12, borderRadius: 17, backgroundColor: colors.card2, borderWidth: 1.5, borderColor: colors.line }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 34, maxWidth: '100%', paddingVertical: 4, paddingLeft: 8, paddingRight: 12, borderRadius: 17, backgroundColor: colors.card2, borderWidth: 1.5, borderColor: colors.line }}>
       <View style={{ width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card }}>
         <Icon name={icon} size={12} color={colors.ink} />
       </View>
-      <Text style={[type.smStrong, { fontSize: 13 }]}>{text}</Text>
+      <Text style={[type.smStrong, { fontSize: 13, flexShrink: 1 }]}>{text}</Text>
     </View>
   );
 }

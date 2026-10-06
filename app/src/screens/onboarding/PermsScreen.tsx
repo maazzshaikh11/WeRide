@@ -96,7 +96,6 @@ export default function PermsScreen({ navigation }: any) {
   return (
     <View style={{ flex: 1 }} testID="screen-Perms">
       <Screen
-        contentStyle={{ paddingBottom: 130 }}
         cta={<Button label="Continue" onPress={() => navigation.navigate('Contact')} disabled={!canContinue} testID="perms-continue" />}
       >
         <TopBar onBack={() => navigation.goBack()} />

@@ -1,10 +1,11 @@
 /**
  * The rider's appearance choice: which theme (Demo / Ember) and whether to follow
- * the phone's light/dark setting or force one. Persisted on the device (MMKV) so
+ * the phone's light/dark setting or force one. Persisted on the device (encrypted MMKV, see services/secureStorage) so
  * it survives restarts; a failed read/write just falls back to the defaults.
  */
 import { create } from 'zustand';
-import { MMKV } from 'react-native-mmkv';
+import type { MMKV } from 'react-native-mmkv';
+import { getEncryptedMMKV } from '../services/secureStorage';
 import { THEME_IDS, ThemeId, ThemePreference } from './palettes';
 
 const KEY_THEME = 'theme.id';
@@ -13,7 +14,7 @@ const KEY_MODE = 'theme.mode';
 let store: MMKV | null = null;
 function prefs(): MMKV | null {
   try {
-    if (!store) store = new MMKV({ id: 'weride_prefs' });
+    if (!store) store = getEncryptedMMKV('weride_prefs');
     return store;
   } catch {
     return null;

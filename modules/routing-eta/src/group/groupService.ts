@@ -2,6 +2,11 @@
  * Group List / Join / Create Ride service.
  * Firestore groups/ CRUD. Used by the GroupListScreen.
  * Ported from group_service.dart.
+ *
+ * Join codes (docs/security/firestore.md): a group is readable only by its members, so a code is NOT resolved by querying
+ * `groups`. Every code has a document `join_codes/{CODE} = { kind: 'ride', target_id }` that can be fetched by id only.
+ * createGroup writes the group and its code doc in one batch; joinGroup resolves the code, then updates the group with
+ * `member_ids += uid` and `join_proof = "<CODE>:<uid>"`. Joining by raw group id (the old legacy path) is no longer possible.
  */
 
 import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
@@ -38,10 +43,24 @@ const JOIN_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const JOIN_CODE_LENGTH = 6;
 const JOIN_CODE_RE = new RegExp(`^[${JOIN_CODE_ALPHABET}]{${JOIN_CODE_LENGTH}}$`);
 
-export function generateJoinCode(random: () => number = Math.random): string {
+/** Uniform index in [0, n) from the platform CSPRNG (rejection sampling, no modulo bias). Throws if there is no secure source. */
+function secureIndex(n: number): number {
+  const c = (globalThis as { crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array } }).crypto;
+  if (!c || typeof c.getRandomValues !== 'function') throw new Error('no secure random source for join codes');
+  const limit = 256 - (256 % n);
+  const buf = new Uint8Array(1);
+  for (;;) {
+    c.getRandomValues(buf);
+    if (buf[0] < limit) return buf[0] % n;
+  }
+}
+
+/** Join codes admit a rider to a ride, so they come from the CSPRNG; `random` exists only for deterministic tests. */
+export function generateJoinCode(random?: () => number): string {
   let out = '';
   for (let i = 0; i < JOIN_CODE_LENGTH; i++) {
-    out += JOIN_CODE_ALPHABET[Math.floor(random() * JOIN_CODE_ALPHABET.length)];
+    const idx = random ? Math.floor(random() * JOIN_CODE_ALPHABET.length) : secureIndex(JOIN_CODE_ALPHABET.length);
+    out += JOIN_CODE_ALPHABET[idx];
   }
   return out;
 }
@@ -68,19 +87,25 @@ export class GroupService {
   }
 
   /**
-   * A join code not used by any existing group. Read-then-write, so two
-   * simultaneous creates could in theory pick the same code; with 31^6 (~887M)
-   * codes that is accepted rather than adding a server-side counter.
+   * Writes the group and its `join_codes/{code}` doc in one batch, with a code nobody uses yet. Read-then-write: if two
+   * riders pick the same code at once the loser's batch is refused by the rules (a code doc cannot be overwritten) and
+   * another code is tried. With 31^6 (~887M) codes a collision is rare.
    */
-  private async _uniqueJoinCode(): Promise<string> {
+  private async _createWithCode(groupId: string, build: (code: string) => Record<string, unknown>): Promise<void> {
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = generateJoinCode();
-      const taken = await this._firestore
-        .collection('groups')
-        .where('join_code', '==', code)
-        .limit(1)
-        .get();
-      if (taken.empty) return code;
+      const taken = await this._firestore.collection('join_codes').doc(code).get();
+      if (taken.exists) continue;
+      const batch = this._firestore.batch();
+      batch.set(this._firestore.collection('groups').doc(groupId), build(code));
+      batch.set(this._firestore.collection('join_codes').doc(code), { kind: 'ride', target_id: groupId });
+      try {
+        await batch.commit();
+        return;
+      } catch (e: any) {
+        if (e?.code === 'permission-denied' && attempt < 4) continue; // lost a race for the code
+        throw e;
+      }
     }
     throw new Error('Could not allocate a join code — try again');
   }
@@ -88,10 +113,9 @@ export class GroupService {
   async createGroup(name?: string, plan?: RidePlanPayload, meta?: RideMeta): Promise<string> {
     const groupId = this._uuid();
     const uid = this._auth.currentUser!.uid;
-    const joinCode = await this._uniqueJoinCode();
 
-    await this._firestore.collection('groups').doc(groupId).set({
-      name: name ?? `Ride ${Date.now()}`,
+    await this._createWithCode(groupId, (joinCode) => ({
+      name: String(name ?? `Ride ${Date.now()}`).slice(0, 60),
       created_by: uid,
       member_ids: [uid],
       created_at: firestore.FieldValue.serverTimestamp(),
@@ -100,7 +124,7 @@ export class GroupService {
       ...(meta?.ride_type ? { ride_type: meta.ride_type } : {}),
       ...(meta?.start_time_ms ? { start_time_ms: meta.start_time_ms } : {}),
       ...(plan ? { ride_plan: plan } : {}),
-    });
+    }));
     return groupId;
   }
 
@@ -129,27 +153,33 @@ export class GroupService {
     };
   }
 
-  /** Resolve a short join code or a raw group id to a group id. */
-  private async _resolveGroupId(input: string): Promise<string> {
-    const trimmed = input.trim();
-    if (!isJoinCode(trimmed)) return trimmed; // legacy: the group id itself
-    const snap = await this._firestore
-      .collection('groups')
-      .where('join_code', '==', trimmed.toUpperCase())
-      .limit(1)
-      .get();
-    if (snap.empty) throw new Error(`Group "${trimmed}" not found`);
-    return snap.docs[0].id;
+  /** Resolve a short join code to a group id through `join_codes/{CODE}`. Throws "not found" for an unknown code. */
+  private async _resolveGroupId(code: string): Promise<string> {
+    const snap = await this._firestore.collection('join_codes').doc(code.toUpperCase()).get();
+    const d = snap.exists ? (snap.data() as { kind?: string; target_id?: string } | undefined) : undefined;
+    if (!d || d.kind !== 'ride' || !d.target_id) throw new Error(`Group "${code}" not found`);
+    return d.target_id;
   }
 
-  /** Join by short code (e.g. "K7M2QX") or by raw group id. */
+  /**
+   * Join by short code (e.g. "K7M2QX"). The raw-group-id path of earlier versions is gone: groups are readable by
+   * members only and joining needs proof of the code, so an id alone is useless (and no longer accepted).
+   */
   async joinGroup(groupCode: string): Promise<void> {
     const uid = this._auth.currentUser!.uid;
-    const groupId = await this._resolveGroupId(groupCode);
+    const code = groupCode.trim().toUpperCase();
+    if (!isJoinCode(code)) throw new Error(`Group "${groupCode}" not found`);
+    const groupId = await this._resolveGroupId(code);
+    const ref = this._firestore.collection('groups').doc(groupId);
+
+    // Already a member? (a stranger is refused the read, which just means "not yet")
+    const existing = await ref.get().catch(() => null);
+    if (existing?.exists && Array.isArray((existing.data() as any)?.member_ids) && (existing.data() as any).member_ids.includes(uid)) return;
 
     try {
-      await this._firestore.collection('groups').doc(groupId).update({
+      await ref.update({
         member_ids: firestore.FieldValue.arrayUnion(uid),
+        join_proof: `${code}:${uid}`,
       });
     } catch (e: any) {
       if (e.code === 'not-found') {

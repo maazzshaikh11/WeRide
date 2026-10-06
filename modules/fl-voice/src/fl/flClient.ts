@@ -13,6 +13,7 @@
  */
 
 import { DpMasking } from './dpMasking';
+import { authedFetch, getIdToken, TokenSource } from '@app/services/idToken';
 
 export interface FlClientParams {
   clientId: string;
@@ -24,6 +25,8 @@ export interface FlClientParams {
    * "Improve ETAs for everyone" setting (Me > Privacy). Omitted = no consent: the client never trains or uploads.
    */
   isEnabled?: () => boolean;
+  /** Firebase ID token source: the server requires `Authorization: Bearer <idToken>` on /fl/*. Defaults to the rider's token. */
+  getToken?: TokenSource;
 }
 
 export class FlClient {
@@ -32,6 +35,7 @@ export class FlClient {
   readonly masking: DpMasking;
   readonly mu: number;
   private readonly _isEnabled: () => boolean;
+  private readonly _getToken: TokenSource;
 
   private _globalWeights?: Float32Array;
   private _round = 0;
@@ -42,6 +46,7 @@ export class FlClient {
     this.masking = params.masking ?? new DpMasking();
     this.mu = params.mu ?? 0.01;
     this._isEnabled = params.isEnabled ?? (() => false);
+    this._getToken = params.getToken ?? getIdToken;
   }
 
   /** true when the rider has opted in to contribute model updates. */
@@ -56,7 +61,7 @@ export class FlClient {
   /** Fetch current global weights from the server. */
   async fetchGlobal(): Promise<void> {
     if (!this.enabled) return;
-    const res = await fetch(`${this.serverUrl}/fl/global`);
+    const res = await authedFetch(`${this.serverUrl}/fl/global`, {}, this._getToken);
     const data = await res.json();
     // _globalWeights = DpMasking.decode(data.weights);
     this._globalWeights = new Float32Array(data.weights?.length ?? 10);
@@ -81,11 +86,15 @@ export class FlClient {
       local_loss: localLoss,
       sample_count: sampleCount,
     };
-    await fetch(`${this.serverUrl}/fl/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    await authedFetch(
+      `${this.serverUrl}/fl/submit`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      this._getToken,
+    );
     this._round++;
   }
 

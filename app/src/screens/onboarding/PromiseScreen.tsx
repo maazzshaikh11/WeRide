@@ -7,6 +7,7 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import { Button, Screen } from '../../ui';
 import { Plates } from '../../theme/palettes';
+import { useScaleBy } from '../../theme/responsive';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
 import { useSessionStore } from '../../store/sessionStore';
 import DarkScope from './parts/DarkScope';
@@ -21,6 +22,7 @@ export const PROOFS = [
 
 function PromiseBody({ navigation }: { navigation: { navigate: (name: 'AuthPhone' | 'Profile') => void } }) {
   const { colors, type } = useTheme();
+  const sz = useScaleBy();
   const uid = useSessionStore((s) => s.uid);
   const s = useStyles(({ type: t }) => ({
     brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -50,7 +52,7 @@ function PromiseBody({ navigation }: { navigation: { navigate: (name: 'AuthPhone
         <LogoTile size={34} />
         <Text style={[type.h3, { letterSpacing: -0.34 }]}>WeRide</Text>
       </View>
-      <Text style={[type.display, { marginTop: 34 }]} accessibilityRole="header">
+      <Text style={[type.display, { marginTop: 34, fontSize: sz(44), lineHeight: sz(44), letterSpacing: -sz(44) * 0.035 }]} accessibilityRole="header">
         Ride together.{'\n'}
         <Text style={{ color: colors.pri }}>Everyone home.</Text>
       </Text>

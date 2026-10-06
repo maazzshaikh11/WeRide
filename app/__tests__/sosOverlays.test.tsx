@@ -136,7 +136,10 @@ describe('SosSentOverlay', () => {
       expect(exists(t, id)).toBe(true);
       expect(flat(t.root.findAll((n) => n.props.testID === id && typeof n.type === 'string')[0].props.style).paddingVertical).toBe(10);
     }
-    const stack = t.root.findAll((n) => typeof n.type === 'string' && flat(n.props.style).bottom === 30 && flat(n.props.style).gap === 10);
+    // the dock (OverlayFrame) is pinned 30 pt from the bottom and stacks its buttons 10 pt apart
+    const pinned = t.root.findAll((n) => typeof n.type === 'string' && flat(n.props.style).marginBottom === 30 && flat(n.props.style).gap === 10);
+    expect(pinned.length).toBeGreaterThan(0);
+    const stack = t.root.findAll((n) => typeof n.type === 'string' && flat(n.props.style).gap === 10);
     expect(stack.length).toBeGreaterThan(0);
     expect(exists(t, 'sos-call112')).toBe(true);
   });

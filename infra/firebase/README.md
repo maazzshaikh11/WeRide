@@ -8,9 +8,17 @@ Copy your Firebase project config here (DO NOT commit to git — these are in .g
 
 ## Firestore security rules
 
-Deploy with: `firebase deploy --only firestore:rules`
+Deploy with: `firebase deploy --only firestore:rules` — but run `migrations/backfill-join-codes.js` FIRST (join codes
+moved to `join_codes/{CODE}` documents; see `docs/security/firestore.md` for the model, the migration and the deploy steps).
 
-See `firestore.rules` for the rules file.
+See `firestore.rules` for the rules file. Tests (Firestore emulator, Java 17, firebase-tools 13):
+
+```
+cd infra/firebase
+npx --yes firebase-tools@13.35.1 emulators:exec --only firestore --project demo-weride "npm --prefix rules-test test"
+# the same attack suite against the pre-hardening rules (shows what used to be allowed):
+npx --yes firebase-tools@13.35.1 emulators:exec --only firestore --project demo-weride "npm --prefix rules-test run test:old"
+```
 
 ## Cloud Functions
 

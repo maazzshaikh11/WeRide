@@ -3,12 +3,14 @@
  * crews/{id}: name, created_by, member_ids, roles, join_code, created_at.
  *
  * A crew code uses the same alphabet as a ride code (no 0/O/1/I/L) so a rider can type either on the Join screen;
- * the screen tries the crew collection first and falls back to ride codes (see JoinScreen).
+ * both live in `join_codes/{CODE}` (see ./joinCodes), the screen tries it as a crew code first, then a ride code (JoinScreen).
  */
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import type { Crew, CrewRole } from '../models/domain';
 import { P } from '../models/paths';
+import { generateJoinCode } from '../utils/joinCode';
+import { createWithJoinCode, joinProof, lookupJoinCode } from './joinCodes';
 
 export type CrewErrorKind = 'not-found' | 'bad-code' | 'bad-name' | 'signed-out' | 'network' | 'unknown';
 
@@ -30,10 +32,9 @@ export function isCrewCode(input: string): boolean {
   return CODE_RE.test(String(input ?? '').trim().toUpperCase());
 }
 
-export function generateCrewCode(random: () => number = Math.random): string {
-  let out = '';
-  for (let i = 0; i < CREW_CODE_LENGTH; i++) out += CREW_CODE_ALPHABET[Math.floor(random() * CREW_CODE_ALPHABET.length)];
-  return out;
+/** Crew codes use the same CSPRNG-backed generator as ride codes (utils/joinCode.ts); `random` is for tests only. */
+export function generateCrewCode(random?: () => number): string {
+  return generateJoinCode(random);
 }
 
 function toMs(v: any): number | null {
@@ -89,16 +90,10 @@ function wrap(e: unknown): CrewError {
   return new CrewError('unknown', (e as Error)?.message || 'Something went wrong.');
 }
 
-async function uniqueCode(): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = generateCrewCode();
-    const taken = await db().collection(P.crews).where('join_code', '==', code).limit(1).get();
-    if (taken.empty) return code;
-  }
-  throw new CrewError('unknown', 'Could not allocate a crew code. Try again.');
-}
-
-/** Creates the crew with the signed-in rider as its only member and its lead. */
+/**
+ * Creates the crew with the signed-in rider as its only member and its lead. The crew and its `join_codes/{code}` doc are
+ * written in one batch (the code is what lets others find it: crews cannot be queried by code any more).
+ */
 export async function createCrew(name: string): Promise<Crew> {
   const clean = String(name ?? '').trim().replace(/\s+/g, ' ');
   if (clean.length < CREW_NAME_MIN || clean.length > CREW_NAME_MAX) {
@@ -106,35 +101,42 @@ export async function createCrew(name: string): Promise<Crew> {
   }
   try {
     const uid = currentUid();
-    const code = await uniqueCode();
     const ref = db().collection(P.crews).doc();
-    await ref.set({
+    const code = await createWithJoinCode('crew', P.crew(ref.id), (c) => ({
       name: clean,
       created_by: uid,
       member_ids: [uid],
       roles: { [uid]: 'lead' },
-      join_code: code,
+      join_code: c,
       created_at: firestore.FieldValue.serverTimestamp(),
-    });
+    }));
     return { id: ref.id, name: clean, created_by: uid, member_ids: [uid], roles: { [uid]: 'lead' }, join_code: code, created_ms: Date.now() };
   } catch (e) {
     throw wrap(e);
   }
 }
 
-/** Resolves a crew code and adds the signed-in rider; rejects with CrewError('not-found') for an unknown code. */
+/**
+ * Resolves a crew code (`join_codes/{CODE}`) and adds the signed-in rider: member_ids + the code as proof, nothing else.
+ * Rejects with CrewError('not-found') for an unknown code or a code that belongs to a ride.
+ */
 export async function joinCrewByCode(code: string): Promise<Crew> {
   const clean = String(code ?? '').trim().toUpperCase();
   if (!isCrewCode(clean)) throw new CrewError('bad-code', 'Codes have six characters.');
   try {
     const uid = currentUid();
-    const snap = await db().collection(P.crews).where('join_code', '==', clean).limit(1).get();
-    if (snap.empty) throw new CrewError('not-found', `No crew uses ${clean}.`);
-    const doc = snap.docs[0];
-    const crew = crewFromDoc(doc.id, doc.data());
-    if (crew.member_ids.includes(uid)) return crew;
-    await db().doc(P.crew(doc.id)).update({ member_ids: firestore.FieldValue.arrayUnion(uid) });
-    return { ...crew, member_ids: [...crew.member_ids, uid] };
+    const target = await lookupJoinCode(clean);
+    if (!target || target.kind !== 'crew') throw new CrewError('not-found', `No crew uses ${clean}.`);
+    const ref = db().doc(P.crew(target.id));
+    // already in? (a non-member is refused the read, which just means "not yet")
+    const before = await ref.get().catch(() => null);
+    if (before?.exists) {
+      const crew = crewFromDoc(target.id, before.data());
+      if (crew.member_ids.includes(uid)) return crew;
+    }
+    await ref.update({ member_ids: firestore.FieldValue.arrayUnion(uid), join_proof: joinProof(clean, uid) });
+    const after = await ref.get(); // a member now: readable
+    return crewFromDoc(target.id, after.data());
   } catch (e) {
     throw wrap(e);
   }
@@ -185,15 +187,21 @@ export interface RideByCode {
   start_time_ms: number | null;
 }
 
+/**
+ * Looks a ride code up (`join_codes/{CODE}`). A ride is readable only by its members (and its crew), so for a rider who has
+ * not joined yet only the id is known: name / members / start time are placeholders until they are in, when this
+ * returns the real values.
+ */
 export async function findRideByCode(code: string): Promise<RideByCode | null> {
   const clean = String(code ?? '').trim().toUpperCase();
   if (!isCrewCode(clean)) return null;
   try {
-    const snap = await db().collection(P.rides).where('join_code', '==', clean).limit(1).get();
-    if (snap.empty) return null;
-    const d = snap.docs[0].data() ?? {};
+    const target = await lookupJoinCode(clean);
+    if (!target || target.kind !== 'ride') return null;
+    const snap = await db().doc(P.ride(target.id)).get().catch(() => null);
+    const d = snap?.exists ? snap.data() ?? {} : {};
     return {
-      id: snap.docs[0].id,
+      id: target.id,
       name: typeof d.name === 'string' && d.name.trim() ? d.name.trim() : 'Ride',
       member_ids: Array.isArray(d.member_ids) ? d.member_ids : [],
       start_time_ms: toMs(d.start_time_ms),

@@ -6,7 +6,7 @@
  */
 /* eslint-disable no-console -- failures here are logged for diagnostics; the rider is told through the UI */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouteStore } from '@routing/client/routeStore';
 import { Plates, THEMES, avatarColor } from '../theme/palettes';
@@ -24,6 +24,9 @@ import { respondToSos, subscribeResponders } from '../services/sosFlowService';
 import type { SosResponder } from '../services/sosFlowService';
 import { ageLabel, distanceM, isRealPosition, relativeDirection } from '../services/sosFormat';
 import { formatShortDistance } from '../utils/units';
+import { useResponsive, useScaleBy } from '../theme/responsive';
+import { CAP } from '../theme/textPolicy';
+import OverlayFrame from './OverlayFrame';
 import OverlayToast, { useOverlayToast } from './OverlayToast';
 import { useSosEventsStore } from './sosEventsStore';
 
@@ -43,6 +46,9 @@ function Body({ state }: { state: InState }) {
   const darkTheme = useMemo(() => buildTheme(themeId, THEMES[themeId].dark), [themeId]);
   const insets = useSafeAreaInsets();
   const { toast, show: showToast } = useOverlayToast();
+  const { isShortHeight } = useResponsive();
+  const sz = useScaleBy();
+  const [toastBottom, setToastBottom] = useState(BOTTOM_PAD + BUTTONS_H + 12);
   const units = useUnits();
   const sessionUid = useSessionStore((s) => s.uid);
   const appUid = useAppStore((s) => s.userId);
@@ -144,13 +150,44 @@ function Body({ state }: { state: InState }) {
 
   return (
     <View style={st.root} testID="overlay-SosIncoming" accessibilityViewIsModal>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: top + 16, paddingBottom: 230 }} showsVerticalScrollIndicator={false}>
-        <Text style={[type.label, { color: FG, opacity: 0.85, letterSpacing: 2.75 }]} testID="sosin-ago">{ago}</Text>
+      <OverlayFrame
+        bg={RED}
+        paddingTop={8}
+        header={
+          // pinned: the age label on the left, "Not now" on the right, never scrolled under anything
+          <View style={{ alignItems: 'center', paddingTop: top - 2 }}>
+            <View style={st.header}>
+              <Text style={[type.label, { color: FG, opacity: 0.85, letterSpacing: 2.75, flexShrink: 1 }]} testID="sosin-ago">{ago}</Text>
+              <PressableScale onPress={dismiss} accessibilityRole="button" accessibilityLabel="Not now, close this alert" style={st.notNow} testID="sosin-dismiss">
+                <Text style={[type.buttonXs, { color: FG }]} maxFontSizeMultiplier={CAP.hud}>Not now</Text>
+              </PressableScale>
+            </View>
+          </View>
+        }
+        onDockHeight={(h) => setToastBottom(h + 12)}
+        dock={
+          <>
+            {going ? (
+              <PressableScale onPress={iAmWith} accessibilityRole="button" accessibilityLabel={`I’m with ${name}`} style={[st.big, { height: isShortHeight ? 68 : 80 }]} testID="sosin-arrived">
+                <Text style={[type.button, { color: RED, fontSize: 22, lineHeight: 26 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} maxFontSizeMultiplier={CAP.hud}>{`I’m with ${name}`}</Text>
+              </PressableScale>
+            ) : (
+              <PressableScale onPress={iAmGoing} accessibilityRole="button" accessibilityLabel="I’m going" style={[st.big, { height: isShortHeight ? 72 : 84 }]} testID="sosin-going">
+                <Text style={[type.button, { color: RED, fontSize: 26, lineHeight: 30 }]} maxFontSizeMultiplier={CAP.hud}>I’m going</Text>
+              </PressableScale>
+            )}
+            <PressableScale onPress={call112} accessibilityRole="button" accessibilityLabel="Call 112, emergency services" style={[st.big, { height: isShortHeight ? 52 : 60 }]} testID="sosin-call112">
+              <Text style={[type.button, { color: RED }]} maxFontSizeMultiplier={CAP.hud}>Call 112</Text>
+            </PressableScale>
+          </>
+        }
+      >
         <Text
-          style={[type.display, { color: FG, fontSize: 52, lineHeight: 52, letterSpacing: -1.8, marginTop: 8 }]}
+          style={[type.display, { color: FG, fontSize: sz(52), lineHeight: sz(52), letterSpacing: -sz(52) * 0.035, marginTop: 8 }]}
           numberOfLines={3}
           adjustsFontSizeToFit
           minimumFontScale={0.6}
+          maxFontSizeMultiplier={CAP.fixed}
           accessibilityRole="header"
           testID="sosin-title"
         >
@@ -182,43 +219,26 @@ function Body({ state }: { state: InState }) {
             return (
               <View key={r.uid} style={st.rowCard} accessible accessibilityLabel={`${n}, ${d != null ? formatShortDistance(d, units) + ', ' : ''}${tail}`} testID={`sosin-resp-${r.uid}`}>
                 <Avatar initials={riderInitials(byId, r.uid)} color={avatarColor(i)} size={32} ring={false} />
-                <Text style={[type.h3, { color: FG, fontSize: 16, flex: 1 }]} numberOfLines={1}>{n}</Text>
-                <Text style={[type.smStrong, { color: FG }]}>{d != null ? `${formatShortDistance(d, units)} ∙ ${tail}` : tail}</Text>
+                <Text style={[type.h3, { color: FG, fontSize: 16, flex: 1, minWidth: 0 }]} numberOfLines={1}>{n}</Text>
+                <Text style={[type.smStrong, { color: FG, flexShrink: 1, textAlign: 'right' }]}>{d != null ? `${formatShortDistance(d, units)} ∙ ${tail}` : tail}</Text>
               </View>
             );
           })}
           {going ? (
             <View style={[st.rowCard, { backgroundColor: FG }]} accessible accessibilityLabel={`You, ${myState === 'arrived' ? 'with ' + name : 'going'}`} testID="sosin-you">
               <Avatar initials={riderInitials(byId, me ?? '')} me size={32} ring={false} />
-              <Text style={[type.h3, { color: RED, fontSize: 16, flex: 1 }]}>You</Text>
-              <Text style={[type.smStrong, { color: RED, fontFamily: type.h3.fontFamily }]}>
+              <Text style={[type.h3, { color: RED, fontSize: 16, flex: 1, minWidth: 0 }]} numberOfLines={1}>You</Text>
+              <Text style={[type.smStrong, { color: RED, fontFamily: type.h3.fontFamily, flexShrink: 1, textAlign: 'right' }]}>
                 {gapM != null ? `${formatShortDistance(gapM, units)} ∙ ` : ''}{myState === 'arrived' ? `with ${name}` : 'going'}
               </Text>
             </View>
           ) : null}
         </View>
-      </ScrollView>
+      </OverlayFrame>
 
-      <PressableScale onPress={dismiss} accessibilityRole="button" accessibilityLabel="Not now, close this alert" style={[st.notNow, { top: top - 2 }]} testID="sosin-dismiss">
-        <Text style={[type.buttonXs, { color: FG }]}>Not now</Text>
-      </PressableScale>
 
-      <View style={[st.bottom, { bottom: BOTTOM_PAD }]}>
-        {going ? (
-          <PressableScale onPress={iAmWith} accessibilityRole="button" accessibilityLabel={`I’m with ${name}`} style={[st.big, { height: 80 }]} testID="sosin-arrived">
-            <Text style={[type.button, { color: RED, fontSize: 22, lineHeight: 26 }]} numberOfLines={1}>{`I’m with ${name}`}</Text>
-          </PressableScale>
-        ) : (
-          <PressableScale onPress={iAmGoing} accessibilityRole="button" accessibilityLabel="I’m going" style={[st.big, { height: 84 }]} testID="sosin-going">
-            <Text style={[type.button, { color: RED, fontSize: 26, lineHeight: 30 }]}>I’m going</Text>
-          </PressableScale>
-        )}
-        <PressableScale onPress={call112} accessibilityRole="button" accessibilityLabel="Call 112, emergency services" style={[st.big, { height: 60 }]} testID="sosin-call112">
-          <Text style={[type.button, { color: RED }]}>Call 112</Text>
-        </PressableScale>
-      </View>
       {/* above the buttons: the top of this screen is the headline (and "Not now") */}
-      <OverlayToast toast={toast} bottom={BOTTOM_PAD + BUTTONS_H + 12} />
+      <OverlayToast toast={toast} bottom={toastBottom} />
     </View>
   );
 }
@@ -231,7 +251,7 @@ const st = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, backgroundColor: RED, overflow: 'hidden' },
   mapWrap: { marginTop: 16, borderRadius: 22, overflow: 'hidden', borderWidth: 3, borderColor: FG },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD, borderRadius: 16, paddingVertical: 8, paddingHorizontal: 14, minHeight: 48 },
-  notNow: { position: 'absolute', right: 16, minHeight: 44, paddingHorizontal: 14, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
-  bottom: { position: 'absolute', left: 14, right: 14, gap: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 20, width: '100%', maxWidth: 640 },
+  notNow: { minHeight: 44, paddingHorizontal: 14, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
   big: { borderRadius: 22, backgroundColor: FG, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
 });

@@ -8,6 +8,7 @@
  */
 
 import { HLC } from '../hlc/hlc';
+import { openStorage } from './storageOpener';
 
 // We cannot instantiate MMKV at module load time due to ts-jest mocking bugs.
 // Lazily instantiate it using the same pattern as HLC.
@@ -218,7 +219,7 @@ export function orSetGetActive(set: ORSet): SOSElement[] {
 }
 
 function getStorage(storageKey: string): any {
-  return new MMKV({ id: storageKey });
+  return openStorage(storageKey, (id) => new MMKV({ id }));
 }
 
 export function orSetSave(

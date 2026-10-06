@@ -9,9 +9,12 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { io as clientIo } from 'socket.io-client';
+import { installFakeAuth, tokenFor } from './helpers/auth.js';
 
 process.env.NODE_ENV = 'test';
 const { server } = await import('../index.js');
+// Every socket must authenticate; membership comes from the injected fake.
+installFakeAuth({ g1: ['rider-1', 'rider-2'], g2: ['intruder'] });
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -24,10 +27,11 @@ describe('signal relay', () => {
   before(async () => {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     port = server.address().port;
-    const connect = () => clientIo(`http://127.0.0.1:${port}`, { transports: ['websocket'] });
-    rider1 = connect();
-    rider2 = connect();
-    outsider = connect();
+    const connect = (uid) =>
+      clientIo(`http://127.0.0.1:${port}`, { transports: ['websocket'], auth: { token: tokenFor(uid) } });
+    rider1 = connect('rider-1');
+    rider2 = connect('rider-2');
+    outsider = connect('intruder');
     await Promise.all([rider1, rider2, outsider].map((s) => new Promise((r) => s.on('connect', r))));
     rider1.emit('join-group', { groupId: 'g1' });
     rider2.emit('join-group', { groupId: 'g1' });
@@ -42,12 +46,19 @@ describe('signal relay', () => {
 
   it('relays a valid signal to the other riders in the group as signal:received', async () => {
     const got = new Promise((resolve) => rider2.once('signal:received', resolve));
-    rider1.emit('signal:send', { group_id: 'g1', rider_id: 'rider-1', label: 'Wait for me' });
+    rider1.emit('signal:send', { group_id: 'g1', rider_id: 'rider-1', label: 'Wait up' });
     const msg = await got;
     assert.equal(msg.group_id, 'g1');
     assert.equal(msg.rider_id, 'rider-1');
-    assert.equal(msg.label, 'Wait for me');
+    assert.equal(msg.label, 'Wait up');
     assert.equal(typeof msg.sent_at, 'number');
+  });
+
+  it('still accepts the legacy "Wait for me" label from older clients', async () => {
+    const got = new Promise((resolve) => rider2.once('signal:received', resolve));
+    rider1.emit('signal:send', { group_id: 'g1', rider_id: 'rider-1', label: 'Wait for me' });
+    const msg = await got;
+    assert.equal(msg.label, 'Wait for me');
   });
 
   it('does not echo the signal back to the sender', async () => {

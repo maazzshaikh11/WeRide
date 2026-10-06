@@ -2,6 +2,7 @@
 /**
  * Creates (or refreshes) the teamDSY demo account in a Firebase project:
  *   - Auth user  teamdsy@weride.app / teamDSY@123  (display name "teamDSY")
+ *   - join_codes/ one `{kind, target_id}` doc per crew and ride (how the app resolves a code)
  *   - users/     teamDSY's profile + private settings (onboarded), public profiles for the crew ids
  *   - crews/     three crews;  groups/  the next ride, a joined ride and four finished rides (RSVPs, presence)
  *   - users/<uid>/ride_logs  synthetic recorded logs for the finished rides;  hazards/  clusters on the next route
@@ -40,18 +41,29 @@ async function ensureUser(auth) {
   }
 }
 
-/** A join code not used by a DIFFERENT group (the app resolves codes by querying them). */
-async function freeCode(db, collection, wanted, ownId) {
-  const taken = await db.collection(collection).where('join_code', '==', wanted).get();
-  if (taken.docs.every((d) => d.id === ownId)) return wanted;
-  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  for (let n = 0; n < 20; n++) {
-    let c = '';
-    for (let i = 0; i < 6; i++) c += alphabet[Math.floor(Math.random() * alphabet.length)];
-    const hit = await db.collection(collection).where('join_code', '==', c).get();
-    if (hit.empty && JOIN_CODE_RE.test(c)) return c;
+/**
+ * Claims a join code for a crew / ride: `join_codes/{CODE} = { kind, target_id }`. The app resolves a code through that
+ * document (crews and groups cannot be queried by code: they are readable by members only), so every seeded crew and ride
+ * needs one. A code already held by a DIFFERENT target is skipped for a random free one.
+ */
+async function claimCode(db, wanted, kind, targetId) {
+  const free = async (c) => {
+    const snap = await db.doc(`join_codes/${c}`).get();
+    return !snap.exists || snap.data().target_id === targetId;
+  };
+  let code = wanted;
+  if (!(await free(code))) {
+    const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    code = null;
+    for (let n = 0; n < 20 && !code; n++) {
+      let c = '';
+      for (let i = 0; i < 6; i++) c += alphabet[require('node:crypto').randomInt(alphabet.length)];
+      if (JOIN_CODE_RE.test(c) && (await free(c))) code = c;
+    }
+    if (!code) throw new Error('Could not find a free join code');
   }
-  throw new Error('Could not find a free join code');
+  await db.doc(`join_codes/${code}`).set({ kind, target_id: targetId });
+  return code;
 }
 
 async function seed(db, auth) {
@@ -69,7 +81,7 @@ async function seed(db, auth) {
   const crewDefs = crews(me, now);
   for (const c of crewDefs) {
     const id = crewDocId(c.key);
-    const code = await freeCode(db, 'crews', c.code, id);
+    const code = await claimCode(db, c.code, 'crew', id);
     await db.doc(`crews/${id}`).set({
       name: c.name, created_by: c.created_by, member_ids: c.member_ids, roles: c.roles, join_code: code, created_at: TS(c.created_ms),
     });
@@ -80,7 +92,7 @@ async function seed(db, auth) {
   const rsvpByKey = rsvps(me, now);
   for (const g of rideDefs) {
     const id = groupDocId(g.key);
-    const code = await freeCode(db, 'groups', g.code, id);
+    const code = await claimCode(db, g.code, 'ride', id);
     const doc = {
       name: g.name, created_by: g.created_by, member_ids: g.member_ids, created_at: TS(g.created_ms), active_ride_id: null,
       join_code: code, ride_type: g.ride_type, start_time_ms: g.start_time_ms, ride_plan: g.ride_plan,
@@ -118,6 +130,13 @@ async function remove(db, auth) {
       await Promise.all(docs.docs.map((d) => d.ref.delete()));
     }
     await ref.delete();
+  }
+  // the join_codes docs of everything seeded (looked up by target, so a re-coded ride leaves nothing behind)
+  for (const [kind, ids] of [['ride', rideDefs.map((g) => groupDocId(g.key))], ['crew', crews(uid || 'none').map((c) => crewDocId(c.key))]]) {
+    for (const id of ids) {
+      const codes = await db.collection('join_codes').where('target_id', '==', id).get();
+      await Promise.all(codes.docs.filter((d) => d.data().kind === kind).map((d) => d.ref.delete()));
+    }
   }
   for (const c of crews(uid || 'none')) await db.doc(`crews/${crewDocId(c.key)}`).delete();
   for (const c of crewProfiles()) await db.doc(`users/${c.uid}`).delete();

@@ -5,6 +5,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
+import { CAP } from '../theme/textPolicy';
 import { Avatar, Pill } from './Controls';
 
 export function RiderTile({ name, initials, color, status, ready, me, role, testID }: {
@@ -22,8 +23,8 @@ export function RiderTile({ name, initials, color, status, ready, me, role, test
       }}
     >
       <Avatar initials={initials} color={color} size={56} me={me} />
-      <Text style={[type.h3, { fontSize: 16 }]} numberOfLines={1}>{name}</Text>
-      <Text style={[type.label, { fontSize: 11, letterSpacing: 1.1, color: ready ? colors.ok : colors.ink3, textAlign: 'center' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{status.toUpperCase()}</Text>
+      <Text style={[type.h3, { fontSize: 16 }]} numberOfLines={1} maxFontSizeMultiplier={CAP.hud}>{name}</Text>
+      <Text style={[type.label, { fontSize: 11, letterSpacing: 1.1, color: ready ? colors.ok : colors.ink3, textAlign: 'center' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={CAP.hud}>{status.toUpperCase()}</Text>
       {role ? <Pill label={role} tone="ink" style={{ position: 'absolute', top: 8, right: 8, height: 20 }} /> : null}
     </View>
   );

@@ -113,6 +113,7 @@ function RecapBody({ log, onRate, onShare, rating }: { log: RideLog; onRate: () 
             <PressableScale
               onPress={replay.toggle}
               haptic="tap"
+              hitSlop={{ top: 3, bottom: 3, left: 3, right: 3 }}
               style={s.play}
               accessibilityRole="button"
               accessibilityLabel={replay.playing ? 'Pause replay' : 'Play replay'}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Production network policy: HTTPS only. No cleartext to any host, and only the system trust store
+  (user-installed CAs are NOT trusted, so a proxy CA a user or attacker installed cannot MITM the app).
+  The debug source set (src/debug/res/xml/network_security_config.xml) overrides this file for debug builds and
+  additionally allows cleartext to the local dev servers only. Certificate pinning is a documented open decision
+  (docs/SECURITY.md): the backend URL is not fixed yet, so we do not pin a pin-set that would lock users out.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

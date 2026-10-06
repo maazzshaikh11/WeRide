@@ -23,7 +23,7 @@ const MapView = ({ style, children, styleURL }) => {
   const dark = styleURL !== 'light';
   const grid = { position: 'absolute', backgroundColor: dark ? 'rgba(148,178,208,0.05)' : 'rgba(20,20,20,0.06)' };
   return React.createElement(Ctx.Provider, { value: { dark } },
-    React.createElement(View, { style: [style, { backgroundColor: dark ? '#0b0f14' : '#E6E2D6', overflow: 'hidden' }] },
+    React.createElement(View, { dataSet: { map: '1' }, style: [style, { backgroundColor: dark ? '#0b0f14' : '#E6E2D6', overflow: 'hidden' }] },
       [14, 30, 47, 63, 80].map((x) => React.createElement(View, { key: 'v' + x, style: [grid, { left: x + '%', top: 0, bottom: 0, width: 1 }] })),
       [18, 38, 58, 78].map((y) => React.createElement(View, { key: 'h' + y, style: [grid, { top: y + '%', left: 0, right: 0, height: 1 }] })),
       React.createElement('div', { style: { position: 'absolute', left: '50%', top: '42%', width: 0, height: 0 } }, children)));

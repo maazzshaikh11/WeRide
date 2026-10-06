@@ -129,19 +129,67 @@ describe('GroupService — codes, leave, ride metadata', () => {
     expect((await svc.getGroup(id))!.member_ids.filter((m) => m === 'rider-2')).toHaveLength(1);
   });
 
-  test('still joins by raw group id (groups created before codes existed)', async () => {
-    const id = await svc.createGroup('Legacy');
+  test('createGroup writes the group and its join_codes/{CODE} doc together', async () => {
+    const id = await svc.createGroup('With a code doc');
+    const code = firestoreMock.__peek(`groups/${id}`).join_code;
+    expect(code).toMatch(/^[A-Z2-9]{6}$/);
+    expect(firestoreMock.__peek(`join_codes/${code}`)).toMatchObject({ kind: 'ride', target_id: id });
+  });
+
+  test('createGroup caps the name at 60 characters (the Firestore rules refuse longer ones)', async () => {
+    const id = await svc.createGroup('x'.repeat(100));
+    expect(firestoreMock.__peek(`groups/${id}`).name).toHaveLength(60);
+  });
+
+  test('createGroup never reuses a code that already has a join_codes doc', async () => {
+    // Codes come from the CSPRNG now; force it to return zeros so every generated code is "AAAAAA".
+    const spy = jest.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(((a: Uint8Array) => {
+      a.fill(0);
+      return a;
+    }) as never);
+    firestoreMock.__put('join_codes/AAAAAA', { kind: 'ride', target_id: 'someone-elses' });
+    await expect(svc.createGroup('Collides')).rejects.toThrow(/join code/i);
+    spy.mockRestore();
+    expect(firestoreMock.__peek('join_codes/AAAAAA').target_id).toBe('someone-elses');
+  });
+
+  test('createGroup skips a taken code and stores the next free one', async () => {
+    const seq = [0, 0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+    const spy = jest.spyOn(Math, 'random').mockImplementation(() => seq.shift() ?? 0.9);
+    firestoreMock.__put('join_codes/AAAAAA', { kind: 'ride', target_id: 'x' });
+    const id = await svc.createGroup('Retry');
+    spy.mockRestore();
+    const code = firestoreMock.__peek(`groups/${id}`).join_code;
+    expect(code).not.toBe('AAAAAA');
+    expect(firestoreMock.__peek(`join_codes/${code}`).target_id).toBe(id);
+  });
+
+  test('the join proof is bound to the rider: "<CODE>:<uid>"', async () => {
+    const id = await svc.createGroup('Proof');
+    const code = firestoreMock.__peek(`groups/${id}`).join_code;
+    authMock.__setUid('rider-9');
+    await new GroupService().joinGroup(code);
+    expect(firestoreMock.__peek(`groups/${id}`).join_proof).toBe(`${code}:rider-9`);
+  });
+
+  test('a stranger cannot read the group, or join it without the code (the mock plays the rules)', async () => {
+    const id = await svc.createGroup('Private');
+    authMock.__setUid('stranger');
+    await expect(new GroupService().getGroup(id)).rejects.toMatchObject({ code: 'permission-denied' });
+  });
+
+  test('a raw group id no longer joins anything (legacy path removed)', async () => {
+    const id = await svc.createGroup('No ids');
     authMock.__setUid('rider-3');
-    await new GroupService().joinGroup(id);
-    expect((await svc.getGroup(id))!.member_ids).toContain('rider-3');
+    await expect(new GroupService().joinGroup(id)).rejects.toThrow('not found');
+    authMock.__setUid('owner-1');
+    expect((await svc.getGroup(id))!.member_ids).toEqual(['owner-1']);
   });
 
-  test('unknown short code → clear "not found" error', async () => {
-    await expect(svc.joinGroup('ZZZZZZ')).rejects.toThrow('not found');
-  });
-
-  test('unknown group id → clear "not found" error', async () => {
-    await expect(svc.joinGroup('no-such-group')).rejects.toThrow('not found');
+  test('a code that belongs to a crew (or nothing) is "not found" for a ride join', async () => {
+    firestoreMock.__put('join_codes/CREW22', { kind: 'crew', target_id: 'c1' });
+    authMock.__setUid('rider-4');
+    await expect(new GroupService().joinGroup('CREW22')).rejects.toThrow('not found');
   });
 
   test('leaveGroup removes only the current user and keeps the group for others', async () => {
@@ -153,6 +201,7 @@ describe('GroupService — codes, leave, ride metadata', () => {
 
     await rider2.leaveGroup(id);
 
+    authMock.__setUid('owner-1'); // rider-2 can no longer read the group
     const g = await svc.getGroup(id);
     expect(g!.member_ids).toEqual(['owner-1']);
   });

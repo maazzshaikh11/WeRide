@@ -6,13 +6,16 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Text, View } from 'react-native';
 import { Plates } from '../../../theme/palettes';
 import { useStyles, useTheme } from '../../../theme/ThemeProvider';
+import { CAP } from '../../../theme/textPolicy';
 import { PressableScale, useReducedMotion } from '../../../ui';
+import { useLiveLayout } from './LiveChrome';
 
 export function HazardConfirmButtons({ onAnswer, name }: { onAnswer: (a: 'still' | 'gone') => void; name?: string }) {
   const { road } = useTheme();
+  const { plateH } = useLiveLayout();
   const s = useStyles(({ roadType: t }) => ({
     row: { flexDirection: 'row', gap: 8 },
-    btn: { flex: 1, height: 76, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    btn: { flex: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
     label: { ...t.button, fontSize: 21, lineHeight: 24, fontFamily: t.plateTitle.fontFamily, letterSpacing: -0.2 },
   }));
   const what = name ? name.toLowerCase() : 'hazard';
@@ -24,9 +27,9 @@ export function HazardConfirmButtons({ onAnswer, name }: { onAnswer: (a: 'still'
         accessibilityRole="button"
         accessibilityLabel={`Still there: the ${what} is still on the road`}
         testID="confirm-still"
-        style={[s.btn, { backgroundColor: road.ok }]}
+        style={[s.btn, { height: Math.min(76, plateH - 4), backgroundColor: road.ok }]}
       >
-        <Text style={[s.label, { color: '#FFFFFF' }]}>STILL THERE</Text>
+        <Text style={[s.label, { color: '#FFFFFF' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} maxFontSizeMultiplier={CAP.fixed}>STILL THERE</Text>
       </PressableScale>
       <PressableScale
         onPress={() => onAnswer('gone')}
@@ -34,9 +37,9 @@ export function HazardConfirmButtons({ onAnswer, name }: { onAnswer: (a: 'still'
         accessibilityRole="button"
         accessibilityLabel={`Gone: the ${what} is no longer there`}
         testID="confirm-gone"
-        style={[s.btn, { backgroundColor: road.ink }]}
+        style={[s.btn, { height: Math.min(76, plateH - 4), backgroundColor: road.ink }]}
       >
-        <Text style={[s.label, { color: road.bg }]}>GONE</Text>
+        <Text style={[s.label, { color: road.bg }]} numberOfLines={1} maxFontSizeMultiplier={CAP.fixed}>GONE</Text>
       </PressableScale>
     </View>
   );
@@ -68,20 +71,21 @@ function WaveBar({ delay, animate, color }: { delay: number; animate: boolean; c
 export function TalkPlate() {
   const { type } = useTheme();
   const reduced = useReducedMotion();
+  const { plateH } = useLiveLayout();
   const p = Plates.green;
   const s = useStyles(() => ({
-    plate: { borderRadius: 18, paddingVertical: 14, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 82, backgroundColor: p.bg },
+    plate: { borderRadius: 18, paddingVertical: 14, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: p.bg },
     rim: { position: 'absolute', top: 4, left: 4, right: 4, bottom: 4, borderRadius: 14, borderWidth: 2, borderColor: p.rim, opacity: 0.92 },
     wave: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 30, width: 41, justifyContent: 'center' },
   }));
   return (
-    <View style={s.plate} testID="talk-plate" accessible accessibilityLabel="Talking to crew. Release to stop." accessibilityLiveRegion="polite">
+    <View style={[s.plate, { minHeight: plateH }]} testID="talk-plate" accessible accessibilityLabel="Talking to crew. Release to stop." accessibilityLiveRegion="polite">
       <View style={s.wave}>
         {BAR_DELAYS.map((d) => <WaveBar key={d} delay={d} animate={!reduced} color={p.fg} />)}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[type.plateTitle, { color: p.fg, fontSize: 28, lineHeight: 28 }]} numberOfLines={1}>TALKING TO CREW</Text>
-        <Text style={[type.plateSub, { color: p.fg, opacity: 0.85, marginTop: 4 }]}>Release to stop</Text>
+        <Text style={[type.plateTitle, { color: p.fg, fontSize: 28, lineHeight: 28 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} maxFontSizeMultiplier={CAP.fixed}>TALKING TO CREW</Text>
+        <Text style={[type.plateSub, { color: p.fg, opacity: 0.85, marginTop: 4 }]} maxFontSizeMultiplier={CAP.hud}>Release to stop</Text>
       </View>
       <View pointerEvents="none" style={s.rim} />
     </View>

@@ -11,6 +11,7 @@ import { useToastStore } from '../store/toastStore';
 import { submitHazardReport, triggerClustering } from '@hazard/services/hazardService';
 import { HazardType } from '@app/models/hazardCluster';
 import { warn } from '../utils/log';
+import { CAP } from '../theme/textPolicy';
 import { Icon, IconName, PressableScale, Sheet, haptic } from '../ui';
 
 export const HAZARD_SHEET_OPTIONS: { type: HazardType; label: string; icon: IconName }[] = [
@@ -48,9 +49,9 @@ export default function HazardSheet({ visible, onClose, groupId, riderId, locati
     grid: { gap: 10 },
     row: { flexDirection: 'row', gap: 10 },
     // three equal columns (demo `.hz`): flex, not a % width, so three tiles + two gaps always fit one row
-    tile: { flex: 1, height: 92, borderRadius: 20, backgroundColor: c.card2, borderWidth: 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center', gap: 8 },
+    tile: { flex: 1, minHeight: 92, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 20, backgroundColor: c.card2, borderWidth: 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center', gap: 8 },
     pad: { flex: 1 },
-    tileLabel: { ...t.tab, fontSize: 12, lineHeight: 14, letterSpacing: 0.96, color: c.ink },
+    tileLabel: { ...t.tab, fontSize: 12, lineHeight: 14, letterSpacing: 0.96, color: c.ink, textAlign: 'center' },
   }));
 
   const report = async (hazardType: HazardType) => {
@@ -98,7 +99,7 @@ export default function HazardSheet({ visible, onClose, groupId, riderId, locati
                 style={[s.tile, busy === o.type && { borderColor: colors.pri }]}
               >
                 <Icon name={o.icon} size={32} />
-                <Text style={s.tileLabel} numberOfLines={1}>{o.label.toUpperCase()}</Text>
+                <Text style={s.tileLabel} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={CAP.hud}>{o.label.toUpperCase()}</Text>
               </PressableScale>
             ))}
             {/* keep the last row's tiles the same width as the full rows */}

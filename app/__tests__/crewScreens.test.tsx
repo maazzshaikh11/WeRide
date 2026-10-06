@@ -605,6 +605,21 @@ describe('JoinScreen', () => {
     setOnboarded.mockRestore();
   });
 
+  it('a ride code: before joining only the id is known, so the success card uses the ride read AFTER joining', async () => {
+    svc.joinCrewByCode.mockRejectedValue(new crewService.CrewError('not-found', 'x'));
+    svc.findRideByCode
+      .mockResolvedValueOnce({ id: 'g1', name: 'Ride', member_ids: [], start_time_ms: null }) // a stranger: placeholders
+      .mockResolvedValueOnce({ id: 'g1', name: 'Sunday Mulshi', member_ids: ['meera', 'me'], start_time_ms: null }); // a member now
+    mockJoinGroup.mockResolvedValue(undefined);
+    const setOnboarded = jest.spyOn(usePrefsStore.getState(), 'setOnboarded').mockResolvedValue(undefined);
+    const t = mount(<JoinScreen navigation={nav() as never} route={route('RYDE22')} />);
+    await press(t, { id: 'join-go' });
+    expect(svc.findRideByCode).toHaveBeenCalledTimes(2);
+    expect(flat(t)).toContain('Sunday Mulshi');
+    expect(flat(t)).toContain('2 riders');
+    setOnboarded.mockRestore();
+  });
+
   it('a ride-code join that fails shows a retryable message', async () => {
     svc.joinCrewByCode.mockRejectedValue(new crewService.CrewError('not-found', 'x'));
     svc.findRideByCode.mockResolvedValue({ id: 'g1', name: 'Sunday Mulshi', member_ids: [], start_time_ms: null });

@@ -9,9 +9,13 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { io as clientIo } from 'socket.io-client';
+import { installFakeAuth, tokenFor } from './helpers/auth.js';
 
 process.env.NODE_ENV = 'test';
 const { server } = await import('../index.js');
+// Every socket must authenticate; membership comes from the injected fake.
+installFakeAuth({ 'group-1': ['rider-1', 'rider-2'], 'group-2': ['rider-3'] });
+const connectOpts = (uid) => ({ transports: ['websocket'], auth: { token: tokenFor(uid) } });
 
 const validPayload = {
   rider_id: 'rider-1',
@@ -44,8 +48,8 @@ describe('location fan-out', () => {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     port = server.address().port;
 
-    rider1 = clientIo(`http://127.0.0.1:${port}`, { transports: ['websocket'] });
-    rider2 = clientIo(`http://127.0.0.1:${port}`, { transports: ['websocket'] });
+    rider1 = clientIo(`http://127.0.0.1:${port}`, connectOpts('rider-1'));
+    rider2 = clientIo(`http://127.0.0.1:${port}`, connectOpts('rider-2'));
     await Promise.all([
       new Promise((r) => rider1.on('connect', r)),
       new Promise((r) => rider2.on('connect', r)),
@@ -82,7 +86,7 @@ describe('location fan-out', () => {
   });
 
   it('does not deliver to clients in a different group', async () => {
-    const other = clientIo(`http://127.0.0.1:${port}`, { transports: ['websocket'] });
+    const other = clientIo(`http://127.0.0.1:${port}`, connectOpts('rider-3'));
     await new Promise((r) => other.on('connect', r));
     other.emit('join-group', { groupId: 'group-2' });
     await new Promise((r) => setTimeout(r, 50));

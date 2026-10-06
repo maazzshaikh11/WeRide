@@ -4,13 +4,25 @@
  * the theme's `road` palette (the high-contrast variant); layout numbers are the
  * demo's. Pure presentation — MapScreen feeds it real values.
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { useInsetsOrZero } from '../../../theme/responsive';
+import { CAP } from '../../../theme/textPolicy';
 import { useStyles, useTheme } from '../../../theme/ThemeProvider';
 import { Icon, IconName, PressableScale } from '../../../ui';
 import type { Units } from '../../../models/domain';
 import { distanceUnit, formatDistance, formatSpeed, speedUnit } from '../../../utils/units';
+import { CONTROL_GAP, LiveLayout, liveLayout } from './liveLayout';
+
+export { CONTROL_GAP };
+
+/** The Live chrome's geometry for this window, safe area and glove setting (see liveLayout.ts). */
+export function useLiveLayout(glove?: boolean): LiveLayout {
+  const { width, height } = useWindowDimensions();
+  const { top, bottom } = useInsetsOrZero();
+  return useMemo(() => liveLayout({ width, height, insets: { top, bottom }, glove }), [width, height, top, bottom, glove]);
+}
 
 /** Heights the map camera must keep clear (see MapScreen padding). */
 export const SIDE_BTN = 62;
@@ -18,7 +30,6 @@ export const CONTROL_H = 88;
 /** Glove mode (demo `.glove .ctl`): bigger keys and a bigger speed. */
 export const GLOVE_CONTROL_H = 104;
 export const GLOVE_SPEED_SIZE = 132;
-export const CONTROL_GAP = 10;
 export const controlHeight = (glove?: boolean): number => (glove ? GLOVE_CONTROL_H : CONTROL_H);
 
 export function Vignettes() {
@@ -52,8 +63,9 @@ export function SideButton({ icon, label, onPress, active, accessibilityLabel, t
   icon: IconName; label: string; onPress: () => void; active?: boolean; accessibilityLabel: string; testID?: string;
 }) {
   const { road, roadType } = useTheme();
+  const { sideBtn } = useLiveLayout();
   const s = useStyles(({ road: r }) => ({
-    btn: { width: SIDE_BTN, height: SIDE_BTN, borderRadius: 18, backgroundColor: r.card, borderWidth: 2, borderColor: r.line2, alignItems: 'center', justifyContent: 'center', gap: 4 },
+    btn: { borderRadius: 18, backgroundColor: r.card, borderWidth: 2, borderColor: r.line2, alignItems: 'center', justifyContent: 'center', gap: 4 },
   }));
   return (
     <PressableScale
@@ -63,10 +75,10 @@ export function SideButton({ icon, label, onPress, active, accessibilityLabel, t
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected: Boolean(active) }}
       testID={testID}
-      style={[s.btn, active && { borderColor: road.pri }]}
+      style={[s.btn, { width: sideBtn, height: sideBtn }, active && { borderColor: road.pri }]}
     >
       <Icon name={icon} size={24} color={active ? road.pri : road.ink} />
-      <Text style={[roadType.tab, { color: road.ink, fontSize: 10, lineHeight: 11 }]}>{label}</Text>
+      <Text style={[roadType.tab, { color: road.ink, fontSize: 10, lineHeight: 11 }]} numberOfLines={1} maxFontSizeMultiplier={CAP.fixed}>{label}</Text>
     </PressableScale>
   );
 }
@@ -79,12 +91,11 @@ export function SpeedCluster({ speedKmh, etaClock, remainingKm, toLabel, onPress
   speedKmh: number | null; etaClock: string | null; remainingKm: number | null; toLabel: string | null; onPress?: () => void; units?: Units; glove?: boolean;
 }) {
   const { road, roadType } = useTheme();
-  const { height } = useWindowDimensions();
-  const speedSize = glove ? GLOVE_SPEED_SIZE : height < 700 ? 96 : 122;
+  const { speedSize } = useLiveLayout(glove);
   const s = useStyles(({ road: r, roadType: t }) => ({
     row: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 18 },
     unit: { ...t.label, fontSize: 15, lineHeight: 17, letterSpacing: 2.1, color: r.ink2, marginTop: 8 },
-    kv: { alignItems: 'flex-end', gap: 8, marginLeft: 'auto', paddingBottom: 6 },
+    kv: { alignItems: 'flex-end', gap: 8, marginLeft: 'auto', paddingBottom: 6, flexShrink: 1, minWidth: 0 },
     a: { ...t.num, fontSize: 34, lineHeight: 34, letterSpacing: 0, color: r.ink },
     b: { ...t.label, fontSize: 11, lineHeight: 12, letterSpacing: 1.5, color: r.ink2, marginTop: -4 },
   }));
@@ -105,22 +116,24 @@ export function SpeedCluster({ speedKmh, etaClock, remainingKm, toLabel, onPress
           testID="speed-value"
           style={[roadType.num, { fontSize: speedSize, lineHeight: speedSize * 0.8, letterSpacing: -speedSize * 0.07, color: road.ink }]}
           accessibilityLabel={speedKmh == null ? 'Speed unknown' : `${shown} ${units === 'mi' ? 'miles' : 'kilometres'} per hour`}
+          maxFontSizeMultiplier={CAP.fixed}
+          numberOfLines={1}
         >
           {shown}
         </Text>
-        <Text style={s.unit} testID="speed-unit">{speedUnit(units)}</Text>
+        <Text style={s.unit} testID="speed-unit" maxFontSizeMultiplier={CAP.fixed}>{speedUnit(units)}</Text>
       </View>
       <View style={s.kv}>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={s.a} testID="eta-value">{etaClock ?? '--:--'}</Text>
-          <Text style={s.b}>ETA</Text>
+        <View style={{ alignItems: 'flex-end', maxWidth: '100%' }}>
+          <Text style={s.a} testID="eta-value" maxFontSizeMultiplier={CAP.fixed} numberOfLines={1}>{etaClock ?? '--:--'}</Text>
+          <Text style={s.b} maxFontSizeMultiplier={CAP.fixed}>ETA</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={s.a} testID="remaining-value">
+          <Text style={s.a} testID="remaining-value" maxFontSizeMultiplier={CAP.fixed} numberOfLines={1}>
             {remaining ?? '--'}
             <Text style={{ fontSize: 16 }}> {distanceUnit(units)}</Text>
           </Text>
-          <Text style={s.b} numberOfLines={1}>{toLabel ? `TO ${toLabel.toUpperCase()}` : 'TO DESTINATION'}</Text>
+          <Text style={s.b} numberOfLines={1} maxFontSizeMultiplier={CAP.fixed}>{toLabel ? `TO ${toLabel.toUpperCase()}` : 'TO DESTINATION'}</Text>
         </View>
       </View>
     </PressableScale>
@@ -133,8 +146,9 @@ export function ControlKey({ icon, label, onPress, onPressIn, onPressOut, active
   active?: boolean; glove?: boolean; accessibilityLabel?: string; accessibilityHint?: string; testID?: string;
 }) {
   const { road, roadType } = useTheme();
+  const { controlH, keyLabelSize } = useLiveLayout(glove);
   const s = useStyles(({ road: r }) => ({
-    key: { flex: 1, height: CONTROL_H, borderRadius: 24, backgroundColor: r.card, borderWidth: 2, borderColor: r.line2, alignItems: 'center', justifyContent: 'center', gap: 7 },
+    key: { flex: 1, borderRadius: 24, backgroundColor: r.card, borderWidth: 2, borderColor: r.line2, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 2 },
   }));
   const fg = active ? '#FFFFFF' : road.ink;
   return (
@@ -149,10 +163,10 @@ export function ControlKey({ icon, label, onPress, onPressIn, onPressOut, active
       accessibilityHint={accessibilityHint}
       accessibilityState={active === undefined ? undefined : { selected: active }}
       testID={testID}
-      style={[s.key, glove && { height: GLOVE_CONTROL_H }, active && { backgroundColor: road.ok, borderColor: road.ok }]}
+      style={[s.key, { height: controlH }, active && { backgroundColor: road.ok, borderColor: road.ok }]}
     >
       <Icon name={icon} size={30} color={fg} />
-      <Text style={[roadType.tab, { color: fg, fontSize: 11.5, lineHeight: 13, letterSpacing: 1.15 }]}>{label.toUpperCase()}</Text>
+      <Text style={[roadType.tab, { color: fg, fontSize: keyLabelSize, lineHeight: 13, letterSpacing: keyLabelSize < 11 ? 0.6 : 1.15 }]} numberOfLines={1} maxFontSizeMultiplier={CAP.fixed}>{label.toUpperCase()}</Text>
     </PressableScale>
   );
 }

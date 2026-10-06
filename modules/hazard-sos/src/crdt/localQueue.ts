@@ -11,6 +11,7 @@
 
 import type { HazardReport } from '../dbscan/dbscan';
 import type { SOSElement } from './orSet';
+import { openStorage } from './storageOpener';
 
 // We cannot instantiate MMKV at module load time due to ts-jest mocking bugs.
 // Lazily instantiate it using the same pattern as HLC and OR-Set.
@@ -42,7 +43,7 @@ let _queueStorage: any | null = null;
 function getQueueStorage(): any {
   if (!_queueStorage) {
     /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
-    _queueStorage = new MMKV({ id: 'offline_queue' });
+    _queueStorage = openStorage('offline_queue', (id) => new MMKV({ id }));
   }
   return _queueStorage;
 }

@@ -115,8 +115,9 @@ describe('StopScreen', () => {
   it('the SOS / ready row sits 30 pt from the bottom (demo .ctls bottom:30), 26 in glove mode', () => {
     const bottomOf = () => {
       const t = mount(stop());
-      const row = t.root.findAll((n) => typeof n.type === 'string' && StyleSheet.flatten(n.props.style)?.position === 'absolute' && StyleSheet.flatten(n.props.style)?.flexDirection === 'row')[0];
-      return StyleSheet.flatten(row.props.style).bottom;
+      // the pinned dock of RoadFrame: absolute, centred column, `bottom` = distance from the screen edge
+      const dock = t.root.findAll((n) => typeof n.type === 'string' && StyleSheet.flatten(n.props.style)?.position === 'absolute' && StyleSheet.flatten(n.props.style)?.alignItems === 'center' && StyleSheet.flatten(n.props.style)?.bottom !== undefined)[0];
+      return StyleSheet.flatten(dock.props.style).bottom;
     };
     expect(bottomOf()).toBe(30);
     usePrefsStore.setState({ prefs: { ...usePrefsStore.getState().prefs, glove: true } } as any);
@@ -221,7 +222,7 @@ describe('ArriveScreen', () => {
 
   it('the end-ride button sits 30 pt from the bottom like the demo', () => {
     const t = mount(arrive());
-    const wrap = t.root.findAll((n) => typeof n.type === 'string' && StyleSheet.flatten(n.props.style)?.position === 'absolute' && StyleSheet.flatten(n.props.style)?.left === 14 && StyleSheet.flatten(n.props.style)?.bottom !== undefined)[0];
+    const wrap = t.root.findAll((n) => typeof n.type === 'string' && StyleSheet.flatten(n.props.style)?.position === 'absolute' && StyleSheet.flatten(n.props.style)?.alignItems === 'center' && StyleSheet.flatten(n.props.style)?.bottom !== undefined)[0];
     expect(StyleSheet.flatten(wrap.props.style).bottom).toBe(30);
   });
 

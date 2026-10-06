@@ -14,6 +14,8 @@ import { riderInitials, riderName, useProfileStore } from '../../store/profileSt
 import { useSessionStore } from '../../store/sessionStore';
 import { useToastStore } from '../../store/toastStore';
 import { colorForUid } from './crew/CrewAvatars';
+import { useScaleBy } from '../../theme/responsive';
+import { CAP } from '../../theme/textPolicy';
 import { useStyles, useTheme } from '../../theme/ThemeProvider';
 import { Avatar, Button, Card, Chip, Icon, List, ListItem, PressableScale, Screen, Segmented, Toggle } from '../../ui';
 import { geocodeSearchStrict, geocodingAvailable } from '../../utils/geocode';
@@ -32,12 +34,12 @@ const STOP_ICON: Record<StopKind, string> = { fuel: '⛽', chai: '☕' };
 
 export default function PlanWhenScreen({ navigation }: Props) {
   const { colors, type } = useTheme();
+  const sz = useScaleBy();
   const styles = useStyles(({ colors: c, type: t }) => ({
     label: { ...t.label, marginTop: 24, marginBottom: 8 },
     wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     timeCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     stepBtn: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card, borderWidth: 1.5, borderColor: c.line },
-    time: { ...t.num, fontSize: 46, lineHeight: 50, letterSpacing: -1.84 },
     ampm: { fontSize: 20, letterSpacing: 0 },
     err: { ...t.sm, color: c.bad, marginTop: 8 },
     solo: { ...t.sm },
@@ -180,7 +182,7 @@ export default function PlanWhenScreen({ navigation }: Props) {
           >
             <Icon name="minus" size={22} color={colors.ink} />
           </PressableScale>
-          <Text style={styles.time} accessibilityLabel={`Roll out at ${clock.hh}:${clock.mm} ${clock.ampm}`} testID="time-value">
+          <Text style={[type.num, { fontSize: sz(46), lineHeight: sz(50), letterSpacing: -sz(46) * 0.04 }]} maxFontSizeMultiplier={CAP.fixed} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.7} accessibilityLabel={`Roll out at ${clock.hh}:${clock.mm} ${clock.ampm}`} testID="time-value">
             {`${clock.hh}:${clock.mm}`}
             <Text style={styles.ampm}>{` ${clock.ampm}`}</Text>
           </Text>

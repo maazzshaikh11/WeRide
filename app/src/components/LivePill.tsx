@@ -8,6 +8,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated } from 'react-native';
 import { withAlpha } from '../theme/palettes';
 import { useStyles, useTheme } from '../theme/ThemeProvider';
+import { CAP } from '../theme/textPolicy';
 import { useReducedMotion } from '../ui';
 
 export type LivePillVariant = 'live' | 'green' | 'gold' | 'grey';
@@ -83,7 +84,7 @@ export default function LivePill({ variant, label }: Props) {
   return (
     <View style={[styles.pill, { backgroundColor: v.bg, borderColor: v.border, borderWidth: v.border === 'transparent' ? 0 : 1.5 }]}>
       <Animated.View style={[styles.dot, { backgroundColor: v.text, opacity: dotOpacity }]} />
-      <Text style={[type.pill, { color: v.text }]}>{text.toUpperCase()}</Text>
+      <Text style={[type.pill, { color: v.text }]} numberOfLines={1} maxFontSizeMultiplier={CAP.hud}>{text.toUpperCase()}</Text>
     </View>
   );
 }

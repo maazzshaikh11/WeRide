@@ -23,7 +23,7 @@ const rules = [
 ];
 const stubPlugin = { name: 'stubs', setup(b) { b.onResolve({ filter: /.*/ }, (a) => { for (const [re, f] of rules) if (re.test(a.path)) return { path: S(f) }; return null; }); } };
 await build({
-  entryPoints: [process.argv[2] || 'scenes.tsx'], bundle: true, outfile: 'scenes.js', format: 'iife', jsx: 'automatic',
+  entryPoints: [process.argv[2] || 'scenes.tsx'], bundle: true, outfile: process.env.BUNDLE || 'scenes.js', format: 'iife', jsx: 'automatic',
   loader: { '.ts': 'ts', '.tsx': 'tsx', '.png': 'dataurl', '.jpeg': 'dataurl', '.jpg': 'dataurl', '.js': 'jsx' },
   plugins: [stubPlugin],
   alias: {
@@ -33,6 +33,7 @@ await build({
     '@hazard': path.join(APP, '../modules/hazard-sos/src'), '@tracking': path.join(APP, '../modules/tracking/src'),
     '@flvoice': path.join(APP, '../modules/fl-voice/src'),
   },
+  banner: { js: 'var process = globalThis.process || { env: {} };' }, // seed data reads process.env.*
   define: { global: 'globalThis', 'process.env.NODE_ENV': '"development"', __DEV__: 'true' },
   logLevel: 'error',
 });

@@ -28,6 +28,8 @@ a bare `teamDSY`).
 - **4 recorded ride logs** for the finished rides (km, time, avg/max speed, together %, longest gap, hazards, signals, a
   240-point track and a timeline of events). **These are synthetic**: the tracks are interpolated along each ride's
   planned route so the Log and Recap screens have something to show — they are not rides anyone recorded.
+- **9 `join_codes/{CODE}` docs** (3 crews + 6 rides): crews and rides are readable by members only, so the app resolves a
+  code through `join_codes/{CODE} = { kind, target_id }` (see `docs/security/firestore.md`).
 - **3 hazard clusters** on the next ride's route (2 active, 1 resolved).
 
 Crew members are plain ids like `seed-meera` with a public profile (name, bike, style, stats) so the app shows names;

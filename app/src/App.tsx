@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import RootNavigator from './navigation/RootNavigator';
 import SessionBootstrap from './navigation/SessionBootstrap';
+import RideLifecycleBridge from './navigation/RideLifecycleBridge';
+import { navigationRef } from './navigation/navigationRef';
 import OverlayHost from './overlays/OverlayHost';
 import { ThemeProvider, useTheme } from './theme/ThemeProvider';
 import { initFirebase } from './services/firebaseService';
@@ -57,7 +59,7 @@ function ThemedNavigation({ children }: { children: React.ReactNode }) {
     colors: { ...base.colors, background: colors.bg, card: colors.bg, text: colors.ink, border: colors.line, primary: colors.pri },
   };
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
       {children}
     </NavigationContainer>
@@ -79,6 +81,7 @@ export default function App() {
           <SessionBootstrap />
           <SyncBootstrap />
           <RootNavigator />
+          <RideLifecycleBridge />
           <OverlayHost />
         </ThemedNavigation>
       </ThemeProvider>

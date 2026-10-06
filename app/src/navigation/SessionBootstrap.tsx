@@ -8,17 +8,23 @@ import { firebaseAuth, saveFcmToken } from '../services/firebaseService';
 import { resetRideSession } from '../store/rideSession';
 import { useAppStore } from '../store/appStore';
 import { usePrefsStore } from '../store/prefsStore';
+import { useCrewsStore } from '../store/crewsStore';
 import { useProfileStore } from '../store/profileStore';
+import { useRidesStore } from '../store/ridesStore';
 import { useSessionStore } from '../store/sessionStore';
 
 export default function SessionBootstrap() {
   useEffect(() => {
     let stopProfile: (() => void) | null = null;
     let stopPrefs: (() => void) | null = null;
+    let stopCrews: (() => void) | null = null;
+    let stopRides: (() => void) | null = null;
     const stop = () => {
       stopProfile?.();
       stopPrefs?.();
-      stopProfile = stopPrefs = null;
+      stopCrews?.();
+      stopRides?.();
+      stopProfile = stopPrefs = stopCrews = stopRides = null;
     };
     const unsubscribe = firebaseAuth.onAuthStateChanged((user: { uid: string } | null) => {
       stop();
@@ -26,6 +32,8 @@ export default function SessionBootstrap() {
         useAppStore.getState().setUserId(user.uid);
         stopProfile = useProfileStore.getState().watchMe(user.uid);
         stopPrefs = usePrefsStore.getState().watch(user.uid);
+        stopCrews = useCrewsStore.getState().watch(user.uid);
+        stopRides = useRidesStore.getState().watch(user.uid);
         Promise.resolve().then(() => saveFcmToken(user.uid)).catch(() => undefined);
         useSessionStore.getState().setAuth(user.uid);
       } else {
@@ -33,6 +41,8 @@ export default function SessionBootstrap() {
         useAppStore.getState().setGroupId(null);
         useProfileStore.getState().clear();
         usePrefsStore.getState().reset();
+        useCrewsStore.getState().clear();
+        useRidesStore.getState().clear();
         resetRideSession();
         useSessionStore.getState().setAuth(null);
       }

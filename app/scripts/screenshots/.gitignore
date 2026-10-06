@@ -1,4 +1,5 @@
 node_modules
-scenes.js
 out
 package-lock.json
+scenes*.js
+scenes.js

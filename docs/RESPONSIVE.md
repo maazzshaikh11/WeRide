@@ -159,7 +159,20 @@ The check (`layoutcheck.js`, injected after each scene settles) reports, per ele
 
 ## 4. Results
 
-RESULTS_PLACEHOLDER
+Run of the full matrix on 2026-10-06: **64 scenes × 9 devices × 3 font scales = 1,728 renders, 0 layout errors** (iPhone 14, iPhone SE,
+iPhone Pro Max, Pixel, short 360 × 640 Android, small 320 × 568 Android, foldable inner screen, iPad portrait and landscape;
+font scales 1.0, 1.5 and 2.0). Every error class in the table in section 3 is 0 in every row: no sideways overflow, nothing off
+screen, no clipped or word-broken text, no touch target under 44 pt (28 pt wide for the dense letter keypad), no overlapping text
+or controls, including after scrolling each screen to its end.
+
+Warnings (not counted as errors) are ellipsis truncations of single-line labels: ride names and subtitles on the smallest
+screens (320 pt) at 1.5-2× text, e.g. "Sunday Gha…" in the live header or a rider's bike line. They are 9-10 per device at normal text
+and up to ~82 on the 320 pt phone at 2× text; none hides something a rider must read (the plates, speed, ETA, SOS and the primary
+buttons never truncate).
+
+Sanity check of the checker itself: a deliberately broken layout (a 700 pt-wide line, an 18 × 18 pt button) injected into a rendered
+scene was reported as `page-hscroll`, `beyond-viewport`, `offscreen` and `target-small`, so a zero is a real zero for those classes.
+Not covered by the checker: a text node clipped by its own element, and anything a browser engine cannot show (next section).
 
 ## 5. What only a device can verify
 

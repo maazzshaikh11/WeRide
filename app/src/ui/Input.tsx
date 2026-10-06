@@ -33,7 +33,7 @@ export function CodeBoxes({ value, length = 6, height = 64, fontSize = 28, error
 }
 
 type KeyProps = { label: React.ReactNode; onPress: () => void; a11y: string; flex?: number; h: number; radius: number; soft?: boolean; fontSize: number };
-function KeyBtn({ label, onPress, a11y, flex = 1, h, radius, soft, fontSize }: KeyProps) {
+function KeyBtn({ label, onPress, a11y, flex, h, radius, soft, fontSize }: KeyProps) {
   const { colors, type } = useTheme();
   return (
     <PressableScale
@@ -42,7 +42,7 @@ function KeyBtn({ label, onPress, a11y, flex = 1, h, radius, soft, fontSize }: K
       scaleTo={0.94}
       accessibilityRole="button"
       accessibilityLabel={a11y}
-      style={{ flex, height: h, borderRadius: radius, alignItems: 'center', justifyContent: 'center', backgroundColor: soft ? colors.card2 : colors.card, borderWidth: 1.5, borderColor: colors.line }}
+      style={{ ...(flex === undefined ? { alignSelf: 'stretch' as const } : { flex }), height: h, borderRadius: radius, alignItems: 'center', justifyContent: 'center', backgroundColor: soft ? colors.card2 : colors.card, borderWidth: 1.5, borderColor: colors.line }}
     >
       {typeof label === 'string' ? <Text style={[type.num, { fontSize, lineHeight: fontSize + 4, color: colors.ink }]}>{label}</Text> : label}
     </PressableScale>

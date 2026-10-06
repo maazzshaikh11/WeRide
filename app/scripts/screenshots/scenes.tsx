@@ -1,141 +1,295 @@
+// @ts-nocheck
+import './clock';
+import './mocks';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { View, Animated } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 
 /**
- * Screenshot scenes: real screens/components with real stores, rendered by
- * react-native-web with native modules stubbed (see ./stubs). Sample data below is
- * illustrative. Run via ./run.sh (see README.md).
+ * Visual-parity scenes: every real screen, sheet and overlay of the app, rendered by react-native-web with native
+ * modules stubbed (./stubs) and the stores + in-memory Firestore seeded from the teamDSY demo account (./seed.ts).
+ * Scene keys equal the file names in docs/demo-screens/ so each render can be put next to its demo reference.
+ *   index.html#<scene>[:<theme>[:<light|dark>]]       garage scenes default to Demo/light, road + SOS scenes to Demo/dark.
+ * Animations are finished instantly (headless Chrome does not advance frames) and looping pulses are held still.
  */
-
-// Screenshots show resting states: finish every animation instantly (headless
-// browsers don't advance animation frames), and keep looping pulses still.
-const done = (v: any, cfg: any) => ({
-  start(cb?: any) { try { v.setValue(cfg.toValue); } catch {} cb?.({ finished: true }); },
-  stop() {}, reset() {},
-});
+const done = (v: any, cfg: any) => ({ start(cb?: any) { try { v.setValue(cfg.toValue); } catch {} cb?.({ finished: true }); }, stop() {}, reset() {} });
 (Animated as any).timing = done;
 (Animated as any).spring = done;
 (Animated as any).loop = () => ({ start() {}, stop() {}, reset() {} });
 (Animated as any).sequence = (list: any[]) => ({ start(cb?: any) { list.forEach((a) => a.start()); cb?.({ finished: true }); }, stop() {} });
 (Animated as any).parallel = (Animated as any).sequence;
-import { useAppStore } from '@app/store/appStore';
-import { useRouteStore } from '@routing/client/routeStore';
-import { useRidePlanStore } from '@app/store/ridePlanStore';
-import { useStopsStore } from '@app/store/stopsStore';
-import { useRidersStore } from '@app/store/ridersStore';
-import { useToastStore } from '@app/store/toastStore';
-import LoginScreen from '@app/screens/LoginScreen';
-import GroupListScreen from '@app/screens/GroupListScreen';
-import AlertsScreen from '@app/screens/AlertsScreen';
-import StopsScreen from '@app/screens/StopsScreen';
-import HistoryScreen from '@app/screens/HistoryScreen';
-import VoiceScreen from '@app/screens/VoiceScreen';
-import FamilyScreen from '@app/screens/FamilyScreen';
-import MapScreen from '@app/screens/map/MapScreen';
-import CreateRideModal from '@app/components/CreateRideModal';
-import SosModal from '@app/components/SosModal';
-import SignalSheet from '@app/components/SignalSheet';
-import HazardSheet from '@app/components/HazardSheet';
-import RouteSheet from '@app/components/RouteSheet';
-import SettingsScreen from '@app/screens/SettingsScreen';
+(Animated as any).delay = () => ({ start(cb?: any) { cb?.({ finished: true }); }, stop() {} });
+
 import { ThemeContext, buildTheme, useTheme } from '@app/theme/ThemeProvider';
-import { THEMES, ThemeId, Scheme } from '@app/theme/palettes';
+import { THEMES } from '@app/theme/palettes';
+import { GarageTabBar } from '@app/navigation/GarageTabs';
+import OverlayHost from '@app/overlays/OverlayHost';
 import ToastContainer from '@app/components/ToastContainer';
-import { MainTabBar } from '@app/navigation/MainTabNavigator';
+import { useOverlayStore } from '@app/store/overlayStore';
+import { useToastStore } from '@app/store/toastStore';
+import { useRouteStore } from '@routing/client/routeStore';
+import { useRidersStore } from '@app/store/ridersStore';
+import { usePlanDraftStore } from '@app/store/planDraftStore';
+import { usePrefsStore } from '@app/store/prefsStore';
+import { useVoiceStore } from '@app/hooks/useVoiceChannel';
+import { useSosSessionStore } from '@app/services/sosFlowService';
+import { useSosEventsStore } from '@app/overlays/sosEventsStore';
+import { startPhoneSignIn } from '@app/services/authService';
 
-const NOW = Date.now();
-const H = 3600e3;
-const ts = (ms: number) => ({ toMillis: () => ms });
-const members = (n: number) => Array.from({ length: n }, (_, i) => (i === 0 ? 'u1' : `u${i + 1}`));
-const planA = {
-  start: { label: 'Bandra, Mumbai', lat: 19.0596, lng: 72.8295 },
-  destination: { label: 'Lonavala, Maharashtra', lat: 18.7546, lng: 73.4062 },
-  stops: [{ id: 's1', label: 'Chai Point, Khopoli', lat: 18.79, lng: 73.34, icon: '☕' }],
+import SplashScreen from '@app/screens/onboarding/SplashScreen';
+import PromiseScreen from '@app/screens/onboarding/PromiseScreen';
+import AuthPhoneScreen from '@app/screens/onboarding/AuthPhoneScreen';
+import AuthOtpScreen from '@app/screens/onboarding/AuthOtpScreen';
+import ProfileScreen from '@app/screens/onboarding/ProfileScreen';
+import PermsScreen from '@app/screens/onboarding/PermsScreen';
+import ContactScreen from '@app/screens/onboarding/ContactScreen';
+import DrillScreen from '@app/screens/onboarding/DrillScreen';
+import CrewStartScreen from '@app/screens/onboarding/CrewStartScreen';
+import JoinScreen from '@app/screens/garage/JoinScreen';
+import RideHomeScreen from '@app/screens/garage/RideHomeScreen';
+import CrewsScreen from '@app/screens/garage/CrewsScreen';
+import CrewScreen from '@app/screens/garage/CrewScreen';
+import LogScreen from '@app/screens/garage/LogScreen';
+import RecapScreen from '@app/screens/garage/RecapScreen';
+import MeScreen from '@app/screens/garage/MeScreen';
+import SafetyScreen from '@app/screens/garage/SafetyScreen';
+import DisplayScreen from '@app/screens/garage/DisplayScreen';
+import PrivacyScreen from '@app/screens/garage/PrivacyScreen';
+import PlanWhereScreen from '@app/screens/garage/PlanWhereScreen';
+import PlanRouteScreen from '@app/screens/garage/PlanRouteScreen';
+import PlanWhenScreen from '@app/screens/garage/PlanWhenScreen';
+import PlanDoneScreen from '@app/screens/garage/PlanDoneScreen';
+import MeetupScreen from '@app/screens/road/MeetupScreen';
+import StopScreen from '@app/screens/road/StopScreen';
+import ArriveScreen from '@app/screens/road/ArriveScreen';
+import MapScreen from '@app/screens/map/MapScreen';
+
+import IntelSheet from '@app/sheets/IntelSheet';
+import RideInfoSheet from '@app/sheets/RideInfoSheet';
+import NewCrewSheet from '@app/sheets/NewCrewSheet';
+import CrewMenuSheet from '@app/sheets/CrewMenuSheet';
+import InviteSheet from '@app/sheets/InviteSheet';
+import MemberSheet from '@app/sheets/MemberSheet';
+import ShareCardSheet from '@app/sheets/ShareCardSheet';
+import RateRouteSheet from '@app/sheets/RateRouteSheet';
+import FamilySheet from '@app/sheets/FamilySheet';
+import VoicePrefsSheet from '@app/sheets/VoicePrefsSheet';
+import PermsSheet from '@app/sheets/PermsSheet';
+import AddContactSheet from '@app/sheets/AddContactSheet';
+
+import { seed, seedLive, hazardCluster, setTheme, fixAt, alongPath, planPath, ME, MEERA, ZOYA, DEV, ISHAN, KABIR, RIDE0, CREW0, rideId } from './seed';
+import T from '../../../infra/firebase/seed/teamdsy-data.js';
+
+const nav: any = {
+  navigate() {}, goBack() {}, replace() {}, reset() {}, dispatch() {}, setOptions() {}, push() {}, popToTop() {},
+  getParent: () => ({ goBack() {}, navigate() {} }), addListener: () => () => {}, canGoBack: () => true, isFocused: () => true,
 };
-(globalThis as any).__GROUPS__ = [
-  { id: 'g1', name: 'Sunday Ghat Ride', created_by: 'u1', member_ids: members(6), created_at: ts(NOW - 5 * H), active_ride_id: null, join_code: 'K7M2QX', ride_type: 'Touring', start_time_ms: NOW + 14 * H, ride_plan: planA },
-  { id: 'g2', name: 'Evening City Loop', created_by: 'u2', member_ids: members(3), created_at: ts(NOW - 9 * H), active_ride_id: null, join_code: 'H8K2QD', ride_type: 'Sport', start_time_ms: NOW + 3 * 24 * H, ride_plan: { start: { label: 'Juhu Circle, Mumbai', lat: 19.1, lng: 72.83 }, destination: { label: 'BKC, Mumbai', lat: 19.066, lng: 72.865 }, stops: [] } },
-  { id: 'g3', name: 'Ride to Goa', created_by: 'u1', member_ids: members(1), created_at: ts(NOW - 2 * H), active_ride_id: null, join_code: 'P4N9TZ', ride_plan: null },
-  { id: 'g4', name: 'Night Loop — BKC', created_by: 'u1', member_ids: members(4), created_at: ts(NOW - 99 * H), active_ride_id: null, join_code: 'M3C8WE', ride_type: 'Casual', start_time_ms: NOW - 3 * 24 * H, ride_plan: { start: { label: 'Bandra, Mumbai', lat: 19.0596, lng: 72.8295 }, destination: { label: 'BKC, Mumbai', lat: 19.066, lng: 72.865 }, stops: [] } },
-];
-(globalThis as any).__CLUSTERS__ = [
-  { cluster_id: 'c1', group_id: 'g1', hazard_type: 'pothole', centroid_lat: 18.99, centroid_lng: 72.95, polygon_points: [], report_count: 4, hazard_score: 0.62, created_at_hlc: `${NOW - 6 * 60e3}:0`, status: 'active' },
-  { cluster_id: 'c2', group_id: 'g1', hazard_type: 'oil_spill', centroid_lat: 18.9, centroid_lng: 73.1, polygon_points: [], report_count: 2, hazard_score: 0.41, created_at_hlc: `${NOW - 25 * 60e3}:0`, status: 'active' },
-  { cluster_id: 'c3', group_id: 'g1', hazard_type: 'debris', centroid_lat: 18.8, centroid_lng: 73.3, polygon_points: [], report_count: 3, hazard_score: 0.35, created_at_hlc: `${NOW - 80 * 60e3}:0`, status: 'resolved' },
-];
+const rt = (params: any = {}) => ({ params, key: 'k', name: 'x' });
+const q = (sel: string) => document.querySelector(sel) as HTMLElement | null;
+const byText = (txt: string) => Array.from(document.querySelectorAll('[role=button],button,[tabindex="0"]')).find((e) => (e as HTMLElement).innerText?.trim().toLowerCase().startsWith(txt.toLowerCase())) as HTMLElement | undefined;
+/** Click the control matching a CSS selector, or `text=Label`, once it exists (polls up to 4 s). */
+const tap = (sel: string, delay = 500) => {
+  const start = Date.now();
+  const go = () => {
+    const el = sel.startsWith('text=') ? byText(sel.slice(5)) : q(sel);
+    if (el) { el.click(); return; }
+    if (Date.now() - start < 4000) setTimeout(go, 150);
+  };
+  setTimeout(go, delay);
+};
+const press = (sel: string, delay = 800) => setTimeout(() => {
+  const el = q(sel);
+  if (!el) return;
+  for (const t of ['pointerdown', 'mousedown']) el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true }));
+}, delay);
+const typeInto = (sel: string, text: string, delay = 600) => setTimeout(() => {
+  const el = q(sel) as HTMLInputElement | null;
+  if (!el) return;
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  set.call(el, text);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}, delay);
+const later = (fn: () => void, ms: number) => setTimeout(fn, ms);
 
-function seedRide() {
-  useAppStore.setState({ userId: 'u1', groupId: 'g1', groupName: 'Sunday Ghat Ride', rideStartedAt: NOW - 38 * 60e3 });
-  const plan = useRidePlanStore.getState();
-  plan.clearPlan();
-  plan.setStart(planA.start); plan.setDestination(planA.destination);
-  planA.stops.forEach((s) => plan.addStop(s));
-  useStopsStore.getState().syncFromPlan();
-  const loc = { rider_id: 'u1', group_id: 'g1', timestamp_hlc: `${NOW}:0`, lat: 19.0, lng: 72.9, speed_mps: 12, heading_deg: 90, spoof_flag: false, nis_score: 0.4, accuracy_m: 6 };
-  useRouteStore.setState({
-    route: { route_id: 'r1', path_points: [[19.0596, 72.8295], [19.0, 72.9], [18.9, 73.1], [18.79, 73.34], [18.7546, 73.4062]], distance_km: 84.2, eta_minutes: 107, safety_score: 0.82, recalculated_at_hlc: '1:0' },
-    currentLocation: loc, lastValidLocation: loc,
-  });
-  const mk = (id: string, lat: number, lng: number) => ({ rider_id: id, group_id: 'g1', timestamp_hlc: `${Date.now()}:0`, lat, lng, speed_mps: 11, heading_deg: 90, spoof_flag: false, nis_score: 0.5, accuracy_m: 8 });
-  [0.0009, -0.002, 0.0034].forEach((d, i) => useRidersStore.getState().upsertRider(mk(`u${i + 2}`, 19.0 + d, 72.9)));
-}
-
-const ROUTE = { route_id: 'r1', path_points: [[19.0596, 72.8295], [19.0, 72.9], [18.9, 73.1], [18.79, 73.34], [18.7546, 73.4062]], distance_km: 84.2, eta_minutes: 107, safety_score: 0.82, recalculated_at_hlc: '1:0' };
-// In the app the routing server answers; in this harness there is none, so apply its reply.
-const reseedRoute = () => setTimeout(() => useRouteStore.setState({ route: ROUTE }), 700);
-const nav = { navigate() {}, goBack() {}, replace() {}, reset() {}, getParent: () => ({ goBack() {} }) };
-const Frame = ({ children, bg, height = 844 }: any) => {
+const W = 390, H = 844;
+const Frame = ({ children, bg }: any) => {
   const { colors } = useTheme();
-  return <View style={{ width: 390, height, backgroundColor: bg ?? colors.bg, overflow: 'hidden' }}>{children}</View>;
+  return <View style={{ width: W, height: H, backgroundColor: bg ?? colors.bg, overflow: 'hidden' }}>{children}</View>;
 };
-// A tab screen laid out like the navigator does: content above, bar below (not overlapping).
-const TabScreen = ({ children, idx }: any) => (
-  <Frame><View style={{ flex: 1 }}>{children}</View><MainTabBar {...tabState(idx)} /></Frame>
-);
-const click = (sel: string, delay = 500) => setTimeout(() => (document.querySelector(sel) as HTMLElement | null)?.click(), delay);
-
 const tabState = (idx: number) => {
-  const names = ['Home', 'Stops', 'Voice', 'Family', 'Alerts', 'History'];
+  const names = ['Ride', 'Crews', 'Log', 'Me'];
   return {
     state: { index: idx, key: 'tab', routes: names.map((n) => ({ key: n, name: n })) },
     descriptors: Object.fromEntries(names.map((n) => [n, { options: {} }])),
     navigation: { emit: () => ({ defaultPrevented: false }), dispatch() {} },
   } as any;
 };
+/** A Garage tab screen exactly as the navigator lays it out: content, then the real tab bar. */
+const Tab = ({ idx, children, after }: any) => (
+  <Frame><View style={{ flex: 1, minHeight: 0 }}>{children}</View><GarageTabBar {...tabState(idx)} />{after}</Frame>
+);
+const Plain = ({ children }: any) => <Frame>{children}</Frame>;
+const Road = ({ children }: any) => { const { road } = useTheme(); return <Frame bg={road.bg}>{children}</Frame>; };
+const Overlay = ({ base }: any) => <Frame bg="#101216">{base}<OverlayHost /></Frame>;
 
-const scenes: Record<string, () => React.ReactElement> = {
-  login: () => <Frame><LoginScreen navigation={nav} /></Frame>,
-  'login-create': () => { click('[aria-label="Switch to create account"]', 900); return <Frame><LoginScreen navigation={nav} /></Frame>; },
-  groups: () => { seedRide(); return <Frame><GroupListScreen navigation={nav} /></Frame>; },
-  'groups-tall': () => { seedRide(); return <Frame height={1900}><GroupListScreen navigation={nav} /></Frame>; },
-  'groups-empty': () => { (globalThis as any).__GROUPS__ = []; return <Frame><GroupListScreen navigation={nav} /></Frame>; },
-  'create-ride': () => {
-    useRidePlanStore.getState().clearPlan();
-    useRidePlanStore.getState().setStart(planA.start); useRidePlanStore.getState().setDestination(planA.destination);
-    useRidePlanStore.getState().addStop(planA.stops[0]);
-    return <Frame><CreateRideModal visible onClose={() => {}} onCreated={() => {}} /></Frame>;
-  },
-  alerts: () => { seedRide(); return <TabScreen idx={4}><AlertsScreen /></TabScreen>; },
-  stops: () => { seedRide(); useStopsStore.getState().markCurrentDone(); return <TabScreen idx={1}><StopsScreen /></TabScreen>; },
-  history: () => { seedRide(); return <TabScreen idx={5}><HistoryScreen navigation={nav} /></TabScreen>; },
-  voice: () => { seedRide(); return <TabScreen idx={2}><VoiceScreen /></TabScreen>; },
-  family: () => { seedRide(); return <TabScreen idx={3}><FamilyScreen /></TabScreen>; },
-  // The live screen sits above the tab bar, like in the app.
-  map: () => { seedRide(); reseedRoute(); return <TabScreen idx={0}><MapScreen navigation={nav} /></TabScreen>; },
-  'map-expanded': () => { seedRide(); reseedRoute(); click('[aria-label="Route details"]', 900); return <TabScreen idx={0}><MapScreen navigation={nav} /></TabScreen>; },
-  hazards: () => { seedRide(); reseedRoute(); click('[aria-label="Report a hazard"]', 900); return <TabScreen idx={0}><MapScreen navigation={nav} /></TabScreen>; },
-  settings: () => <Frame><SettingsScreen navigation={nav} /></Frame>,
-  sos: () => { seedRide(); return <Frame><SosModal visible riderId="u1" groupId="g1" riderCount={4} location={{ lat: 19, lng: 72.9 }} onCancel={() => {}} onSent={() => {}} /></Frame>; },
-  signals: () => { seedRide(); reseedRoute(); click('[aria-label="Send a quick signal"]', 900); return <TabScreen idx={0}><MapScreen navigation={nav} /></TabScreen>; },
-  tabbar: () => <Frame><View style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}><MainTabBar {...tabState(0)} /></View></Frame>,
+interface Scene { kind?: 'garage' | 'road'; setup?: () => Promise<void> | void; render: () => React.ReactElement; wait?: number }
+const S: Record<string, Scene> = {};
+const sheets = (k: string, tab: number | null, host: () => React.ReactElement, sheet: (w: any) => React.ReactElement, o: any = {}) => {
+  S[k] = { setup: () => { (globalThis as any).__W__ = seed(o); }, render: () => { const w = (globalThis as any).__W__; return tab == null ? <Plain>{host()}{sheet(w)}</Plain> : <Tab idx={tab}>{host()}</Tab>; } };
 };
 
-// #scene[:theme[:scheme]]  e.g. #map:ember:light
-const [name, themeArg = 'demo', schemeArg = 'dark'] = (location.hash || '#login').slice(1).split(':');
-const themeId = (themeArg === 'ember' ? 'ember' : 'demo') as ThemeId;
-const scheme = (schemeArg === 'light' ? 'light' : 'dark') as Scheme;
-document.body.style.background = THEMES[themeId][scheme].bg;
-createRoot(document.getElementById('root')!).render(
-  <ThemeContext.Provider value={buildTheme(themeId, THEMES[themeId][scheme])}>{(scenes[name] ?? scenes.login)()}</ThemeContext.Provider>,
-);
+// ───────────────────────── first launch ─────────────────────────
+S['01-splash'] = { kind: 'road', setup: () => { seed({ signedIn: false, onboarded: false }); }, render: () => <Plain><SplashScreen navigation={nav} route={rt()} /></Plain> };
+S['02-promise'] = { kind: 'road', setup: () => { seed({ signedIn: false, onboarded: false }); }, render: () => <Plain><PromiseScreen navigation={nav} route={rt()} /></Plain> };
+S['03-auth-phone'] = { setup: () => { seed({ signedIn: false, onboarded: false }); }, render: () => <Plain><AuthPhoneScreen navigation={nav} route={rt()} /></Plain> };
+const otp = async () => { seed({ signedIn: false, onboarded: false }); await startPhoneSignIn('+919876543210'); };
+S['04-auth-otp'] = { setup: otp, render: () => <Plain><AuthOtpScreen navigation={nav} route={rt()} /></Plain> };
+S['auth-otp-typed'] = { setup: otp, render: () => { ['4', '8', '2'].forEach((k, i) => tap(`[aria-label="${k}"]`, 500 + i * 200)); return <Plain><AuthOtpScreen navigation={nav} route={rt()} /></Plain>; } };
+const first = { onboarded: false, contacts: false, crews: false, rides: false, logs: false };
+S['05-profile'] = { setup: () => { seed(first); useProfileStoreMe(null); }, render: () => { typeInto('input', 'Arjun Rao', 600); return <Plain><ProfileScreen navigation={nav} route={rt()} /></Plain>; } };
+S['06-perms'] = { setup: () => { seed(first); }, render: () => <Plain><PermsScreen navigation={nav} route={rt()} /></Plain> };
+S['perm-prompt-location'] = { setup: () => { seed(first); }, render: () => { tap('[data-testid="perm-btn-location"]', 700); return <Plain><PermsScreen navigation={nav} route={rt()} /></Plain>; } };
+S['07-contact'] = { setup: () => { seed({ ...first, contacts: true }); }, render: () => <Plain><ContactScreen navigation={nav} route={rt()} /></Plain> };
+S['08-drill'] = { setup: () => { seed({ ...first, contacts: true }); }, render: () => <Plain><DrillScreen navigation={nav} route={rt({})} /></Plain> };
+S['09-crew-start'] = { setup: () => { seed({ ...first, contacts: true }); }, render: () => <Plain><CrewStartScreen navigation={nav} route={rt()} /></Plain> };
+S['10-join'] = { setup: () => { seed({ ...first, contacts: true }); }, render: () => <Plain><JoinScreen navigation={nav} route={rt({})} /></Plain> };
+S['join-error'] = { setup: () => { seed({ ...first, contacts: true }); }, render: () => { 'K4N9TZ'.split('').forEach((k, i) => tap(`[aria-label="${k}"]`, 500 + i * 150)); tap('text=Join crew', 1800); return <Plain><JoinScreen navigation={nav} route={rt({})} /></Plain>; }, wait: 2200 };
+function useProfileStoreMe(v: any) { const { useProfileStore } = require_profile(); useProfileStore.setState({ me: v }); }
+import * as profileMod from '@app/store/profileStore';
+function require_profile() { return profileMod; }
+
+// ───────────────────────── garage ─────────────────────────
+const home = (ride: any, o: any = {}) => ({ setup: () => { seed({ ride, ...o }); }, render: () => <Tab idx={0}><RideHomeScreen navigation={nav} route={rt()} /></Tab>, wait: 1800 });
+S['11-home'] = home('planned');
+S['11b-home-meetup'] = home('meetup');
+S['11c-home-live'] = home('live');
+S['11d-home-finished'] = home('finished', { onlyNextRide: true });
+S['12-crews'] = { setup: () => { seed({}); }, render: () => <Tab idx={1}><CrewsScreen navigation={nav} route={rt()} /></Tab> };
+S['13-crew'] = { setup: () => { seed({}); }, render: () => <Plain><CrewScreen navigation={nav} route={rt({ crewId: CREW0 })} /></Plain> };
+S['14-log'] = { setup: () => { seed({}); }, render: () => <Tab idx={2}><LogScreen navigation={nav} route={rt()} /></Tab> };
+const recapId = rideId('lonavala-sunrise-loop');
+S['15-recap'] = { setup: () => { seed({}); }, render: () => <Plain><RecapScreen navigation={nav} route={rt({ rideId: recapId })} /></Plain>, wait: 1500 };
+S['16-me'] = { setup: () => { seed({}); }, render: () => <Tab idx={3}><MeScreen navigation={nav} route={rt()} /></Tab> };
+S['17-safety'] = { setup: () => { seed({}); }, render: () => <Plain><SafetyScreen navigation={nav} route={rt()} /></Plain> };
+S['18-display'] = { setup: () => { seed({}); }, render: () => <Plain><DisplayScreen navigation={nav} route={rt()} /></Plain> };
+S['19-privacy'] = { setup: () => { seed({}); }, render: () => <Plain><PrivacyScreen navigation={nav} route={rt()} /></Plain> };
+
+// plan flow
+const lonavala = { label: 'Lonavala, Maharashtra', lat: 18.7481, lng: 73.4072 };
+const bandra = { label: 'Bandra Fort, Mumbai', lat: 19.0419, lng: 72.8188 };
+S['20-plan-where'] = { setup: () => { seed({}); }, render: () => <Plain><PlanWhereScreen navigation={nav} route={rt()} /></Plain> };
+S['21-plan-route'] = { setup: () => { seed({}); const d = usePlanDraftStore.getState(); d.setStart(bandra); d.setDestination(lonavala); }, render: () => <Plain><PlanRouteScreen navigation={nav} route={rt()} /></Plain>, wait: 2800 };
+S['22-plan-when'] = { setup: () => {
+  const w = seed({}); const d = usePlanDraftStore.getState();
+  d.setStart(bandra); d.setDestination(lonavala);
+  const p = planPath({ start: bandra, stops: [], destination: lonavala });
+  d.setOptions([{ route_id: 'r1', path_points: p, distance_km: 84.2, eta_minutes: 125, safety_score: 0.91, hazard_count: 1, label: 'Fastest' }], 0);
+  d.setCrew(CREW0, w.crews[0].member_ids.filter((u: string) => u !== ME), true);
+}, render: () => <Plain><PlanWhenScreen navigation={nav} route={rt()} /></Plain>, wait: 1500 };
+S['23-plan-done'] = { setup: () => {
+  const w = seed({}); const d = usePlanDraftStore.getState();
+  d.setStart(bandra); d.setDestination(lonavala);
+  d.setOptions([{ route_id: 'r1', path_points: planPath({ start: bandra, stops: [], destination: lonavala }), distance_km: 84.2, eta_minutes: 125, safety_score: 0.91, hazard_count: 1, label: 'Fastest' }], 0);
+  d.setCrew(CREW0, w.crews[0].member_ids.filter((u: string) => u !== ME), true);
+}, render: () => <Plain><PlanDoneScreen navigation={nav} route={rt({ rideId: RIDE0 })} /></Plain>, wait: 1500 };
+
+// ───────────────────────── road ─────────────────────────
+const WAITING_LOC = { [MEERA]: { eastM: 20 }, [ZOYA]: { eastM: 35 }, [KABIR]: { eastM: 60 }, [DEV]: { eastM: 700, speed: 9 }, [ISHAN]: { eastM: 1500, speed: 7 } };
+S['24-meetup'] = { setup: () => { seed({ ride: 'meetup', ready: [MEERA], locations: WAITING_LOC }); }, render: () => <Plain><MeetupScreen navigation={nav} route={rt({ groupId: RIDE0 })} /></Plain>, wait: 1800 };
+S['meetup-waiting'] = S['24-meetup'];
+S['meetup-ready'] = { setup: () => { seed({ ride: 'meetup', ready: [ME, MEERA, ZOYA, KABIR, DEV], locations: { ...WAITING_LOC, [DEV]: { eastM: 30 } } }); }, render: () => <Plain><MeetupScreen navigation={nav} route={rt({ groupId: RIDE0 })} /></Plain>, wait: 1800 };
+
+const live = (o: any = {}, after?: () => void) => ({ kind: 'road' as const, setup: () => { seedLive(o); }, render: () => { after?.(); return <Plain><MapScreen navigation={nav} route={rt({ groupId: RIDE0 })} /></Plain>; }, wait: 1800 });
+const TOGETHER = { [MEERA]: 300, [ZOYA]: 140, [DEV]: -110, [ISHAN]: -190, [KABIR]: -280 };
+S['road-live'] = live({ riders: TOGETHER });
+S['live-gap'] = live({ riders: { [MEERA]: 320, [ZOYA]: 140, [DEV]: -110, [ISHAN]: -520, [KABIR]: -1300 } });
+const pathOf = () => planPath(T.rides(ME)[0].ride_plan);
+S['live-hazard-ahead'] = { kind: 'road', setup: () => { const p = pathOf(); seedLive({ atM: 3000, riders: TOGETHER, clusters: [hazardCluster(p, 3380)] }); }, render: () => <Plain><MapScreen navigation={nav} route={rt({ groupId: RIDE0 })} /></Plain>, wait: 1800 };
+S['live-hazard-confirm'] = { kind: 'road', setup: () => {
+  const p = pathOf(); const c = hazardCluster(p, 3200);
+  seedLive({ atM: 3050, riders: TOGETHER, clusters: [c] });
+  later(() => { const f = fixAt(p, 3340); useRouteStore.setState({ currentLocation: f, lastValidLocation: f }); (globalThis as any).__MAP__ = { lat: f.lat, lng: f.lng, mpp: 2.3, heading: f.heading_deg }; }, 500);
+}, render: () => <Plain><MapScreen navigation={nav} route={rt({ groupId: RIDE0 })} /></Plain>, wait: 2200 };
+S['live-signal-incoming'] = live({ riders: TOGETHER }, () => later(() => (globalThis as any).__SOCK__.fire('signal:received', { group_id: RIDE0, rider_id: MEERA, label: 'Wait up' }), 900));
+S['live-rider-nosignal'] = live({ riders: { ...TOGETHER, [KABIR]: { m: -280, ageMs: 70000 } } });
+S['live-ptt'] = live({ riders: TOGETHER }, () => later(() => useVoiceStore.setState({ status: 'live', talking: true }), 900));
+S['live-sheet-signals'] = live({ riders: TOGETHER }, () => tap('[data-testid="key-signal"]', 900));
+S['live-sheet-hazard'] = live({ riders: TOGETHER }, () => tap('[data-testid="key-hazard"]', 900));
+
+const stopSetup = () => { seedLive({ atM: 42000, presence: { [MEERA]: 'ready', [ZOYA]: 'ready', [ISHAN]: 'ready', [DEV]: 'fuel', [KABIR]: 'riding', [ME]: 'stopped' } }); };
+S['road-stop'] = { kind: 'road', setup: stopSetup, render: () => <Plain><StopScreen navigation={nav} route={rt({ groupId: RIDE0, stopId: 's1' })} /></Plain>, wait: 1800 };
+S['road-stop-late'] = { kind: 'road', setup: () => { seedLive({ atM: 42000, presence: { [MEERA]: 'ready', [ZOYA]: 'ready', [DEV]: 'ready', [ISHAN]: 'riding', [KABIR]: 'riding', [ME]: 'stopped' } }); }, render: () => <Plain><StopScreen navigation={nav} route={rt({ groupId: RIDE0, stopId: 's1' })} /></Plain>, wait: 1800 };
+S['road-arrive'] = { kind: 'road', setup: () => { const p = pathOf(); seedLive({ atM: 90000, presence: { [ME]: 'arrived', [MEERA]: 'arrived', [ZOYA]: 'arrived', [DEV]: 'arrived', [ISHAN]: 'arrived', [KABIR]: 'riding' } }); }, render: () => <Plain><ArriveScreen navigation={nav} route={rt({ groupId: RIDE0 })} /></Plain>, wait: 1800 };
+
+// ───────────────────────── SOS & overlays ─────────────────────────
+const sosSession = (o: any) => { const f = useRouteStore.getState().lastValidLocation; useSosSessionStore.getState().setSession({ sosId: 'sos1', groupId: RIDE0, drill: false, auto: false, startedMs: Date.now() - 12000, fix: { lat: f.lat, lng: f.lng, accuracy_m: 5 }, queued: false, ...o }); };
+const goingDocs = () => { const D = (globalThis as any).__FS__; D.set('sos_events/sos1/responders/' + MEERA, { state: 'going', updated_ms: Date.now() - 5000 }); D.set('sos_events/sos1/responders/' + ZOYA, { state: 'going', updated_ms: Date.now() - 4000 }); };
+const sosScene = (state: any, session: any, extra?: () => void) => ({ kind: 'road' as const, setup: () => { (globalThis as any).__QUEUE__ = []; seedLive({ riders: TOGETHER }); sosSession(session); extra?.(); useOverlayStore.getState().show(state); }, render: () => <Overlay base={null} />, wait: 1500 });
+S['sos-sent'] = sosScene({ kind: 'sos-sent', sosId: 'sos1', groupId: RIDE0 }, {}, goingDocs);
+S['sos-queued'] = sosScene({ kind: 'sos-sent', sosId: 'sos1', groupId: RIDE0 }, { queued: true }, () => { (globalThis as any).__QUEUE__ = [{ type: 'sos_event', data: { sos_id: 'sos1' } }]; useRidersStore.setState({ connected: false }); });
+S['sos-drill'] = sosScene({ kind: 'sos-sent', sosId: 'sos1', groupId: RIDE0, drill: true }, { drill: true });
+S['sos-auto'] = sosScene({ kind: 'sos-sent', sosId: 'sos1', groupId: RIDE0, auto: true }, { auto: true }, goingDocs);
+const incoming = { kind: 'sos-incoming', sosId: 'sos9', riderId: KABIR, groupId: RIDE0, lat: 0, lng: 0, startedMs: Date.now() - 40000 };
+const inSetup = () => { seedLive({ riders: TOGETHER }); const D = (globalThis as any).__FS__; D.set('sos_events/sos9/responders/' + MEERA, { state: 'going', updated_ms: Date.now() - 9000 }); D.set('sos_events/sos9/responders/' + ZOYA, { state: 'going', updated_ms: Date.now() - 6000 }); const f = fixAt(pathOf(), 1500 - 1400, 0, KABIR); incoming.lat = f.lat; incoming.lng = f.lng; useOverlayStore.getState().show(incoming); };
+S['sos-incoming'] = { kind: 'road', setup: inSetup, render: () => <Overlay base={null} />, wait: 1500 };
+S['sos-incoming-going'] = { kind: 'road', setup: inSetup, render: () => { tap('[data-testid="sosin-going"]', 900); return <Overlay base={null} />; }, wait: 2000 };
+S['crash-countdown'] = { kind: 'road', setup: () => { seedLive({}); useOverlayStore.getState().show({ kind: 'crash' }); }, render: () => <Overlay base={null} />, wait: 1200 };
+S['call-112'] = { kind: 'road', setup: () => { seedLive({}); useOverlayStore.getState().show({ kind: 'call112' }); }, render: () => <Overlay base={null} />, wait: 1200 };
+
+// ───────────────────────── sheets ─────────────────────────
+const homeHost = () => <Tab idx={0}><RideHomeScreen navigation={nav} route={rt()} /></Tab>;
+const sh = (k: string, idx: number, host: () => any, sheet: () => any, o: any = {}) => {
+  S[k] = { setup: () => { (globalThis as any).__W__ = seed(o); }, render: () => <Frame>{host()}{sheet()}</Frame>, wait: 1500 };
+};
+const hostTab = (idx: number, el: any) => () => (<View style={{ flex: 1 }}><View style={{ flex: 1, minHeight: 0 }}>{el}</View><GarageTabBar {...tabState(idx)} /></View>);
+const w = () => (globalThis as any).__W__;
+sh('sheet-intel', 0, hostTab(0, <RideHomeScreen navigation={nav} route={rt()} />), () => {
+  const r = w().rides[0]; const path = planPath(r.ride_plan);
+  return <IntelSheet visible onClose={() => {}} clusters={(globalThis as any).__CLUSTERS__} path={path.map((p) => ({ lat: p[0], lng: p[1] }))} safety={0.91} />;
+});
+sh('sheet-rideinfo', 0, hostTab(0, <RideHomeScreen navigation={nav} route={rt()} />), () => <RideInfoSheet visible onClose={() => {}} ride={w().rides[1]} />);
+sh('sheet-newcrew', 1, hostTab(1, <CrewsScreen navigation={nav} route={rt()} />), () => <NewCrewSheet visible onClose={() => {}} />);
+sh('sheet-crewmenu', 1, () => <CrewScreen navigation={nav} route={rt({ crewId: CREW0 })} />, () => <CrewMenuSheet visible onClose={() => {}} crewName="Ghat Ghosts" muted={false} />);
+sh('sheet-invite', 1, () => <CrewScreen navigation={nav} route={rt({ crewId: CREW0 })} />, () => <InviteSheet visible onClose={() => {}} crew={w().crews[0]} />);
+sh('sheet-member', 1, () => <CrewScreen navigation={nav} route={rt({ crewId: CREW0 })} />, () => <MemberSheet visible onClose={() => {}} profile={w().byId[MEERA]} uid={MEERA} role="lead" isMe={false} />);
+sh('sheet-sharecard', 1, () => <RecapScreen navigation={nav} route={rt({ rideId: recapId })} />, () => <ShareCardSheet visible onClose={() => {}} log={w().logs.find((l: any) => l.ride_id === recapId)} />);
+sh('sheet-rate', 1, () => <RecapScreen navigation={nav} route={rt({ rideId: recapId })} />, () => <RateRouteSheet visible onClose={() => {}} rideId={recapId} current={null} />);
+sh('sheet-family', 3, hostTab(3, <MeScreen navigation={nav} route={rt()} />), () => <FamilySheet visible onClose={() => {}} />);
+sh('sheet-voiceprefs', 3, hostTab(3, <MeScreen navigation={nav} route={rt()} />), () => <VoicePrefsSheet visible onClose={() => {}} />);
+sh('sheet-perms', 3, hostTab(3, <MeScreen navigation={nav} route={rt()} />), () => { (globalThis as any).__NOTIF__ = 1; return <PermsSheet visible onClose={() => {}} />; });
+sh('sheet-addcontact', 0, () => <SafetyScreen navigation={nav} route={rt()} />, () => <AddContactSheet visible onClose={() => {}} />, { contacts: false });
+
+// ───────────────────────── runner ─────────────────────────
+class Boundary extends React.Component<any, { err: any }> {
+  state = { err: null };
+  static getDerivedStateFromError(err: any) { return { err }; }
+  componentDidCatch(err: any) { (window as any).__ERR__ = String(err?.stack || err).slice(0, 1500); }
+  render() { return this.state.err ? <View style={{ width: W, height: H, backgroundColor: '#fee', padding: 16 }}><Text style={{ color: '#900', fontFamily: 'monospace', fontSize: 11 }}>{String((this.state.err as any)?.stack || this.state.err).slice(0, 1400)}</Text></View> : this.props.children; }
+}
+const errs: string[] = [];
+(window as any).__ERRS__ = errs;
+window.addEventListener('error', (e) => errs.push('uncaught: ' + (e.error?.stack || e.message).toString().slice(0, 600)));
+window.addEventListener('unhandledrejection', (e) => errs.push('rejection: ' + String((e.reason && e.reason.stack) || e.reason).slice(0, 600)));
+const ce = console.error.bind(console);
+console.error = (...a: any[]) => { const s = a.map((x) => (x && x.stack) || String(x)).join(' ').slice(0, 500); if (!/Warning: |React does not recognize|validateDOMNesting|Unknown event handler|act\(/.test(s)) errs.push('console.error: ' + s); ce(...a); };
+
+const [name, themeArg = 'demo', schemeArg = ''] = (location.hash || '#11-home').slice(1).split(':');
+(async () => {
+  const sc = S[name];
+  if (!sc) { document.body.innerHTML = `<pre id="noscene">NO SCENE ${name}</pre>`; (window as any).__READY__ = 'noscene'; return; }
+  const themeId = themeArg === 'ember' ? 'ember' : 'demo';
+  const scheme = (schemeArg || (sc.kind === 'road' ? 'dark' : 'light')) as any;
+  try {
+    setTheme(themeId, scheme);
+    await sc.setup?.();
+    // setup may reset stores: theme again so DisplayScreen shows the right choice
+    setTheme(themeId, scheme);
+  } catch (e: any) { errs.push('setup: ' + (e?.stack || e)); }
+  document.body.style.background = THEMES[themeId][scheme].bg;
+  const theme = buildTheme(themeId, THEMES[themeId][scheme], sc.kind === 'road' ? scheme : undefined);
+  createRoot(document.getElementById('root')!).render(
+    <ThemeContext.Provider value={theme}><Boundary>{sc.render()}</Boundary></ThemeContext.Provider>,
+  );
+  (window as any).__WAIT__ = sc.wait ?? 1200;
+  (window as any).__READY__ = 'ok';
+})();

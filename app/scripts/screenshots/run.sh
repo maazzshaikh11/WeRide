@@ -1,32 +1,33 @@
 #!/bin/bash
-# Renders the app's real screens to ../../../screenshots (phone-sized, 2x).
-#   CHROME=/path/to/chrome ./run.sh
-# Writes:
-#   screenshots/*.png                         every scene, Demo theme, dark
-#   screenshots/themes/<theme>-<scheme>/*.png the key screens in all four theme/mode combinations
+# Visual-parity harness: renders EVERY real screen / sheet / overlay of the app in headless Chrome (react-native-web) and
+# puts each next to its demo reference (docs/demo-screens/<name>.png).
+#
+#   CHROME=/usr/bin/google-chrome app/scripts/screenshots/run.sh [scene ...]
+#
+# Output (scratchpad, NOT the repo):  $OUT (default below)
+#   real/<name>.png        the real app at 2x of the 390x844 phone
+#   compare/<name>.png     [demo | real] side by side
+#   compare/sheet-NN.png   contact sheets, 4 pairs each
+#   compare/INDEX.md       per scene: "rendered ok" or the errors
+# With scene names as arguments only those are re-rendered (scene[:theme:scheme], e.g. 11-home:ember:dark);
+# the compare images are rebuilt for everything that has been rendered.
+# Scenes live in scenes.tsx (keys = demo file names); stubs/ holds the native-module stand-ins; seed.ts the data.
 set -e
 cd "$(dirname "$0")"
 : "${CHROME:?Set CHROME to a Chromium/Chrome binary}"
+OUT="${OUT:-/tmp/claude-1000/-home-raj-dev-muaz/0c87c01f-33c3-4c77-bef7-5290091872cd/scratchpad}"
+DEMO="$(cd ../../.. && pwd)/docs/demo-screens"
 [ -d node_modules ] || npm install --no-audit --no-fund
 node build.mjs
-ROOT="$(cd ../../.. && pwd)/screenshots"; mkdir -p "$ROOT"
-shoot() { # scene[:theme:scheme] outfile [height]
-  "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
-    --window-size=390,${3:-844} --virtual-time-budget=6000 --screenshot="$2" "file://$PWD/index.html#$1" >/dev/null 2>&1
-  echo "${2#$ROOT/}"
-}
-declare -A FILES=(
-  [login]=01-sign-in [login-create]=02-create-account [groups]=03-rides [groups-tall]=04-rides-full-list
-  [groups-empty]=05-rides-empty [create-ride]=06-create-ride [map]=07-live-map [map-expanded]=08-live-map-route-details
-  [sos]=09-sos-confirm [signals]=10-quick-signals [hazards]=11-report-hazard [alerts]=12-road-alerts [stops]=13-planned-stops
-  [history]=14-ride-history [voice]=15-group-voice [family]=16-family [settings]=17-settings-appearance
-)
-ORDER=(login login-create groups groups-tall groups-empty create-ride map map-expanded sos signals hazards alerts stops history voice family settings)
-for s in "${ORDER[@]}"; do
-  h=844; [ "$s" = groups-tall ] && h=1900
-  shoot "$s:demo:dark" "$ROOT/${FILES[$s]}.png" $h
-done
-for t in demo ember; do for m in light dark; do
-  mkdir -p "$ROOT/themes/$t-$m"
-  for s in groups map map-expanded settings; do shoot "$s:$t:$m" "$ROOT/themes/$t-$m/${FILES[$s]}.png"; done
-done; done
+mkdir -p "$OUT/real"
+if [ $# -gt 0 ]; then SCENES=("$@"); else SCENES=($(ls "$DEMO" | grep '\.png$' | sed 's/\.png$//')); fi
+node shoot.mjs "$CHROME" "$OUT/real" "$OUT/results.partial.json" "${SCENES[@]}"
+# merge results (partial runs keep earlier ones)
+python3 - "$OUT/results.json" "$OUT/results.partial.json" <<'PY'
+import json, os, sys
+a = json.load(open(sys.argv[1])) if os.path.exists(sys.argv[1]) else {}
+a.update(json.load(open(sys.argv[2])))
+json.dump(a, open(sys.argv[1], 'w'), indent=1)
+PY
+python3 compare.py "$DEMO" "$OUT/real" "$OUT/compare" "$OUT/results.json"
+echo "compare images: $OUT/compare"

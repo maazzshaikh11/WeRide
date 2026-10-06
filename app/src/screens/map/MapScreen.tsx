@@ -11,11 +11,17 @@
  *
  * There is no separate crew-ahead/behind panel: the readout belongs next to the avatar.
  *
+ * Demo parity (docs/DEMO_PARITY_SPEC.md §3 Live): the plate also shows hazard-ahead, signal-from-the-crew,
+ * stop-ahead and rider-no-signal; after passing a hazard the plate is replaced by STILL THERE / GONE;
+ * GROUP fits every rider for 7 s; the Talk key is push-to-talk on the crew voice channel; SOS goes through
+ * triggerSosFlow; glove mode and units follow the rider's prefs; own fixes and riders feed the ride recorder;
+ * own presence is written while live; Stop / Arrive open automatically.
+ *
  * Person A/B/C/D functionality fully preserved:
  *  - TrackingService lifecycle (Person A)
  *  - Hazard/SOS Firestore subscriptions (Person B)
  *  - RoutingClient + route store (Person C)
- *  - VoxClient untouched — Voice tab owns voice now (Person D); Talk opens it
+ *  - The screen stays mounted underneath Stop / Arrive (they are pushed on top), so tracking never restarts
  */
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { View, Text, Linking, ScrollView } from 'react-native';
@@ -41,22 +47,34 @@ import NetworkBanner from '../../components/NetworkBanner';
 import SignalSheet from '../../components/SignalSheet';
 import HazardSheet from '../../components/HazardSheet';
 import RouteSheet from '../../components/RouteSheet';
-import SosModal from '../../components/SosModal';
 import SosFab from '../../components/SosFab';
 import { googleMapsDeepLink } from '@routing/client/deepLink';
 import { GroupService } from '@routing/group/groupService';
 import { resolveSos } from '@hazard/services/sosService';
 import { resolveHazard } from '@hazard/services/hazardService';
+import { logError, warn } from '../../utils/log';
+import { resetRideSession } from '../../store/rideSession';
 import { useRidePlanStore } from '../../store/ridePlanStore';
+import { useRidesStore } from '../../store/ridesStore';
+import { riderName, useProfileStore } from '../../store/profileStore';
+import { usePrefsStore } from '../../store/prefsStore';
 import { useStopsStore } from '../../store/stopsStore';
 import { Icon, PressableScale } from '../../ui';
-import { fitPadding } from '../../utils/mapFit';
+import { fitPadding, planFit } from '../../utils/mapFit';
 import { nextNetworkBanner, NetworkTracker } from '../../utils/networkBanner';
 import { fitPointsFor, fitSignature } from './rideGeometry';
 import { useRouteFit } from './useRouteFit';
 import LiveAvatar from './live/LiveAvatar';
-import { ControlKey, CONTROL_GAP, CONTROL_H, SIDE_BTN, SideButton, SpeedCluster, Vignettes, clockAfter } from './live/LiveChrome';
-import { formatGap, freshRiders, liveStatus, nearestRider } from './live/liveGeometry';
+import { ControlKey, CONTROL_GAP, SIDE_BTN, SideButton, SpeedCluster, Vignettes, clockAfter, controlHeight } from './live/LiveChrome';
+import { hazardName } from './live/liveRide';
+import { formatGap, freshRiders, groupSpreadM, liveStatus, nearestRider, staleRider } from './live/liveGeometry';
+import { HazardConfirmButtons, TalkPlate } from './live/LiveOverlays';
+import { useLiveFlow, FlowStop } from './live/useLiveFlow';
+import { markStopVisited, startRecorderOnce } from '../../services/rideFlow';
+import { rideRecorder } from '../../services/rideRecorder';
+import { setPresence } from '../../services/rideService';
+import { noteAnyFix, triggerSosFlow } from '../../services/sosFlowService';
+import { setTalking, startVoice, stopVoice, useVoiceChannel } from '../../hooks/useVoiceChannel';
 
 // Phase 6 — tracking service wiring (Person A, unchanged)
 import { Ekf } from '@tracking/ekf';
@@ -79,32 +97,44 @@ const TOP_CHROME_H = HEADER_PAD + HEADER_BAR_H + HEADER_PAD + PLATE_H + HEADER_P
 const SIDE_COLUMN_W = SIDE_BTN + GUTTER;              // side buttons + right gutter
 const CLUSTER_H = 132;                                // speed / ETA cluster
 const CONTROLS_BOTTOM = 16;                           // controls sit this far above the tab bar
-const BOTTOM_CHROME_H = CONTROLS_BOTTOM + CONTROL_H + CLUSTER_H + 8;
 const SIDE_GAP = 12;
 const NETWORK_BANNER_H = 64;                          // reserved height of the banner (toasts stack below it)
 const FOLLOW_ZOOM = 16;
+const GROUP_VIEW_MS = 7000;                           // GROUP button: fit everyone for 7 s, then follow again
+const PRESENCE_MS = 15000;                            // own presence (riding) is refreshed this often while live
+const GAP_EVENT_M = 500;                              // the recorded "gap" event starts past this spread
 
 /** Minimal slice of the tab navigator's `navigation` prop that MapScreen uses. */
 export interface MapScreenNavigation {
   goBack: () => void;
-  navigate?: (name: string) => void;
+  navigate?: (name: string, params?: object) => void;
+  reset?: (state: { index: number; routes: { name: string; params?: object }[] }) => void;
+  canGoBack?: () => boolean;
+  isFocused?: () => boolean;
   getParent?: () => { goBack: () => void } | undefined;
 }
 
 interface MapScreenProps {
   navigation?: MapScreenNavigation;
+  route?: { params?: { groupId?: string } };
 }
 
-export default function MapScreen({ navigation }: MapScreenProps = {}) {
+export default function MapScreen({ navigation, route: navRoute }: MapScreenProps = {}) {
   // No demo fallback: without a real group there is nothing to track.
   // The component renders a "no group selected" placeholder instead.
-  const groupId = useAppStore((s) => s.groupId);
+  const storeGroupId = useAppStore((s) => s.groupId);
+  const groupId = navRoute?.params?.groupId ?? storeGroupId;
   const userId = useAppStore((s) => s.userId);
   const riders = useRidersStore((s) => s.riders);
   const connected = useRidersStore((s) => s.connected);
   const lastValidLocation = useRouteStore((s) => s.lastValidLocation);
   const route = useRouteStore((s) => s.route);
+  const activeClusters = useRouteStore((s) => s.activeClusters);
   const avoidHazardTypes = useRouteStore((s) => s.avoidHazardTypes);
+  const units = usePrefsStore((s) => s.prefs.units);
+  const glove = usePrefsStore((s) => s.prefs.glove);
+  const ride = useRidesStore((s) => s.rides.find((r) => r.id === groupId) ?? null);
+  const profiles = useProfileStore((s) => s.byId);
   const push = useToastStore((s) => s.push);
   const insets = useSafeAreaInsets();
   const { road, scheme } = useTheme();
@@ -129,6 +159,8 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
   const [signalOpen, setSignalOpen] = useState(false);
   const [hazardOpen, setHazardOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
+  const [groupView, setGroupView] = useState(false);
+  const groupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Camera: frame the route (Google Maps style); follow the rider only on request.
   const cameraRef = useRef<MapboxGL.Camera>(null);
@@ -140,11 +172,9 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
   const [followPref, setFollowPref] = useState<boolean | null>(null);
 
   // UI state
-  const [sosModalOpen, setSosModalOpen] = useState(false);
   const [sosEvents, setSosEvents] = useState<ActiveSos[]>([]);
   const [selectedHazard, setSelectedHazard] = useState<any>(null);
   const [networkBanner, setNetworkBanner] = useState<'lost' | 'recovered' | null>(null);
-  const [sosActive, setSosActive] = useState(false);
   // Ride name for the header (demo shows "Lonavala Loop", not the group ID).
   const [rideName, setRideName] = useState<string | null>(null);
 
@@ -179,10 +209,13 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
       { socket, riderId: userId, groupId },
       (fix) => {
         lastAnyFixRef.current = { lat: fix.lat, lng: fix.lng };
+        noteAnyFix({ lat: fix.lat, lng: fix.lng, accuracy_m: fix.accuracy_m });
         if (!isUsableOwnFix(fix)) return;
         const routeState = useRouteStore.getState();
         routeState.setCurrentLocation(fix);
         routeState.setLastValidLocation(fix);
+        // the ride recorder takes the same trusted fixes (1 Hz)
+        rideRecorder.onOwnFix(fix);
       },
     );
 
@@ -193,16 +226,16 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
     // background module is unavailable (permissions, platform limits).
     service.start(true).then((started) => {
       if (started) return;
-      console.warn('[MapScreen] Background tracking unavailable; falling back to foreground.');
+      warn('[MapScreen] Background tracking unavailable; falling back to foreground.');
       push('Background location unavailable — using foreground tracking', 'warn');
       return service.start(false).then((fgStarted) => {
         if (!fgStarted) {
-          console.error('[MapScreen] TrackingService.start failed (foreground too).');
+          logError('[MapScreen] TrackingService.start failed (foreground too).');
           push('Could not start location tracking', 'error');
         }
       });
     }).catch((err: unknown) => {
-      console.error('[MapScreen] TrackingService.start failed:', err);
+      logError('[MapScreen] TrackingService.start failed:', err);
     });
 
     // Subscribe riders store to location updates (other riders' markers).
@@ -213,7 +246,7 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
       .fetchGroupLastKnown(groupId)
       .then((docs) => useRidersStore.getState().seedRiders(docs))
       .catch((e: unknown) => {
-        console.warn('[MapScreen] Rider seed failed:', e);
+        warn('[MapScreen] Rider seed failed:', e);
       });
 
     // Load the ride plan saved at group creation (Create Ride modal).
@@ -227,7 +260,7 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
         }
       })
       .catch((e: unknown) => {
-        console.warn('[MapScreen] Group name load failed:', e);
+        warn('[MapScreen] Group name load failed:', e);
       });
     groupService
       .getRidePlan(groupId)
@@ -243,31 +276,83 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
         useStopsStore.getState().syncFromPlan();
       })
       .catch((e: unknown) => {
-        console.warn('[MapScreen] Ride plan load failed:', e);
+        warn('[MapScreen] Ride plan load failed:', e);
       });
 
     return () => {
       service.stop().catch((err: unknown) => {
-        console.error('[MapScreen] TrackingService.stop failed:', err);
+        logError('[MapScreen] TrackingService.stop failed:', err);
       });
       serviceRef.current = null;
       useRidersStore.getState().unsubscribe();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `push` is a stable store action; restarting tracking for it would be wrong
   }, [userId, groupId]);
 
-  // Quick signals from the rest of the group (server relays as signal:received).
+  // Opened for a ride other than the one the app remembers (e.g. rolled out from the roll call): switch the session to it.
   useEffect(() => {
-    if (!groupId) return;
-    const socket = getLocationSocket();
-    const onSignal = (p: { group_id?: string; rider_id?: string; label?: string }) => {
-      if (!p || p.group_id !== groupId || p.rider_id === userId || !p.label) return;
-      push(`Rider ${String(p.rider_id ?? '').slice(-4)}: ${p.label}`, 'warn');
+    const id = navRoute?.params?.groupId;
+    if (!id || id === storeGroupId) return;
+    resetRideSession();
+    useAppStore.getState().setGroupId(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the route param decides
+  }, [navRoute?.params?.groupId]);
+
+  // Names and avatars for everyone in the ride.
+  useEffect(() => {
+    if (ride?.member_ids?.length) useProfileStore.getState().ensure(ride.member_ids);
+  }, [ride?.member_ids]);
+
+  // Recording: start (once) if the roll-out overlay did not already, and feed the recorder the other riders every second.
+  useEffect(() => {
+    if (ride && ride.status === 'live') startRecorderOnce(ride);
+  }, [ride]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const list = freshRiders(useRidersStore.getState().riders, userId).map((r) => r.location);
+      rideRecorder.onRiders(list);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [userId]);
+
+  // Presence: "riding" while this screen is the one in front (Stop / Arrive write their own).
+  useEffect(() => {
+    if (!groupId || !userId) return;
+    const write = () => {
+      if (navigation?.isFocused && !navigation.isFocused()) return;
+      setPresence(groupId, userId, 'riding').catch(() => undefined);
     };
-    socket.on('signal:received', onSignal);
-    return () => {
-      socket.off('signal:received', onSignal);
-    };
-  }, [groupId, userId, push]);
+    write();
+    const id = setInterval(write, PRESENCE_MS);
+    return () => clearInterval(id);
+  }, [groupId, userId, navigation]);
+
+  // Crew voice channel (joins only when the microphone is already allowed) + push-to-talk.
+  const voice = useVoiceChannel(groupId, userId);
+  const talkHeld = useRef(false);
+  const onTalkIn = useCallback(() => {
+    if (!groupId || !userId) return;
+    if (voice.status !== 'live') {
+      push("Voice channel isn't live yet", 'warn');
+      // the first hold asks for the microphone / connects, so the next hold can work
+      startVoice(groupId, userId, { prompt: true }).catch(() => undefined);
+      return;
+    }
+    if (setTalking(true)) talkHeld.current = true;
+    else push("Voice channel isn't live yet", 'warn');
+  }, [groupId, userId, voice.status, push]);
+  const onTalkOut = useCallback(() => {
+    if (!talkHeld.current) return;
+    talkHeld.current = false;
+    setTalking(false);
+  }, []);
+  useEffect(
+    () => () => {
+      if (talkHeld.current) setTalking(false);
+      stopVoice().catch(() => undefined);
+    },
+    [],
+  );
 
   // Network banner: only after the socket was actually up and then dropped
   // (the first connect after mount is not a recovery).
@@ -276,8 +361,6 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
     networkRef.current = tracker;
     if (banner) setNetworkBanner(banner);
   }, [connected]);
-
-  const riderCount = riders.size;
 
   const plan = useMemo(
     () => ({ start: planStart, stops: planStops, destination: planDestination }),
@@ -291,11 +374,11 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
       fitPadding({
         headerHeight: insets.top + TOP_CHROME_H,
         fabColumnWidth: SIDE_COLUMN_W,
-        sheetHeight: BOTTOM_CHROME_H,
+        sheetHeight: CONTROLS_BOTTOM + controlHeight(glove) + CLUSTER_H + 8,
       }),
-    [insets.top],
+    [insets.top, glove],
   );
-  const { markFitted } = useRouteFit({
+  const { fit, markFitted } = useRouteFit({
     cameraRef,
     mapReady,
     following,
@@ -331,19 +414,13 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
     Linking.openURL(url).catch(() => push('Could not open Google Maps', 'warn'));
   }, [lastValidLocation, route, push]);
 
-  const handleSosSent = useCallback(() => {
-    setSosModalOpen(false);
-    setSosActive(true);
-  }, []);
-
   const handleResolveSos = useCallback(async (sosId: string) => {
     if (!groupId) return;
     try {
       await resolveSos(sosId, groupId);
-      setSosActive(false);
       push('SOS cancelled');
     } catch (e) {
-      console.error('[MapScreen] resolveSos failed:', e);
+      logError('[MapScreen] resolveSos failed:', e);
       push('Failed to cancel SOS', 'error');
     }
   }, [groupId, push]);
@@ -357,10 +434,37 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
     const parent = navigation?.getParent?.();
     if (parent) {
       parent.goBack();
+    } else if (navigation?.canGoBack && !navigation.canGoBack() && navigation.reset) {
+      // Live is usually the only screen in the stack (reset to by the roll-out): go home instead of nowhere.
+      navigation.reset({ index: 0, routes: [{ name: 'GarageTabs' }] });
     } else {
       navigation?.goBack();
     }
   }, [navigation]);
+
+  // GROUP: fit every rider for 7 s, then the camera goes back to following / framing the route.
+  const showGroup = useCallback(() => {
+    const pts: { lat: number; lng: number }[] = [];
+    if (lastValidLocation) pts.push({ lat: lastValidLocation.lat, lng: lastValidLocation.lng });
+    useRidersStore.getState().riders.forEach((r) => pts.push({ lat: r.location.lat, lng: r.location.lng }));
+    const fitPlan = planFit(pts);
+    if (!fitPlan) {
+      push('No riders to show yet', 'warn');
+      return;
+    }
+    setGroupView(true);
+    if (fitPlan.kind === 'bounds') cameraRef.current?.fitBounds(fitPlan.ne, fitPlan.sw, padding, 600);
+    else cameraRef.current?.setCamera({ centerCoordinate: fitPlan.center, zoomLevel: fitPlan.zoom, animationDuration: 600 });
+    if (groupTimer.current) clearTimeout(groupTimer.current);
+    groupTimer.current = setTimeout(() => {
+      groupTimer.current = null;
+      setGroupView(false);
+      if (!following) fit(true);
+    }, GROUP_VIEW_MS);
+  }, [lastValidLocation, padding, following, fit, push]);
+  useEffect(() => () => {
+    if (groupTimer.current) clearTimeout(groupTimer.current);
+  }, []);
 
   // ---- live values: all from real data; null/empty when there is nothing to show ----
   const others = useMemo(() => freshRiders(riders, userId), [riders, userId]);
@@ -368,11 +472,78 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
   const nearest = nearestRider(own, others);
   const gapLabel = nearest ? formatGap(nearest.distanceM) : null;
   const sosFrom = sosEvents.find((e) => !e.resolved && !e.isSender)?.rider_id ?? null;
-  const status = liveStatus({ own, others, signalLost: networkBanner === 'lost', sosFrom });
+  const nameOf = useCallback((id: string) => riderName(profiles, id, userId), [profiles, userId]);
+  const flowStops = useMemo<FlowStop[]>(
+    () => planStops.map((st) => ({ id: st.id, label: st.label, lat: st.lat, lng: st.lng, name: st.label.split(',')[0] })),
+    [planStops],
+  );
+  const flow = useLiveFlow({
+    groupId,
+    userId,
+    fix: lastValidLocation,
+    routePath: route?.path_points ?? null,
+    clusters: activeClusters,
+    stops: flowStops,
+    destination: planDestination ? { lat: planDestination.lat, lng: planDestination.lng } : null,
+    nameOf,
+    push,
+    onOpenStop: (stopId) => {
+      if (groupId) navigation?.navigate?.('Stop', { groupId, stopId });
+    },
+    onArrive: () => {
+      if (groupId) navigation?.navigate?.('Arrive', { groupId });
+    },
+  });
+  const stale = staleRider(riders, userId);
+  const status = liveStatus({
+    own,
+    others,
+    signalLost: networkBanner === 'lost',
+    sosFrom,
+    hazard: flow.hazard,
+    signal: flow.signal,
+    stop: flow.stop,
+    staleRider: stale ? { name: nameOf(stale.riderId), ageS: stale.ageS } : null,
+    nameOf,
+    units,
+  });
+  const sosActive = sosEvents.some((e) => e.isSender && !e.resolved);
   const speedKmh = lastValidLocation && Number.isFinite(lastValidLocation.speed_mps) ? Math.max(0, lastValidLocation.speed_mps * 3.6) : null;
   const etaClock = route && Number.isFinite(route.eta_minutes) ? clockAfter(route.eta_minutes) : null;
   const remainingKm = route && Number.isFinite(route.distance_km) ? route.distance_km : null;
   const toLabel = planDestination?.label?.split(',')[0] ?? null;
+  const ctlH = controlHeight(glove);
+
+  // Recorder events that start on a transition: a gap opening (> 500 m spread) — once per gap.
+  const gapOpen = own != null && others.length > 0 && groupSpreadM([own, ...others.map((r) => r.location)]) > GAP_EVENT_M;
+  const gapWas = useRef(false);
+  useEffect(() => {
+    if (gapOpen && !gapWas.current) rideRecorder.addEvent('gap', status.key === 'gap' ? (status.subtitle ?? 'Gap opened') : 'Gap opened');
+    gapWas.current = gapOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the edge is what matters
+  }, [gapOpen]);
+
+  // Tapping the plate: the useful next step for what it says.
+  const onPlateTap = useCallback(() => {
+    switch (status.key) {
+      case 'gap':
+        setSignalOpen(true);
+        break;
+      case 'stop-ahead':
+        if (groupId && flow.stop) {
+          markStopVisited(groupId, flow.stop.id);
+          navigation?.navigate?.('Stop', { groupId, stopId: flow.stop.id });
+        }
+        break;
+      case 'together':
+        push('Everyone is within 600 m. We alert you past that', 'info');
+        break;
+      case 'sos':
+        break;
+      default:
+        showGroup();
+    }
+  }, [status.key, groupId, flow.stop, navigation, push, showGroup]);
 
   // Explicit empty state: no demo-group fallback. All hooks above run
   // unconditionally, so this early return is hook-safe.
@@ -400,7 +571,7 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
       >
         <MapboxGL.Camera
           ref={cameraRef}
-          followUserLocation={following}
+          followUserLocation={following && !groupView}
           followUserMode={MapboxGL.UserTrackingMode.FollowWithHeading}
           followZoomLevel={FOLLOW_ZOOM}
           onUserTrackingModeChange={(e) => {
@@ -427,7 +598,7 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
             anchor={{ x: 0.5, y: 0.5 }}
             allowOverlap
           >
-            <LiveAvatar label={gapLabel} />
+            <LiveAvatar label={gapLabel} talking={voice.talking} />
           </MapboxGL.MarkerView>
         ) : null}
       </MapboxGL.MapView>
@@ -452,23 +623,30 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
           ) : null}
           <View style={styles.titleBox}>
             <Text style={styles.title} numberOfLines={1}>
-              {rideName ?? groupId.slice(0, 8)}
+              {ride?.name ?? rideName ?? groupId.slice(0, 8)}
             </Text>
             <FlStatusOverlay />
           </View>
           <LivePill variant={connected ? 'live' : 'grey'} />
         </View>
         <View style={{ marginTop: HEADER_PAD }}>
-          <Plate
-            key={status.key}
-            testID="status-plate"
-            tone={status.tone}
-            icon={status.icon}
-            title={status.title}
-            subtitle={status.subtitle}
-            titleSize={status.title.length > 17 ? 23 : 28}
-            style={{ minHeight: PLATE_H }}
-          />
+          {voice.talking ? (
+            <TalkPlate />
+          ) : flow.confirm ? (
+            <HazardConfirmButtons onAnswer={flow.answerConfirm} name={hazardName(flow.confirm.cluster.hazard_type)} />
+          ) : (
+            <Plate
+              key={status.key}
+              testID="status-plate"
+              tone={status.tone}
+              icon={status.icon}
+              title={status.title}
+              subtitle={status.subtitle}
+              titleSize={status.title.length > 17 ? 23 : 28}
+              style={{ minHeight: PLATE_H }}
+              onPress={onPlateTap}
+            />
+          )}
         </View>
       </View>
 
@@ -486,8 +664,9 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
       {/* Toasts: below the plate (and below the banner when it is up) */}
       <ToastContainer top={topInset + (networkBanner ? NETWORK_BANNER_H : 0)} />
 
-      {/* Side buttons: follow/fit, Google Maps, route details */}
+      {/* Side buttons: group view, follow/fit, Google Maps, route details */}
       <View style={[styles.sideColumn, { top: topInset + SIDE_GAP }]} pointerEvents="box-none">
+        <SideButton icon="group" label="GROUP" active={groupView} onPress={showGroup} accessibilityLabel="Show the whole group" testID="side-group" />
         <SideButton
           icon={following ? 'gps' : 'target'}
           label={following ? 'FOLLOW' : 'FIT'}
@@ -501,7 +680,7 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
       </View>
 
       {/* Info cards (hazard / SOS / rider) sit above the controls */}
-      <View style={[styles.bottom, { bottom: CONTROLS_BOTTOM + CONTROL_H + 12 }]} pointerEvents="box-none">
+      <View style={[styles.bottom, { bottom: CONTROLS_BOTTOM + ctlH + 12 }]} pointerEvents="box-none">
         <ScrollView
           style={styles.infoCardsScroll}
           contentContainerStyle={styles.infoCardsContent}
@@ -537,22 +716,42 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
       </View>
 
       {/* Speed, ETA, distance left — tap for route details */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: CONTROLS_BOTTOM + CONTROL_H + 8, zIndex: 20 }} pointerEvents="box-none">
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: CONTROLS_BOTTOM + ctlH + 8, zIndex: 20 }} pointerEvents="box-none">
         <SpeedCluster
           speedKmh={speedKmh}
           etaClock={etaClock}
           remainingKm={remainingKm}
           toLabel={toLabel}
           onPress={() => setRouteOpen(true)}
+          units={units}
+          glove={glove}
         />
       </View>
 
-      {/* Control keys: SOS (hold) · Signal · Hazard · Talk */}
-      <View style={styles.controls}>
-        <SosFab onHoldComplete={() => setSosModalOpen(true)} disabled={sosActive} />
-        <ControlKey icon="signal" label="Signal" onPress={() => setSignalOpen(true)} accessibilityLabel="Send a quick signal" testID="key-signal" />
-        <ControlKey icon="haz" label="Hazard" onPress={() => setHazardOpen(true)} accessibilityLabel="Report a hazard" testID="key-hazard" />
-        <ControlKey icon="mic" label="Talk" onPress={() => navigation?.navigate?.('Voice')} accessibilityLabel="Talk to the crew" testID="key-talk" />
+      {/* Control keys: SOS (hold) · Signal · Hazard · Talk (hold) */}
+      <View style={[styles.controls, { alignItems: 'flex-end' }]}>
+        <View style={{ height: ctlH, justifyContent: 'center' }}>
+          <SosFab
+            onHoldComplete={() => {
+              rideRecorder.addEvent('sos', 'SOS sent');
+              triggerSosFlow(groupId).catch((e: unknown) => warn('[MapScreen] triggerSosFlow failed:', e));
+            }}
+            disabled={sosActive}
+          />
+        </View>
+        <ControlKey icon="signal" label="Signal" glove={glove} onPress={() => setSignalOpen(true)} accessibilityLabel="Send a quick signal" testID="key-signal" />
+        <ControlKey icon="haz" label="Hazard" glove={glove} onPress={() => setHazardOpen(true)} accessibilityLabel="Report a hazard" testID="key-hazard" />
+        <ControlKey
+          icon="mic"
+          label="Talk"
+          glove={glove}
+          active={voice.talking}
+          onPressIn={onTalkIn}
+          onPressOut={onTalkOut}
+          accessibilityLabel="Talk to the crew"
+          accessibilityHint="Press and hold to talk, release to stop"
+          testID="key-talk"
+        />
       </View>
 
       {/* Sheets */}
@@ -560,7 +759,10 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
         visible={signalOpen}
         groupId={groupId}
         riderId={userId ?? ''}
-        onSend={() => setSignalOpen(false)}
+        onSend={() => {
+          setSignalOpen(false);
+          rideRecorder.countSignal();
+        }}
         onClose={() => setSignalOpen(false)}
       />
       <HazardSheet
@@ -569,6 +771,10 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
         groupId={groupId}
         riderId={userId}
         location={lastValidLocation}
+        onReported={(type) => {
+          rideRecorder.countHazard();
+          rideRecorder.addEvent('hazard', `Reported ${hazardName(type).toLowerCase()}`);
+        }}
       />
       <RouteSheet
         visible={routeOpen}
@@ -583,21 +789,6 @@ export default function MapScreen({ navigation }: MapScreenProps = {}) {
           }
         }}
         onOpenInGoogleMaps={openGoogleMaps}
-      />
-
-      {/* SOS modal */}
-      <SosModal
-        visible={sosModalOpen}
-        riderId={userId ?? ''}
-        groupId={groupId}
-        riderCount={Math.max(riderCount, 1)}
-        location={
-          lastValidLocation
-            ? { lat: lastValidLocation.lat, lng: lastValidLocation.lng }
-            : lastAnyFixRef.current
-        }
-        onCancel={() => setSosModalOpen(false)}
-        onSent={handleSosSent}
       />
     </View>
   );

@@ -12,7 +12,7 @@ import { useStyles, useTheme } from '../../../theme/ThemeProvider';
 export const GAP_LABEL_W = 68;
 export const LIVE_AVATAR_SIZE = 40;
 
-export default function LiveAvatar({ label }: { label: string | null }) {
+export default function LiveAvatar({ label, talking }: { label: string | null; talking?: boolean }) {
   const { road, roadType } = useTheme();
   const s = useStyles(({ road: r, roadType: t }) => ({
     row: { flexDirection: 'row', alignItems: 'center' },
@@ -30,13 +30,15 @@ export default function LiveAvatar({ label }: { label: string | null }) {
       borderWidth: 3, borderColor: r.ink,
     },
     ring: { position: 'absolute', width: LIVE_AVATAR_SIZE + 6, height: LIVE_AVATAR_SIZE + 6, borderRadius: (LIVE_AVATAR_SIZE + 6) / 2, borderWidth: 3, borderColor: r.bg },
+    // demo `.ld.talk .dot`: a green ring while the push-to-talk key is held
+    talkRing: { borderColor: r.ok },
   }));
   return (
     <View style={s.row} pointerEvents="none" testID="live-avatar" accessible accessibilityLabel={label ? `You. Nearest rider ${label} away` : 'You'}>
       <View style={s.spacer} />
       <View style={{ width: LIVE_AVATAR_SIZE + 6, height: LIVE_AVATAR_SIZE + 6, alignItems: 'center', justifyContent: 'center' }}>
         <View style={s.ring} />
-        <View style={s.dot}>
+        <View style={[s.dot, talking && s.talkRing]} testID={talking ? 'live-avatar-talking' : undefined}>
           <Text style={[roadType.num, { fontSize: 11.5, lineHeight: 13, color: road.priInk, letterSpacing: 0 }]}>YOU</Text>
         </View>
       </View>

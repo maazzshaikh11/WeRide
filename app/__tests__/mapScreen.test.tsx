@@ -150,7 +150,6 @@ jest.mock('../src/components/SignalSheet', () => {
   const React = require('react');
   return { __esModule: true, default: (props: any) => React.createElement('SignalSheetStub', props) };
 });
-jest.mock('../src/components/SosModal', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/store/toastStore', () => ({
   useToastStore: (selector?: (s: unknown) => unknown) =>
     selector ? selector({ toasts: [], push: jest.fn(), dismiss: jest.fn() }) : { toasts: [], push: jest.fn(), dismiss: jest.fn() },
@@ -213,6 +212,13 @@ jest.mock('@hazard/services/hazardService', () => ({
   resolveHazard: jest.fn(),
   submitHazardReport: jest.fn(),
   subscribeToHazardClusters: jest.fn(() => jest.fn()),
+}));
+
+// SOS goes through the SOS flow service (package E); voice needs the WebRTC native module.
+jest.mock('../src/services/sosFlowService', () => ({ triggerSosFlow: jest.fn().mockResolvedValue(undefined), noteAnyFix: jest.fn() }));
+jest.mock('@flvoice/vox/micPermission', () => ({
+  checkMicrophonePermission: jest.fn().mockResolvedValue(false),
+  requestMicrophonePermission: jest.fn().mockResolvedValue(false),
 }));
 
 // ---- imports ----------------------------------------------------------------
@@ -435,13 +441,13 @@ describe('MapScreen — Phase 6 TrackingService lifecycle', () => {
   test('control keys: SOS (hold), Signal, Hazard, Talk are all present', () => {
     const renderer = renderWithUser('user-abc');
     const has = (label: string) => renderer.root.findAll((n: any) => n.props.accessibilityLabel === label).length > 0;
-    expect(has('Hold for 2 seconds to send SOS')).toBe(true);
+    expect(renderer.root.findAll((n: any) => /^Hold for [\d.]+ seconds? to send SOS$/.test(String(n.props.accessibilityLabel))).length).toBeGreaterThan(0);
     expect(has('Send a quick signal')).toBe(true);
     expect(has('Report a hazard')).toBe(true);
     expect(has('Talk to the crew')).toBe(true);
   });
 
-  test('Signal key opens the signal sheet; Talk opens the Voice tab', () => {
+  test('Signal key opens the signal sheet; Talk is push-to-talk (it no longer navigates)', () => {
     const navigate = jest.fn();
     const renderer = renderWithUser('user-abc', 'group-1', { navigation: { goBack: jest.fn(), navigate } });
     const sheet = () => renderer.root.findByType('SignalSheetStub' as any);
@@ -450,8 +456,9 @@ describe('MapScreen — Phase 6 TrackingService lifecycle', () => {
     expect(sheet().props.visible).toBe(true);
     act(() => sheet().props.onClose());
     expect(sheet().props.visible).toBe(false);
-    act(() => press(renderer, 'Talk to the crew').props.onPress({}));
-    expect(navigate).toHaveBeenCalledWith('Voice');
+    act(() => press(renderer, 'Talk to the crew').props.onPressIn({}));
+    act(() => press(renderer, 'Talk to the crew').props.onPressOut({}));
+    expect(navigate).not.toHaveBeenCalledWith('Voice');
   });
 
   test('there is no crew ahead/behind panel any more', () => {

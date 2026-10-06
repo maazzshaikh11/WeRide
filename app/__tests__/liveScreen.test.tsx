@@ -35,7 +35,11 @@ jest.mock('../src/screens/map/overlays/HazardOverlay', () => ({ __esModule: true
 jest.mock('../src/screens/map/overlays/SosOverlay', () => ({ __esModule: true, SosOverlayMapLayer: () => null, SosOverlayInfoCards: () => null }));
 jest.mock('../src/screens/map/overlays/RouteOverlay', () => ({ __esModule: true, default: () => null }));
 jest.mock('../src/screens/map/overlays/FlStatusOverlay', () => ({ __esModule: true, default: () => null }));
-jest.mock('../src/components/SosModal', () => ({ __esModule: true, default: () => null }));
+jest.mock('../src/services/sosFlowService', () => ({ triggerSosFlow: jest.fn().mockResolvedValue(undefined), noteAnyFix: jest.fn() }));
+jest.mock('@flvoice/vox/micPermission', () => ({
+  checkMicrophonePermission: jest.fn().mockResolvedValue(false),
+  requestMicrophonePermission: jest.fn().mockResolvedValue(false),
+}));
 jest.mock('@routing/client/deepLink', () => ({ googleMapsDeepLink: jest.fn(() => 'https://maps.google.com') }));
 jest.mock('@routing/group/groupService', () => ({
   GroupService: jest.fn().mockImplementation(() => ({
@@ -77,11 +81,11 @@ const setRider = (id: string, at: { lat: number; lng: number }) =>
   act(() => useRidersStore.getState().upsertRider({ ...fix(id, at), spoof_flag: false }));
 
 const mounted: ReactTestRenderer[] = [];
-function mount(palette = THEMES.demo.dark) {
+function mount(palette = THEMES.demo.dark, roadScheme?: 'light' | 'dark') {
   let tree!: ReactTestRenderer;
   act(() => {
     tree = create(
-      <ThemeContext.Provider value={buildTheme('demo', palette)}>
+      <ThemeContext.Provider value={buildTheme('demo', palette, roadScheme)}>
         <MapScreen navigation={{ goBack: jest.fn(), navigate: jest.fn() }} />
       </ThemeContext.Provider>,
     );
@@ -204,6 +208,26 @@ describe('live ride screen', () => {
       expect(StyleSheet.flatten(root.props.style).backgroundColor).toBe(p.road.bg);
       act(() => t.unmount());
       mounted.pop();
+    }
+  });
+
+  it('the Road palette follows the Road theme, not the garage scheme', () => {
+    // Garage light + Road night, and garage dark + Road day, for both themes.
+    const cases = [
+      ['demo', 'light', 'dark'], ['demo', 'dark', 'light'], ['ember', 'light', 'dark'], ['ember', 'dark', 'light'],
+    ] as const;
+    for (const [id, garage, road] of cases) {
+      let tree!: ReactTestRenderer;
+      act(() => {
+        tree = create(
+          <ThemeContext.Provider value={buildTheme(id, THEMES[id][garage], road)}>
+            <MapScreen navigation={{ goBack: jest.fn(), navigate: jest.fn() }} />
+          </ThemeContext.Provider>,
+        );
+      });
+      const root = tree.root.findAll((n) => typeof n.type === 'string' && n.props.style && StyleSheet.flatten(n.props.style).flex === 1 && StyleSheet.flatten(n.props.style).backgroundColor)[0];
+      expect(StyleSheet.flatten(root.props.style).backgroundColor).toBe(THEMES[id][road].road.bg);
+      act(() => tree.unmount());
     }
   });
 });

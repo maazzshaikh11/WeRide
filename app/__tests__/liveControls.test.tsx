@@ -7,7 +7,7 @@
 import React from 'react';
 import { Platform, Text, Vibration } from 'react-native';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
-import { ControlKey, SideButton } from '../src/screens/map/live/LiveChrome';
+import { ControlKey, SideButton, SpeedCluster } from '../src/screens/map/live/LiveChrome';
 import AvatarStack from '../src/components/AvatarStack';
 import NetworkBanner from '../src/components/NetworkBanner';
 
@@ -60,6 +60,32 @@ describe('live controls', () => {
     act(() => real(t, 'Report a hazard').props.onPress({}));
     expect(onPress).toHaveBeenCalledTimes(1);
     expect(vibrate).toHaveBeenCalledWith(12);
+  });
+});
+
+describe('ControlKey push-to-talk / glove, SpeedCluster units', () => {
+  afterEach(() => mounted.splice(0).forEach((t) => act(() => t.unmount())));
+  it('forwards press-in / press-out (hold to talk) and shows the active state', () => {
+    const onIn = jest.fn(), onOut = jest.fn();
+    const t = render(<ControlKey icon="mic" label="Talk" active onPressIn={onIn} onPressOut={onOut} accessibilityLabel="Talk to the crew" />);
+    const key = real(t, 'Talk to the crew');
+    act(() => key.props.onPressIn({}));
+    act(() => key.props.onPressOut({}));
+    expect(onIn).toHaveBeenCalledTimes(1);
+    expect(onOut).toHaveBeenCalledTimes(1);
+    const hosts = t.root.findAll((n) => n.props.accessibilityLabel === 'Talk to the crew' && typeof n.type === 'string');
+    expect(hosts[0].props.accessibilityState).toMatchObject({ selected: true });
+  });
+  it('glove mode makes the key 104 high', () => {
+    const { StyleSheet } = require('react-native');
+    const t = render(<ControlKey icon="haz" label="Hazard" glove onPress={jest.fn()} accessibilityLabel="Report a hazard" />);
+    expect(StyleSheet.flatten(real(t, 'Report a hazard').props.style).height).toBe(104);
+  });
+  it('SpeedCluster converts to miles and labels MPH', () => {
+    const t = render(<SpeedCluster speedKmh={96.56} etaClock="08:00" remainingKm={16.09344} toLabel="Lonavala" units="mi" />);
+    const txt = (id: string) => t.root.findAll((n) => n.props.testID === id && typeof n.type === 'string')[0].props.children;
+    expect(txt('speed-value')).toBe('60');
+    expect(txt('speed-unit')).toBe('MPH');
   });
 });
 

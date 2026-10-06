@@ -8,6 +8,9 @@ import { haversineMeters } from '../../../utils/geoUtils';
 import type { RiderEntry } from '../../../store/ridersStore';
 import type { PlateTone } from '../../../theme/palettes';
 import type { IconName } from '../../../ui';
+import type { Units } from '../../../models/domain';
+import { formatShortDistance } from '../../../utils/units';
+import { extractHlcPhysical } from '../overlays/riderMarkerState';
 
 export interface LatLng {
   lat: number;
@@ -70,11 +73,34 @@ export function groupSpreadM(points: readonly LatLng[]): number {
 
 export interface LiveStatus {
   /** Stable key so the plate only re-animates when the state really changes. */
-  key: 'sos' | 'no-signal' | 'no-fix' | 'solo' | 'gap' | 'together';
+  key: 'sos' | 'no-signal' | 'no-fix' | 'hazard' | 'signal' | 'stop-ahead' | 'rider-no-signal' | 'solo' | 'gap' | 'together';
   tone: PlateTone;
   icon: IconName;
   title: string;
   subtitle?: string;
+}
+
+/** An active hazard cluster ahead of the rider on the route (name already resolved, e.g. "Pothole"). */
+export interface PlateHazard {
+  id: string;
+  name: string;
+  distanceM: number;
+  reportCount: number;
+}
+/** A quick signal received from a crew member (shown ~15 s). */
+export interface PlateSignal {
+  name: string;
+  label: string;
+}
+/** A planned stop within 800 m ahead. */
+export interface PlateStop {
+  name: string;
+  distanceM: number;
+}
+/** A rider whose last fix went stale (marker GREY). */
+export interface PlateStale {
+  name: string;
+  ageS: number;
 }
 
 export interface LiveStatusInput {
@@ -86,21 +112,57 @@ export interface LiveStatusInput {
   signalLost: boolean;
   /** Someone else's SOS is active (their rider id). */
   sosFrom: string | null;
+  hazard?: PlateHazard | null;
+  signal?: PlateSignal | null;
+  stop?: PlateStop | null;
+  staleRider?: PlateStale | null;
+  /** Rider id -> display name (defaults to "Rider 1234"). */
+  nameOf?: (riderId: string) => string;
+  units?: Units;
 }
 
 const shortId = (id: string) => `Rider ${id.slice(-4)}`;
 const km = (m: number) => (m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
 
-/** The one-glance answer to "is the group OK?" — a single plate. Priority: SOS, no signal, no fix, solo, gap, together. */
-export function liveStatus({ own, others, signalLost, sosFrom }: LiveStatusInput): LiveStatus {
+/**
+ * The one-glance answer to "is the group OK?" — a single plate.
+ * Priority: SOS, no signal, no fix, hazard ahead, signal from the crew, stop ahead, rider no signal, solo, gap, together.
+ */
+export function liveStatus({ own, others, signalLost, sosFrom, hazard, signal, stop, staleRider, nameOf, units = 'km' }: LiveStatusInput): LiveStatus {
+  const who = nameOf ?? shortId;
   if (sosFrom) {
-    return { key: 'sos', tone: 'red', icon: 'warn', title: 'SOS', subtitle: `${shortId(sosFrom)} needs help` };
+    return { key: 'sos', tone: 'red', icon: 'warn', title: 'SOS', subtitle: `${who(sosFrom)} needs help` };
   }
   if (signalLost) {
     return { key: 'no-signal', tone: 'yellow', icon: 'wifioff', title: 'No signal', subtitle: 'Reconnecting. Your SOS still works' };
   }
   if (!own) {
     return { key: 'no-fix', tone: 'white', icon: 'gps', title: 'Finding you', subtitle: 'Waiting for a GPS fix' };
+  }
+  if (hazard) {
+    return {
+      key: 'hazard', tone: 'yellow', icon: 'haz',
+      title: `${hazard.name} · ${formatShortDistance(Math.max(0, hazard.distanceM), units)}`,
+      subtitle: `${hazard.reportCount > 1 ? `Reported by ${hazard.reportCount} riders` : 'Reported by a rider'} · ease off`,
+    };
+  }
+  if (signal) {
+    return {
+      key: 'signal', tone: /^all good$/i.test(signal.label) ? 'green' : 'yellow', icon: 'signal',
+      title: `${signal.name} · ${signal.label}`, subtitle: 'Signal from the crew',
+    };
+  }
+  if (stop) {
+    return {
+      key: 'stop-ahead', tone: 'blue', icon: 'cup',
+      title: `${stop.name} · ${formatShortDistance(Math.max(0, stop.distanceM), units)}`, subtitle: 'Pull in together',
+    };
+  }
+  if (staleRider) {
+    return {
+      key: 'rider-no-signal', tone: 'yellow', icon: 'wifioff',
+      title: `${staleRider.name} · No signal`, subtitle: `Last seen ${Math.max(0, Math.round(staleRider.ageS))} s ago · position held`,
+    };
   }
   if (others.length === 0) {
     return { key: 'solo', tone: 'white', icon: 'users', title: 'Riding solo', subtitle: 'No other riders are live yet' };
@@ -112,7 +174,21 @@ export function liveStatus({ own, others, signalLost, sosFrom }: LiveStatusInput
   const spread = groupSpreadM([own, ...others.map((r) => r.location)]);
   const count = others.length + 1;
   if (spread > GAP_THRESHOLD_M && far) {
-    return { key: 'gap', tone: 'yellow', icon: 'warn', title: 'Gap', subtitle: `${shortId(far.riderId)} is ${km(far.distanceM)} away` };
+    return { key: 'gap', tone: 'yellow', icon: 'warn', title: 'Gap', subtitle: `${who(far.riderId)} is ${km(far.distanceM)} away` };
   }
   return { key: 'together', tone: 'green', icon: 'check', title: 'All together', subtitle: `${count} riders · ${km(spread)} spread` };
+}
+
+/** The rider whose marker went GREY most recently, if still plausibly on the ride (stale for under 10 min). */
+export function staleRider(riders: ReadonlyMap<string, RiderEntry>, selfId: string | null | undefined, now: number = Date.now()): { riderId: string; ageS: number } | null {
+  let best: { riderId: string; ageS: number } | null = null;
+  riders.forEach((r, id) => {
+    if (id === selfId || r.location.rider_id === selfId) return;
+    if (r.markerState !== 'GREY') return;
+    const seenAt = extractHlcPhysical(r.location.timestamp_hlc) ?? r.receivedAt;
+    const ageS = (now - seenAt) / 1000;
+    if (!Number.isFinite(ageS) || ageS > 600) return;
+    if (!best || ageS < best.ageS) best = { riderId: id, ageS };
+  });
+  return best;
 }

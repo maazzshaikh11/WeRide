@@ -10,6 +10,7 @@ import { useStyles, useTheme } from '../theme/ThemeProvider';
 import { useToastStore } from '../store/toastStore';
 import { submitHazardReport, triggerClustering } from '@hazard/services/hazardService';
 import { HazardType } from '@app/models/hazardCluster';
+import { warn } from '../utils/log';
 import { Icon, IconName, PressableScale, Sheet, haptic } from '../ui';
 
 export const HAZARD_SHEET_OPTIONS: { type: HazardType; label: string; icon: IconName }[] = [
@@ -27,9 +28,11 @@ interface Props {
   riderId: string | null;
   /** The rider's verified own fix (route store), or null when there is none yet. */
   location: { lat: number; lng: number; timestamp_hlc?: string } | null;
+  /** Called after a report was accepted (sent or queued), so the ride recorder can count it. */
+  onReported?: (type: HazardType) => void;
 }
 
-export default function HazardSheet({ visible, onClose, groupId, riderId, location }: Props) {
+export default function HazardSheet({ visible, onClose, groupId, riderId, location, onReported }: Props) {
   const { colors, type } = useTheme();
   const push = useToastStore((st) => st.push);
   const [busy, setBusy] = useState<HazardType | null>(null);
@@ -54,9 +57,10 @@ export default function HazardSheet({ visible, onClose, groupId, riderId, locati
       await triggerClustering(groupId);
       push(queued ? 'Hazard queued — will sync when online' : 'Hazard reported', queued ? 'warn' : undefined);
       haptic('success');
+      onReported?.(hazardType);
       onClose();
     } catch (e) {
-      console.warn('[HazardSheet] submitHazardReport failed:', e);
+      warn('[HazardSheet] submitHazardReport failed:', e);
       push('Could not submit hazard — please try again', 'error');
       haptic('error');
     } finally {

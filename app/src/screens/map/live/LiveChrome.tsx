@@ -9,11 +9,17 @@ import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useStyles, useTheme } from '../../../theme/ThemeProvider';
 import { Icon, IconName, PressableScale } from '../../../ui';
+import type { Units } from '../../../models/domain';
+import { distanceUnit, formatDistance, formatSpeed, speedUnit } from '../../../utils/units';
 
 /** Heights the map camera must keep clear (see MapScreen padding). */
 export const SIDE_BTN = 62;
 export const CONTROL_H = 88;
+/** Glove mode (demo `.glove .ctl`): bigger keys and a bigger speed. */
+export const GLOVE_CONTROL_H = 104;
+export const GLOVE_SPEED_SIZE = 132;
 export const CONTROL_GAP = 10;
+export const controlHeight = (glove?: boolean): number => (glove ? GLOVE_CONTROL_H : CONTROL_H);
 
 export function Vignettes() {
   const { road } = useTheme();
@@ -65,13 +71,16 @@ export function SideButton({ icon, label, onPress, active, accessibilityLabel, t
   );
 }
 
-/** Big speed, plus ETA and distance left. `null` means "no data yet" and shows dashes — never a made-up number. */
-export function SpeedCluster({ speedKmh, etaClock, remainingKm, toLabel, onPress }: {
-  speedKmh: number | null; etaClock: string | null; remainingKm: number | null; toLabel: string | null; onPress?: () => void;
+/**
+ * Big speed, plus ETA and distance left. `null` means "no data yet" and shows dashes — never a made-up number.
+ * Speed and distance are shown in the rider's units (km or mi); `speedKmh` / `remainingKm` are always metric inputs.
+ */
+export function SpeedCluster({ speedKmh, etaClock, remainingKm, toLabel, onPress, units = 'km', glove }: {
+  speedKmh: number | null; etaClock: string | null; remainingKm: number | null; toLabel: string | null; onPress?: () => void; units?: Units; glove?: boolean;
 }) {
   const { road, roadType } = useTheme();
   const { height } = useWindowDimensions();
-  const speedSize = height < 700 ? 96 : 122;
+  const speedSize = glove ? GLOVE_SPEED_SIZE : height < 700 ? 96 : 122;
   const s = useStyles(({ road: r, roadType: t }) => ({
     row: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 18 },
     unit: { ...t.label, fontSize: 15, lineHeight: 17, letterSpacing: 2.1, color: r.ink2, marginTop: 8 },
@@ -79,7 +88,8 @@ export function SpeedCluster({ speedKmh, etaClock, remainingKm, toLabel, onPress
     a: { ...t.num, fontSize: 34, lineHeight: 34, letterSpacing: 0, color: r.ink },
     b: { ...t.label, fontSize: 11, lineHeight: 12, letterSpacing: 1.5, color: r.ink2, marginTop: -4 },
   }));
-  const shown = speedKmh == null ? '--' : String(Math.round(speedKmh));
+  const shown = speedKmh == null ? '--' : formatSpeed(speedKmh, units);
+  const remaining = remainingKm == null ? null : formatDistance(remainingKm, units, false);
   return (
     <PressableScale
       onPress={onPress}
@@ -94,11 +104,11 @@ export function SpeedCluster({ speedKmh, etaClock, remainingKm, toLabel, onPress
         <Text
           testID="speed-value"
           style={[roadType.num, { fontSize: speedSize, lineHeight: speedSize * 0.8, letterSpacing: -speedSize * 0.07, color: road.ink }]}
-          accessibilityLabel={speedKmh == null ? 'Speed unknown' : `${shown} kilometres per hour`}
+          accessibilityLabel={speedKmh == null ? 'Speed unknown' : `${shown} ${units === 'mi' ? 'miles' : 'kilometres'} per hour`}
         >
           {shown}
         </Text>
-        <Text style={s.unit}>KM/H</Text>
+        <Text style={s.unit} testID="speed-unit">{speedUnit(units)}</Text>
       </View>
       <View style={s.kv}>
         <View style={{ alignItems: 'flex-end' }}>
@@ -107,8 +117,8 @@ export function SpeedCluster({ speedKmh, etaClock, remainingKm, toLabel, onPress
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={s.a} testID="remaining-value">
-            {remainingKm == null ? '--' : remainingKm.toFixed(remainingKm < 10 ? 1 : 0)}
-            <Text style={{ fontSize: 16 }}> km</Text>
+            {remaining ?? '--'}
+            <Text style={{ fontSize: 16 }}> {distanceUnit(units)}</Text>
           </Text>
           <Text style={s.b} numberOfLines={1}>{toLabel ? `TO ${toLabel.toUpperCase()}` : 'TO DESTINATION'}</Text>
         </View>
@@ -117,25 +127,32 @@ export function SpeedCluster({ speedKmh, etaClock, remainingKm, toLabel, onPress
   );
 }
 
-export function ControlKey({ icon, label, onPress, accessibilityLabel, testID }: {
-  icon: IconName; label: string; onPress: () => void; accessibilityLabel?: string; testID?: string;
+export function ControlKey({ icon, label, onPress, onPressIn, onPressOut, active, glove, accessibilityLabel, accessibilityHint, testID }: {
+  icon: IconName; label: string; onPress?: () => void; onPressIn?: () => void; onPressOut?: () => void;
+  /** Pressed-and-talking state (demo `.ctl.talk`): solid `ok` fill. */
+  active?: boolean; glove?: boolean; accessibilityLabel?: string; accessibilityHint?: string; testID?: string;
 }) {
   const { road, roadType } = useTheme();
   const s = useStyles(({ road: r }) => ({
     key: { flex: 1, height: CONTROL_H, borderRadius: 24, backgroundColor: r.card, borderWidth: 2, borderColor: r.line2, alignItems: 'center', justifyContent: 'center', gap: 7 },
   }));
+  const fg = active ? '#FFFFFF' : road.ink;
   return (
     <PressableScale
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       haptic="select"
       scaleTo={0.95}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={active === undefined ? undefined : { selected: active }}
       testID={testID}
-      style={s.key}
+      style={[s.key, glove && { height: GLOVE_CONTROL_H }, active && { backgroundColor: road.ok, borderColor: road.ok }]}
     >
-      <Icon name={icon} size={30} color={road.ink} />
-      <Text style={[roadType.tab, { color: road.ink, fontSize: 11.5, lineHeight: 13, letterSpacing: 1.15 }]}>{label.toUpperCase()}</Text>
+      <Icon name={icon} size={30} color={fg} />
+      <Text style={[roadType.tab, { color: fg, fontSize: 11.5, lineHeight: 13, letterSpacing: 1.15 }]}>{label.toUpperCase()}</Text>
     </PressableScale>
   );
 }

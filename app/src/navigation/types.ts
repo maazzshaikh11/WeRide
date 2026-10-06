@@ -36,6 +36,6 @@ export type RootStackParamList = {
   // road
   Meetup: { groupId: string };
   Live: { groupId: string };
-  Stop: { groupId: string };
+  Stop: { groupId: string; stopId?: string };
   Arrive: { groupId: string };
 };

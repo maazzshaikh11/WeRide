@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigator from './navigation/RootNavigator';
 import SessionBootstrap from './navigation/SessionBootstrap';
 import RideLifecycleBridge from './navigation/RideLifecycleBridge';
+import GlobalToasts from './navigation/GlobalToasts';
 import { navigationRef } from './navigation/navigationRef';
 import OverlayHost from './overlays/OverlayHost';
 import SosListener from './overlays/SosListener';
@@ -86,6 +87,7 @@ export default function App() {
           <RideLifecycleBridge />
           <SosListener />
           <CrashWatcher />
+          <GlobalToasts />
           <OverlayHost />
         </ThemedNavigation>
       </ThemeProvider>

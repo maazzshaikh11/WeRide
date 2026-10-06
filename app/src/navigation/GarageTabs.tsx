@@ -107,7 +107,7 @@ export default function GarageTabs() {
   return (
     <Tab.Navigator tabBar={(props) => <GarageTabBar {...props} />} screenOptions={{ headerShown: false }}>
       {GARAGE_TABS.map((tab) => (
-        <Tab.Screen key={tab.name} name={tab.name} component={tab.component} options={{ tabBarAccessibilityLabel: `${tab.label} tab` }} />
+        <Tab.Screen key={tab.name} name={tab.name} component={tab.component as React.ComponentType<any>} options={{ tabBarAccessibilityLabel: `${tab.label} tab` }} />
       ))}
     </Tab.Navigator>
   );

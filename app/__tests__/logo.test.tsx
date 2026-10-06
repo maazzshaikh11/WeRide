@@ -58,22 +58,20 @@ describe('real logo', () => {
 });
 
 describe('<Logo>', () => {
-  it('renders logo.jpeg cropped to its tile, labelled WeRide', () => {
+  it('renders the background-free mark, labelled WeRide', () => {
     let tree!: renderer.ReactTestRenderer;
     act(() => {
-      tree = renderer.create(<Logo size={112.8} />);
+      tree = renderer.create(<Logo size={140} />);
     });
-    const box = tree.root.findByProps({ testID: 'weride-logo' });
-    expect(box.props.accessibilityLabel).toBe('WeRide');
-    const boxStyle = StyleSheet.flatten(box.props.style);
-    expect(boxStyle.width).toBeCloseTo(112.8);
-    expect(boxStyle.borderRadius).toBeCloseTo(112.8 * 0.224);
-    const img = tree.root.findByType(Image);
+    const img = tree.root.findByProps({ testID: 'weride-logo' });
+    expect(img.props.accessibilityLabel).toBe('WeRide');
+    expect(img.type).toBe(Image);
     expect(img.props.source).toBe(LOGO_SOURCE);
     const st = StyleSheet.flatten(img.props.style);
-    // the 1254px artwork is scaled so the 1128px tile fills the box
-    expect(st.width).toBeCloseTo((112.8 * 1254) / 1128);
-    expect(st.left).toBeCloseTo((-62 * 112.8) / 1128);
+    // mark fills the box: no tile, no background colour, aspect kept
+    expect(st.width).toBeCloseTo(140);
+    expect(st.height).toBeCloseTo(140 / (1046 / 723));
+    expect(st.backgroundColor).toBeUndefined();
     act(() => tree.unmount());
   });
 });

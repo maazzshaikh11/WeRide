@@ -3,7 +3,9 @@ import { StatusBar } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { RootStack } from './navigation/RootStack';
+import RootNavigator from './navigation/RootNavigator';
+import SessionBootstrap from './navigation/SessionBootstrap';
+import OverlayHost from './overlays/OverlayHost';
 import { ThemeProvider, useTheme } from './theme/ThemeProvider';
 import { initFirebase } from './services/firebaseService';
 import { initStorage } from './services/localStorage';
@@ -74,8 +76,10 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <ThemedNavigation>
+          <SessionBootstrap />
           <SyncBootstrap />
-          <RootStack />
+          <RootNavigator />
+          <OverlayHost />
         </ThemedNavigation>
       </ThemeProvider>
     </SafeAreaProvider>
